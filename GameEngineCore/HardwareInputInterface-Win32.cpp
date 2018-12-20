@@ -1,3 +1,4 @@
+#ifdef _WIN32
 #include "HardwareInputInterface.h"
 #include "CoreLib/Basic.h"
 #include <Windows.h>
@@ -58,3 +59,4 @@ namespace GameEngine
 		return new WindowsHardwareInputInterface(window);
 	}
 }
+#endif

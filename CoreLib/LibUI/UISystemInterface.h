@@ -186,7 +186,7 @@ namespace GraphicsUI
 
     class UIWindowContext : public CoreLib::RefObject {};
 
-	class ISystemInterface : public CoreLib::Object
+	class ISystemInterface : public CoreLib::RefObject
 	{
 	public:
 		virtual void SwitchCursor(GraphicsUI::CursorType cursor) = 0;

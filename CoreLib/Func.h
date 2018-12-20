@@ -11,7 +11,7 @@ namespace CoreLib
 		class FuncPtr
 		{
 		public:
-			virtual TResult operator()(Arguments...) = 0;
+			virtual TResult operator()(Arguments...) const = 0;
 			virtual bool operator == (const FuncPtr<TResult, Arguments...> *)
 			{
 				return false;
@@ -32,7 +32,7 @@ namespace CoreLib
 			{
 			}
 
-			virtual TResult operator()(Arguments... params) override
+			virtual TResult operator()(Arguments... params) const override
 			{
 				return funcPtr(params...);
 			}
@@ -61,7 +61,7 @@ namespace CoreLib
 			{
 			}
 
-			virtual TResult operator()(Arguments... params) override
+			virtual TResult operator()(Arguments... params) const override
 			{
 				return (object->*funcPtr)(params...);
 			}
@@ -85,7 +85,7 @@ namespace CoreLib
 			LambdaFuncPtr(const F & _func)
 				: func(_func)
 			{}
-			virtual TResult operator()(Arguments... params) override
+			virtual TResult operator()(Arguments... params) const override
 			{
 				return func(params...);
 			}
@@ -141,7 +141,7 @@ namespace CoreLib
 			{
 				return !(*this == f);
 			}
-			TResult operator()(Arguments... params)
+			TResult operator()(Arguments... params) const
 			{
 				return (*funcPtr)(params...);
 			}
@@ -200,7 +200,7 @@ namespace CoreLib
 			{
 				funcPtr = nullptr;
 			}
-			void operator()(Arguments... params)
+			void operator()(Arguments... params) const
 			{
 				if (funcPtr)
 					(*funcPtr)(params...);

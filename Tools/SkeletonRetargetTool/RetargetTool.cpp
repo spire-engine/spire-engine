@@ -2,7 +2,7 @@
 #include "CoreLib/WinForm/WinForm.h"
 #include "CoreLib/WinForm/WinApp.h"
 #include "CoreLib/LibUI/LibUI.h"
-#include "SystemWindow.h"
+#include "OS.h"
 
 using namespace CoreLib::WinForm;
 using namespace GameEngine;

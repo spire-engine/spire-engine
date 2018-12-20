@@ -1,9 +1,10 @@
 #include "TextIO.h"
+#if 0
 #ifdef _WIN32
 #include <Windows.h>
 #define CONVERT_END_OF_LINE
 #endif
-
+#endif
 namespace CoreLib
 {
 	namespace IO
@@ -213,6 +214,7 @@ namespace CoreLib
 			}
 			else
 			{
+#if 0
 #ifdef _WIN32
 				int flag = IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS | IS_TEXT_UNICODE_ASCII16;
 				int rs = IsTextUnicode(buffer.Buffer(), buffer.Count(), &flag);
@@ -226,6 +228,7 @@ namespace CoreLib
 						return Encoding::UTF8;
 				}
 #endif 
+#endif
 				return Encoding::UTF8;
 			}
 		}

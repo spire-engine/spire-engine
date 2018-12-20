@@ -35,7 +35,7 @@ namespace GameEngine
 		GraphicsUI::VScrollPanel * pnlProperties;
 		GraphicsUI::ListBox * lstActors = nullptr;
 		GraphicsUI::TextBox * txtName = nullptr;
-		RefPtr<CoreLib::WinForm::FileDialog> dlgOpen, dlgSave;
+		RefPtr<GameEngine::FileDialog> dlgOpen, dlgSave;
 		const Color uiGrayText = Color(180, 180, 180, 255);
 		void UpdatePropertyPanel()
 		{
@@ -179,12 +179,12 @@ namespace GameEngine
 			Color uiBackColor = Color(45, 45, 45, 255);
 			Global::Colors.EditableAreaBackColor = Color(35, 35, 35, 255);
 
-			dlgOpen = new CoreLib::WinForm::FileDialog(Engine::Instance()->GetMainWindow());
+            dlgOpen = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
 			dlgOpen->FileMustExist = true;
 			dlgOpen->Filter = "Level file|*.level";
 			dlgOpen->DefaultEXT = "level";
 			dlgOpen->FileName = Engine::Instance()->GetDirectory(false, ResourceType::Level) + "\\";
-			dlgSave = new CoreLib::WinForm::FileDialog(Engine::Instance()->GetMainWindow());
+			dlgSave = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
 			dlgSave->PathMustExist = true;
 			dlgSave->OverwritePrompt = true;
 			dlgSave->Filter = "Level file|*.level";

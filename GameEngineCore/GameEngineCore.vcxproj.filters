@@ -13,13 +13,11 @@
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="DynamicVariable.cpp" />
     <ClCompile Include="InputDispatcher.cpp" />
-    <ClCompile Include="HardwareInputInterface.cpp" />
     <ClCompile Include="TextureCompressor.cpp" />
     <ClCompile Include="TextureTool\LibSquish.cpp" />
     <ClCompile Include="GLAPI\GLHardwareRenderer.cpp">
       <Filter>Renderer\RenderAPI\GL API</Filter>
     </ClCompile>
-    <ClCompile Include="UISystem_Windows.cpp" />
     <ClCompile Include="MotionGraph.cpp" />
     <ClCompile Include="CatmullSpline.cpp" />
     <ClCompile Include="MeshBuilder.cpp" />
@@ -120,7 +118,6 @@
     <ClCompile Include="ArcBallCameraController.cpp">
       <Filter>Actors</Filter>
     </ClCompile>
-    <ClCompile Include="SystemWindow.cpp" />
     <ClCompile Include="LightingData.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
@@ -169,6 +166,21 @@
     <ClCompile Include="SimpleAnimationControllerActor.cpp">
       <Filter>Actors</Filter>
     </ClCompile>
+    <ClCompile Include="UISystemBase.cpp">
+      <Filter>OS</Filter>
+    </ClCompile>
+    <ClCompile Include="SystemWindow-Win32.cpp">
+      <Filter>OS\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="OS-Win32.cpp">
+      <Filter>OS\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="UISystem-Win32.cpp">
+      <Filter>OS\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="HardwareInputInterface-Win32.cpp">
+      <Filter>OS\Win32</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -192,10 +204,8 @@
       <Filter>Spire</Filter>
     </ClInclude>
     <ClInclude Include="InputDispatcher.h" />
-    <ClInclude Include="HardwareInputInterface.h" />
     <ClInclude Include="TextureCompressor.h" />
     <ClInclude Include="TextureTool\LibSquish.h" />
-    <ClInclude Include="UISystem_Windows.h" />
     <ClInclude Include="MotionGraph.h" />
     <ClInclude Include="CatmullSpline.h" />
     <ClInclude Include="MeshBuilder.h" />
@@ -264,7 +274,6 @@
     <ClInclude Include="ShaderCompiler.h">
       <Filter>Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="OS.h" />
     <ClInclude Include="EngineLimits.h" />
     <ClInclude Include="AsyncCommandBuffer.h">
       <Filter>Renderer</Filter>
@@ -307,7 +316,6 @@
     <ClInclude Include="ArcBallCameraController.h">
       <Filter>Actors</Filter>
     </ClInclude>
-    <ClInclude Include="SystemWindow.h" />
     <ClInclude Include="RenderProcedure.h" />
     <ClInclude Include="LightBinningPass.h">
       <Filter>Renderer\ComputePasses</Filter>
@@ -359,6 +367,21 @@
     <ClInclude Include="SimpleAnimationControllerActor.h">
       <Filter>Actors</Filter>
     </ClInclude>
+    <ClInclude Include="OS.h">
+      <Filter>OS</Filter>
+    </ClInclude>
+    <ClInclude Include="UISystemBase.h">
+      <Filter>OS</Filter>
+    </ClInclude>
+    <ClInclude Include="SystemWindow-Win32.h">
+      <Filter>OS\Win32</Filter>
+    </ClInclude>
+    <ClInclude Include="UISystem-Win32.h">
+      <Filter>OS\Win32</Filter>
+    </ClInclude>
+    <ClInclude Include="HardwareInputInterface.h">
+      <Filter>OS</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Spire">
@@ -399,6 +422,12 @@
     </Filter>
     <Filter Include="Editor">
       <UniqueIdentifier>{6ed8f88e-2daf-4a91-9f35-1fd1f5f141c1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OS">
+      <UniqueIdentifier>{abc5cc87-6512-417a-84ec-722b60ceb244}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OS\Win32">
+      <UniqueIdentifier>{2133fcad-31c4-46a6-b793-c47ee61c2391}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -99,14 +99,14 @@ namespace GameEngine
 	private:
 		ResourceType resType = ResourceType::Level;
 		String ext;
-		CoreLib::WinForm::FileDialog openDlg;
+		RefPtr<GameEngine::FileDialog> openDlg;
 		Label * lblName;
 		TextBox * txtValue;
 		Button * btnBrowse;
 		GenericProperty<CoreLib::String> * strProperty;
 	public:
 		ResourcePropertyEdit(Container * owner, Property * pTargetProperty, String attrib, SystemWindow * window)
-			: PropertyEdit(owner, pTargetProperty), openDlg(window)
+			: PropertyEdit(owner, pTargetProperty), openDlg(OsApplication::CreateFileDialog(window))
 		{
 			strProperty = (GenericProperty<CoreLib::String>*)pTargetProperty;
 			CoreLib::Text::TokenReader parser(attrib);
@@ -129,10 +129,10 @@ namespace GameEngine
 			else if (resourceType == "Landscape")
 				resType = ResourceType::Landscape; 
 
-			openDlg.Filter = resourceType + "|*." + ext;
-			openDlg.DefaultEXT = ext;
-			openDlg.FileMustExist = true;
-			openDlg.FileName = Engine::Instance()->GetDirectory(false, resType) + CoreLib::IO::Path::PathDelimiter;
+			openDlg->Filter = resourceType + "|*." + ext;
+			openDlg->DefaultEXT = ext;
+			openDlg->FileMustExist = true;
+			openDlg->FileName = Engine::Instance()->GetDirectory(false, resType) + CoreLib::IO::Path::PathDelimiter;
 			lblName = new Label(this);
 			lblName->Posit(0, 0, 200, 30);
 			lblName->SetText(targetProperty->GetName());
@@ -171,9 +171,9 @@ namespace GameEngine
 		}
 		void btnBrowse_Clicked(UI_Base *)
 		{
-			if (openDlg.ShowOpen())
+			if (openDlg->ShowOpen())
 			{
-				auto newPath = GetRelativePath(resType, openDlg.FileName);
+				auto newPath = GetRelativePath(resType, openDlg->FileName);
 				SetPropertyValue(newPath);
 			}
 		}

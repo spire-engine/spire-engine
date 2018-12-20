@@ -7,13 +7,12 @@
 #include "CoreLib/Tokenizer.h"
 #include "InputDispatcher.h"
 #include "CoreLib/LibUI/LibUI.h"
-#include "UISystem_Windows.h"
-#include "CoreLib/WinForm/Debug.h"
 #include "GraphicsSettings.h"
 #include "DrawCallStatForm.h"
-#include "SystemWindow.h"
 #include "LevelEditor.h"
+#include "HardwareRenderer.h"
 #include "OS.h"
+#include "UISystemBase.h"
 #include "VideoEncoder.h"
 
 namespace GameEngine
@@ -22,8 +21,8 @@ namespace GameEngine
     {
         bool EnableVideoCapture = false;
         bool DumpRenderStats = false;
-        String RenderStatsDumpFileName;
-        String Directory;
+        CoreLib::String RenderStatsDumpFileName;
+        CoreLib::String Directory;
         float Length = 10.0f;
         int FramesPerSecond = 30;
         int RunForFrames = 0; // run for this many frames and then terminate
@@ -69,7 +68,7 @@ namespace GameEngine
 		WindowBounds currentViewport;
 		GraphicsSettings graphicsSettings;
 		CoreLib::String levelToLoad;
-		CoreLib::List<CoreLib::List<RefPtr<Fence>>> fencePool;
+		CoreLib::List<CoreLib::List<CoreLib::RefPtr<Fence>>> fencePool;
 		CoreLib::List<CoreLib::List<Fence*>> syncFences;
 	private:
 		bool enableInput = true;
@@ -88,8 +87,8 @@ namespace GameEngine
 		CoreLib::Array<RenderStat, 16> renderStats;
 		GraphicsUI::CommandForm * uiCommandForm = nullptr;
 		DrawCallStatForm * drawCallStatForm = nullptr;
-		CoreLib::RefPtr<UIWindowsSystemInterface> uiSystemInterface;
-        void MainLoop(CoreLib::Object *, CoreLib::WinForm::EventArgs);
+		CoreLib::RefPtr<UISystemBase> uiSystemInterface;
+        void MainLoop();
 		bool OnToggleConsoleAction(const CoreLib::String & actionName, ActionInput input);
 		void Resize();
 		Engine() {};
@@ -122,6 +121,10 @@ namespace GameEngine
         int GetFrameId()
         {
             return frameCounter;
+        }
+        GraphicsUI::ISystemInterface* GetUISystemInterface()
+        {
+            return uiSystemInterface.Ptr();
         }
 		Level * GetLevel()
 		{
@@ -183,7 +186,6 @@ namespace GameEngine
 		}
 		void SetEngineMode(EngineMode newMode);
         SystemWindow * CreateSystemWindow(int log2BufferSize = 20);
-		int HandleWindowsMessage(SystemWindow * window, UINT message, WPARAM &wparam, LPARAM &lparam);
 	public:
 		int GpuId = 0;
 		bool RecompileShaders = false;
@@ -216,9 +218,9 @@ namespace GameEngine
 			{
 				printf(message, args...);
 			}
-			CoreLib::Diagnostics::Debug::Write(printBuffer);
+            OsApplication::DebugPrint(printBuffer);
 		}
-		static void SaveImage(Texture2D * texture, String fileName);
+		static void SaveImage(Texture2D * texture, CoreLib::String fileName);
 	};
 
 	template<typename ...Args>

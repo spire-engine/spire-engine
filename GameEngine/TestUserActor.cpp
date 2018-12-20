@@ -4,7 +4,7 @@
 #include "Engine.h"
 #include "Level.h"
 #include "CoreLib/LibUI/LibUI.h"
-#include "SystemWindow.h"
+#include "OS.h"
 #include "RendererService.h"
 
 using namespace GraphicsUI;
@@ -109,7 +109,6 @@ public:
         uiForm->SizeChanged();
         Engine::Instance()->GetInputDispatcher()->BindActionHandler("TestUserCtrl", [=](String, ActionInput)
         {
-            sysWindow->SetVisible(true);
             sysWindow->Show();
             return true; 
         });

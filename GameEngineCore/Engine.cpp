@@ -5,7 +5,8 @@
 #include "CoreLib/LibIO.h"
 #include "CoreLib/Tokenizer.h"
 #include "EngineLimits.h"
-#include "CoreLib/WinForm/WinApp.h"
+#include "CoreLib/Imaging/Bitmap.h"
+#include "UISystemBase.h"
 
 #ifndef DWORD
 typedef unsigned long DWORD;
@@ -33,7 +34,7 @@ namespace GameEngine
 
     }
 
-    void Engine::MainLoop(CoreLib::Object *, CoreLib::WinForm::EventArgs)
+    void Engine::MainLoop()
     {
         static int frameId = 0;
 
@@ -154,24 +155,24 @@ namespace GameEngine
 			currentViewport.height = args.Height;
 			syncFences.SetSize(DynamicBufferLengthMultiplier);
 			fencePool.SetSize(DynamicBufferLengthMultiplier);
-			uiSystemInterface = new UIWindowsSystemInterface(renderer->GetHardwareRenderer());
+			uiSystemInterface = dynamic_cast<UISystemBase*>(OsApplication::CreateUISystemInterface(renderer->GetHardwareRenderer()));
 			Global::Colors = CreateDarkColorTable();
 			
-           
             // create main window
-            mainWindow = new SystemWindow(uiSystemInterface.Ptr(), 22);
+            mainWindow = OsApplication::CreateSystemWindow(uiSystemInterface.Ptr(), 22);
+            mainWindow->GetUIEntry()->BackColor.A = 0;
             mainWindow->SetText("Game Engine");
-            mainWindow->OnResized.Bind([=](Object*, CoreLib::WinForm::EventArgs) 
+            mainWindow->SizeChanged.Bind([=]() 
             {
                 Engine::Instance()->Resize(); 
             });
 			mainWindow->SetClientWidth(args.Width);
 			mainWindow->SetClientHeight(args.Height);
             mainWindow->CenterScreen();
-            CoreLib::WinForm::Application::SetMainLoopEventHandler(new CoreLib::WinForm::NotifyEvent(this, &Engine::MainLoop));
+            OsApplication::SetMainLoopEventHandler([this]() {MainLoop(); });
 
             // initialize input dispatcher
-            inputDispatcher = new InputDispatcher(CreateHardwareInputInterface(mainWindow->GetHandle()));
+            inputDispatcher = new InputDispatcher(CreateHardwareInputInterface(mainWindow->GetNativeHandle()));
             auto bindingFile = Path::Combine(gameDir, "bindings.config");
             if (File::Exists(bindingFile))
                 inputDispatcher->LoadMapping(bindingFile);
@@ -229,7 +230,7 @@ namespace GameEngine
 		}
 		catch (const Exception & e)
 		{
-			MessageBox(NULL, e.Message.ToWString(), L"Error", MB_ICONEXCLAMATION);
+			OsApplication::ShowMessage(e.Message, "Error");
 			exit(1);
 		}
 	}
@@ -323,7 +324,7 @@ namespace GameEngine
 
         for (auto && sysWindow : uiSystemInterface->windowContexts)
         {
-            if (!sysWindow.Key->GetVisible())
+            if (!sysWindow.Key->IsVisible())
                 continue;
             auto uiEntry = sysWindow.Value->uiEntry.Ptr();
             auto uiCommands = uiEntry->DrawUI();
@@ -344,7 +345,7 @@ namespace GameEngine
 		syncFences[version].Clear();
 		for (auto && sysWindow : uiSystemInterface->windowContexts)
 		{
-			if (!sysWindow.Key->GetVisible())
+			if (!sysWindow.Key->IsVisible())
 				continue;
 			if (fencePool[version].Count() == fenceAlloc)
 				fencePool[version].Add(renderer->GetHardwareRenderer()->CreateFence());
@@ -488,27 +489,13 @@ namespace GameEngine
 
 	SystemWindow * Engine::CreateSystemWindow(int log2BufferSize)
     {
-        auto rs = new SystemWindow(uiSystemInterface.Ptr(), log2BufferSize);
-        rs->GetUIEntry()->BackColor = GraphicsUI::Color(50, 50, 50);
-        return rs;
+        return OsApplication::CreateSystemWindow(uiSystemInterface.Ptr(), log2BufferSize);
     }
-
-	int Engine::HandleWindowsMessage(SystemWindow * window, UINT message, WPARAM & wparam, LPARAM & lparam)
-	{
-        if (uiSystemInterface)
-        {
-			auto ret = uiSystemInterface->HandleSystemMessage(window, message, wparam, lparam);
-            return ret;
-        }
-        if (message == WM_PAINT)
-            return 0;
-		return -1;
-	}
 
 	Texture2D * Engine::GetRenderResult(bool withUI)
 	{
         if (withUI)
-            return mainWindow->GetUIContext()->uiOverlayTexture.Ptr();
+            return ((GameEngine::UIWindowContext*)mainWindow->GetUIContext())->uiOverlayTexture.Ptr();
 		else
 			return renderer->GetRenderedImage();
 	}
@@ -592,7 +579,7 @@ namespace GameEngine
 
     GraphicsUI::IFont * Engine::LoadFont(Font f)
     {
-        return uiSystemInterface->LoadFont(mainWindow->GetUIContext(), f);
+        return uiSystemInterface->LoadFont((GameEngine::UIWindowContext*)mainWindow->GetUIContext(), f);
     }
 
 	void Engine::UpdateLightProbes()
@@ -696,7 +683,7 @@ namespace GameEngine
 	}
     void Engine::Run()
     {
-        CoreLib::WinForm::Application::Run(Engine::Instance()->mainWindow.Ptr(), true);
+        OsApplication::Run(Engine::Instance()->mainWindow.Ptr());
     }
 	void Engine::Destroy()
 	{

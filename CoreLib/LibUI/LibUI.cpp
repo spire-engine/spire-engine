@@ -1,5 +1,4 @@
 #include "LibUI.h"
-#include "../WinForm/Debug.h"
 
 namespace GraphicsUI
 {
@@ -7234,7 +7233,6 @@ namespace GraphicsUI
         }
         else if (EnableZoom && (shift & SS_CONTROL) == SS_CONTROL)
         {
-            CoreLib::Diagnostics::Debug::WriteLine(String("delta ") + delta);
             if (delta > 0)
                 SetZoomLevel(zoomLevel + 1);
             else

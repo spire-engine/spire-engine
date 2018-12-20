@@ -9,7 +9,7 @@
 #include "Level.h"
 #include "RendererService.h"
 #include "CoreLib/LibUI/LibUI.h"
-#include "SystemWindow.h"
+#include "OS.h"
 #include "AnimationSynthesizer.h"
 #include "ArcBallCameraController.h"
 #include "CameraActor.h"
@@ -234,17 +234,17 @@ public:
 	{
 		if (!sourceModel)
 		{
-			Engine::Instance()->GetMainWindow()->MessageBox("Please load source model first.", "Error", MB_ICONEXCLAMATION);
+			Engine::Instance()->GetMainWindow()->ShowMessage("Please load source model first.", "Error");
 			return;
 		}
-		WinForm::FileDialog dlg(Engine::Instance()->GetMainWindow());
-		dlg.Filter = "Skeleton|*.skeleton|All Files|*.*";
-		if (dlg.ShowOpen())
+		RefPtr<GameEngine::FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+		dlg->Filter = "Skeleton|*.skeleton|All Files|*.*";
+		if (dlg->ShowOpen())
 		{
 			Engine::Instance()->GetRenderer()->Wait();
 			Matrix4::Translation(targetSkeletonTransform, 200.0f, 0.0f, 0.0f);
 			targetSkeleton = new Skeleton();
-			targetSkeleton->LoadFromFile(dlg.FileName);
+			targetSkeleton->LoadFromFile(dlg->FileName);
 			targetSkeletonMesh.FromSkeleton(targetSkeleton.Ptr(), 6.0f);
 			targetSkeletonDrawable = nullptr;
 			targetSkeletonMaterial.SetVariable("highlightId", -1);
@@ -294,25 +294,25 @@ public:
 
 	void LoadAnimation(GraphicsUI::UI_Base *)
 	{
-		WinForm::FileDialog dlg(Engine::Instance()->GetMainWindow());
-		dlg.Filter = "Animation|*.anim|All Files|*.*";
-		if (dlg.ShowOpen())
+		RefPtr<GameEngine::FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+		dlg->Filter = "Animation|*.anim|All Files|*.*";
+		if (dlg->ShowOpen())
 		{
-			currentAnim.LoadFromFile(dlg.FileName);
+			currentAnim.LoadFromFile(dlg->FileName);
 			scTimeline->SetValue(0, (int)(currentAnim.Duration * 30.0f), 0, 1);
 		}
 	}
 
 	void LoadSourceModel(GraphicsUI::UI_Base *)
 	{
-		WinForm::FileDialog dlg(Engine::Instance()->GetMainWindow());
-		dlg.Filter = "Model|*.model|All Files|*.*";
-		if (dlg.ShowOpen())
+        RefPtr<GameEngine::FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+		dlg->Filter = "Model|*.model|All Files|*.*";
+		if (dlg->ShowOpen())
 		{
 			Engine::Instance()->GetRenderer()->Wait();
 
 			sourceModel = new Model();
-			sourceModel->LoadFromFile(level, dlg.FileName);
+			sourceModel->LoadFromFile(level, dlg->FileName);
 			sourceModelInstance.Drawables.Clear();
 			sourceSkeletonMesh.FromSkeleton(sourceModel->GetSkeleton(), 5.0f);
 			sourceSkeletonDrawable = nullptr;
@@ -342,32 +342,32 @@ public:
 
 	void Save(GraphicsUI::UI_Base *)
 	{
-		WinForm::FileDialog dlg(Engine::Instance()->GetMainWindow());
-		dlg.Filter = "Retarget File|*.retarget|All Files|*.*";
-		dlg.DefaultEXT = "retarget";
-		if (dlg.ShowSave())
+        RefPtr<GameEngine::FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+		dlg->Filter = "Retarget File|*.retarget|All Files|*.*";
+		dlg->DefaultEXT = "retarget";
+		if (dlg->ShowSave())
 		{
-			retargetFile.SaveToFile(dlg.FileName);
+			retargetFile.SaveToFile(dlg->FileName);
 		}
 	}
 
 	void Open(GraphicsUI::UI_Base *)
 	{
-		WinForm::FileDialog dlg(Engine::Instance()->GetMainWindow());
-		dlg.Filter = "Retarget File|*.retarget|All Files|*.*";
-		dlg.DefaultEXT = "retarget";
+        RefPtr<GameEngine::FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+		dlg->Filter = "Retarget File|*.retarget|All Files|*.*";
+		dlg->DefaultEXT = "retarget";
 		if (sourceModel && targetSkeleton)
 		{
-			if (dlg.ShowOpen())
+			if (dlg->ShowOpen())
 			{
 				RetargetFile file;
-				file.LoadFromFile(dlg.FileName);
+				file.LoadFromFile(dlg->FileName);
 				bool isValid = true;
 				for (auto id : file.ModelBoneIdToAnimationBoneId)
 					if (id >= targetSkeleton->Bones.Count())
 						isValid = false;
 				if (!isValid || file.ModelBoneIdToAnimationBoneId.Count() != sourceModel->GetSkeleton()->Bones.Count())
-					Engine::Instance()->GetMainWindow()->MessageBox("This retarget file does not match the current model / target skeleton.", "Error", MB_ICONEXCLAMATION);
+					Engine::Instance()->GetMainWindow()->ShowMessage("This retarget file does not match the current model / target skeleton.", "Error");
 				else
 				{
 					retargetFile = file;
@@ -380,7 +380,7 @@ public:
 			}
 		}
 		else
-			Engine::Instance()->GetMainWindow()->MessageBox("Please load source model and target skeleton first.", "Error", MB_ICONEXCLAMATION);
+			Engine::Instance()->GetMainWindow()->ShowMessage("Please load source model and target skeleton first.", "Error");
 	}
 	
 	bool disableTextChange = false;

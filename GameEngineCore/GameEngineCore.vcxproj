@@ -184,7 +184,7 @@
     <ClCompile Include="GizmoActor.cpp" />
     <ClCompile Include="GLAPI\GLHardwareRenderer.cpp" />
     <ClCompile Include="GraphicsSettings.cpp" />
-    <ClCompile Include="HardwareInputInterface.cpp" />
+    <ClCompile Include="HardwareInputInterface-Win32.cpp" />
     <ClCompile Include="ImageLayoutTransferTaskPool.cpp" />
     <ClCompile Include="InputDispatcher.cpp" />
     <ClCompile Include="Level.cpp" />
@@ -197,6 +197,7 @@
     <ClCompile Include="MeshBuilder.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="MotionGraph.cpp" />
+    <ClCompile Include="OS-Win32.cpp" />
     <ClCompile Include="OutlinePostRenderPass.cpp" />
     <ClCompile Include="Physics.cpp" />
     <ClCompile Include="PipelineContext.cpp" />
@@ -216,12 +217,13 @@
     <ClCompile Include="SSAO.cpp" />
     <ClCompile Include="StandardRenderProcedure.cpp" />
     <ClCompile Include="StaticMeshActor.cpp" />
-    <ClCompile Include="SystemWindow.cpp" />
+    <ClCompile Include="SystemWindow-Win32.cpp" />
     <ClCompile Include="TerrainActor.cpp" />
     <ClCompile Include="TextureCompressor.cpp" />
     <ClCompile Include="TextureTool\LibSquish.cpp" />
     <ClCompile Include="ToneMappingActor.cpp" />
-    <ClCompile Include="UISystem_Windows.cpp" />
+    <ClCompile Include="UISystemBase.cpp" />
+    <ClCompile Include="UISystem-Win32.cpp" />
     <ClCompile Include="VideoEncoder.cpp" />
     <ClCompile Include="View.cpp" />
     <ClCompile Include="ViewResource.cpp" />
@@ -303,7 +305,7 @@
     <ClInclude Include="SSAO.h" />
     <ClInclude Include="StandardViewUniforms.h" />
     <ClInclude Include="StaticMeshActor.h" />
-    <ClInclude Include="SystemWindow.h" />
+    <ClInclude Include="SystemWindow-Win32.h" />
     <ClInclude Include="TerrainActor.h" />
     <ClInclude Include="TextureCompressor.h" />
     <ClInclude Include="TextureTool\LibSquish.h" />
@@ -313,7 +315,8 @@
     </ClCompile>
     <ClInclude Include="ToneMapping.h" />
     <ClInclude Include="ToneMappingActor.h" />
-    <ClInclude Include="UISystem_Windows.h" />
+    <ClInclude Include="UISystemBase.h" />
+    <ClInclude Include="UISystem-Win32.h" />
     <ClInclude Include="VideoEncoder.h" />
     <ClInclude Include="View.h" />
     <ClInclude Include="ViewResource.h" />

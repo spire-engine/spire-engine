@@ -21,6 +21,7 @@
 
 using namespace GameEngine;
 using namespace CoreLib::IO;
+using namespace CoreLib;
 
 namespace VK
 {

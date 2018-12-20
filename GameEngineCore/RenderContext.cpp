@@ -603,7 +603,7 @@ namespace GameEngine
 		spEnvLoadModuleLibrary(sharedSpireEnvironment, defShaderFile.Buffer(), spireSink);
 		if (spDiagnosticSinkHasAnyErrors(spireSink))
 		{
-			Diagnostics::Debug::WriteLine(GetSpireOutput(spireSink));
+			OsApplication::DebugWriteLine(GetSpireOutput(spireSink).Buffer());
 			throw HardwareRendererException("shader compilation error.");
 		}
 	}

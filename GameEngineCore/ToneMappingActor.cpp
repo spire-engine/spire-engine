@@ -1,6 +1,9 @@
 #include "ToneMappingActor.h"
 #include "CoreLib/LibIO.h"
 #include "Engine.h"
+
+using namespace CoreLib;
+
 namespace GameEngine
 {
     void ToneMappingActor::ColorLUT_Changing(CoreLib::String & newFileName)

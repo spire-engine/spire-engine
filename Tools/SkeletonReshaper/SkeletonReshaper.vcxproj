@@ -23,7 +23,7 @@
     <ProjectGuid>{11C0D805-6E17-4B9A-8A9F-729AF6B0E56A}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>SkeletonReshaper</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
