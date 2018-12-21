@@ -101,7 +101,6 @@ namespace GameEngine
         FrameBuffer * CreateFrameBuffer(Texture2D * texture);
         CoreLib::RefPtr<UIWindowContext> CreateWindowContext(SystemWindow* handle, int w, int h, int log2BufferSize);
         void UnregisterWindowContext(UIWindowContext * ctx);
-        virtual GraphicsUI::IFont * LoadFont(UIWindowContext * ctx, const Font & f) = 0;
     };
 }
 

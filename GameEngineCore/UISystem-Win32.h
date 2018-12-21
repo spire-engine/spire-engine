@@ -26,7 +26,7 @@ namespace GameEngine
 		void UpdateCompositionWindowPos(HIMC hIMC, int x, int y);
 	public:
         Win32UISystem(HardwareRenderer * ctx);
-        virtual GraphicsUI::IFont * LoadFont(UIWindowContext * ctx, const Font & f) override;
+        GraphicsUI::IFont * LoadFont(UIWindowContext * ctx, const Font & f);
 		int HandleSystemMessage(SystemWindow* window, UINT message, WPARAM &wParam, LPARAM &lParam);
 	};
 }
