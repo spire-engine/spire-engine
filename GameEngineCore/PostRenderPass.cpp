@@ -18,7 +18,7 @@ namespace GameEngine
 		pipelineBuilder->SetVertexLayout(deferredVertexFormat);
 		ShaderCompilationResult rs;
 		auto shaderFileName = GetShaderFileName();
-        auto compiledShader = CompileShader(renderer->GetHardwareRenderer(), shaderFileName);
+        auto compiledShader = CompileGraphicsShader(renderer->GetHardwareRenderer(), shaderFileName);
 		if (!compiledShader)
 			throw HardwareRendererException("Shader compilation failure");
 

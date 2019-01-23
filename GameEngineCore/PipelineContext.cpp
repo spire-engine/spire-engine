@@ -103,36 +103,33 @@ namespace GameEngine
             ShaderEntryPoint * entryPoint;
             ShaderType shaderType;
         };
-        const CompilationTask tasks[] = { {vertexShaderEntryPoint, ShaderType::VertexShader}, {fragmentShaderEntryPoint, ShaderType::FragmentShader} };
         RefPtr<PipelineClass> pipelineClass = new PipelineClass();
         static int pipelineClassId = 0;
         pipelineClassId++;
         pipelineClass->Id = pipelineClassId;
+        Array<ShaderEntryPoint*, 2> entryPoints;
+        entryPoints.SetSize(2);
+        entryPoints[0] = vertexShaderEntryPoint;
+        entryPoints[1] = fragmentShaderEntryPoint;
 		List<RefPtr<DescriptorSetLayout>> descSetLayouts;
-        for (auto task : tasks)
+        ShaderCompilationResult compileRs;
+        Engine::GetShaderCompiler()->CompileShader(compileRs, entryPoints.GetArrayView(), &env);
+        auto vsObj = hwRenderer->CreateShader(ShaderType::VertexShader, compileRs.ShaderCode[0].Buffer(), compileRs.ShaderCode[0].Count());
+        auto fsObj = hwRenderer->CreateShader(ShaderType::FragmentShader, compileRs.ShaderCode[1].Buffer(), compileRs.ShaderCode[1].Count());
+        pipelineClass->shaders.Add(vsObj);
+        pipelineClass->shaders.Add(fsObj);
+
+        for (auto & descSet : compileRs.BindingLayouts)
         {
-            ShaderCompilationResult compileRs;
-            Engine::GetShaderCompiler()->CompileShader(compileRs, Engine::Instance()->GetRenderer()->GetHardwareRenderer()->GetShadingLanguage(),
-                task.shaderType, task.entryPoint, &env);
-            for (auto & diag : compileRs.Diagnostics)
-            {
-                Print("%S(%d): %S\n", String(diag.FileName).ToWString(), diag.Line, String(diag.Message).ToWString());
-            }
-            auto shaderObj = hwRenderer->CreateShader(tasks->shaderType, compileRs.ShaderCode.Buffer(), compileRs.ShaderCode.Count());
-            pipelineClass->shaders.Add(shaderObj);
+            if (descSet.Value.BindingPoint == -1)
+                continue;
+            for (auto & desc : descSet.Value.Descriptors)
+                desc.Stages = (StageFlags)(StageFlags::sfVertex | StageFlags::sfFragment);
+            auto layout = hwRenderer->CreateDescriptorSetLayout(descSet.Value.Descriptors.GetArrayView());
+            if (descSet.Value.BindingPoint >= descSetLayouts.Count())
+                descSetLayouts.SetSize(descSet.Value.BindingPoint + 1);
+            descSetLayouts[descSet.Value.BindingPoint] = layout;
 
-            for (auto & descSet : compileRs.BindingLayouts)
-            {
-                if (descSet.Value.BindingPoint == -1)
-                    continue;
-                for (auto & desc : descSet.Value.Descriptors)
-                    desc.Stages = (StageFlags)(StageFlags::sfVertex | StageFlags::sfFragment);
-                auto layout = hwRenderer->CreateDescriptorSetLayout(descSet.Value.Descriptors.GetArrayView());
-                if (descSet.Value.BindingPoint >= descSetLayouts.Count())
-                    descSetLayouts.SetSize(descSet.Value.BindingPoint + 1);
-                descSetLayouts[descSet.Value.BindingPoint] = layout;
-
-            }
         }
 		pipelineBuilder->SetShaders(From(pipelineClass->shaders).Select([](const RefPtr<Shader>& s) {return s.Ptr(); }).ToList().GetArrayView());
 		pipelineBuilder->SetBindingLayout(From(descSetLayouts).Select([](auto x) {return x.Ptr(); }).ToList().GetArrayView());

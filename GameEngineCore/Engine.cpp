@@ -246,6 +246,7 @@ namespace GameEngine
         mainWindow = nullptr;
 		uiSystemInterface = nullptr;
 		renderer = nullptr;
+        shaderCompiler = nullptr;
 	}
 
 	void Engine::SaveGraphicsSettings()

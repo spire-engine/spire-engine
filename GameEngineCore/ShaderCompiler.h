@@ -6,19 +6,10 @@
 
 namespace GameEngine
 {
-	class ShaderCompilationError
-	{
-	public:
-		CoreLib::String Message;
-		CoreLib::String FileName;
-		int Line, Col;
-	};
-
 	struct DescriptorSetInfo
 	{
 		CoreLib::List<DescriptorLayout> Descriptors;
 		int BindingPoint;
-		CoreLib::String BindingName;
 	};
 
     enum class ShaderVariableType
@@ -41,7 +32,7 @@ namespace GameEngine
         CoreLib::String FileName;
         uint32_t TypeId;
         int UniformBufferSize = 0;
-        CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::RefPtr<ShaderVariableLayout>> VarLayouts;
+        CoreLib::EnumerableDictionary<CoreLib::String, ShaderVariableLayout> VarLayouts;
         bool HasMember(CoreLib::String memberName)
         {
             return VarLayouts.ContainsKey(memberName);
@@ -52,17 +43,17 @@ namespace GameEngine
     {
         CoreLib::String FileName;
         CoreLib::String FunctionName;
+        StageFlags Stage;
         uint32_t Id;
     };
 
 	class ShaderCompilationResult
 	{
 	public:
-        TargetShadingLanguage Language;
-		CoreLib::List<char> ShaderCode;
-		CoreLib::List<ShaderCompilationError> Diagnostics;
+		CoreLib::List<CoreLib::List<char>> ShaderCode;
+		CoreLib::String Diagnostics;
 		CoreLib::EnumerableDictionary<CoreLib::String, DescriptorSetInfo> BindingLayouts;
-	};
+    };
 
     class ShaderCompilationEnvironment : public CoreLib::RefObject
     {
@@ -74,14 +65,10 @@ namespace GameEngine
     {
     public:
         virtual bool CompileShader(ShaderCompilationResult & src,
-            TargetShadingLanguage targetLang,
-            ShaderType shaderType,
-            const ShaderEntryPoint* entryPoint,
+            const CoreLib::ArrayView<ShaderEntryPoint*> entryPoints,
             const ShaderCompilationEnvironment* env = nullptr) = 0;
-        virtual ShaderTypeSymbol* LoadSystemTypeSymbol(CoreLib::String TypeName) = 0;
-        virtual ShaderTypeSymbol* LoadTypeSymbol(CoreLib::String fileName, CoreLib::String TypeName) = 0;
-        virtual ShaderTypeSymbol* CreateTypeSymbol(CoreLib::String TypeName, CoreLib::String src) = 0;
-        virtual ShaderTypeSymbol* LookupTypeSymbol(CoreLib::String TypeName) = 0;
+        virtual ShaderTypeSymbol* LoadSystemTypeSymbol(CoreLib::String typeName) = 0;
+        virtual ShaderTypeSymbol* LoadTypeSymbol(CoreLib::String fileName, CoreLib::String typeName) = 0;
         virtual ShaderEntryPoint* LoadShaderEntryPoint(CoreLib::String fileName, CoreLib::String functionName) = 0;
     };
 
@@ -95,7 +82,7 @@ namespace GameEngine
             return vertexShader && fragmentShader;
         }
     };
-    ShaderSet CompileShader(HardwareRenderer * hw, CoreLib::String fileName);
+    ShaderSet CompileGraphicsShader(HardwareRenderer * hw, CoreLib::String fileName);
 }
 
 #endif

@@ -257,9 +257,9 @@ namespace GameEngine
 			EnumerableDictionary<String, DynamicVariable*> vars;
 			for (auto v : module->VarLayouts)
 			{
-				if (v.Value->Type != ShaderVariableType::Data)
+				if (v.Value.Type != ShaderVariableType::Data)
 				{
-					bindingLocs[v.Key] = v.Value->BindingOffset;
+					bindingLocs[v.Key] = v.Value.BindingOffset;
 				}
 				else
 				{
@@ -491,11 +491,11 @@ namespace GameEngine
 				descs.Add(DescriptorLayout(GameEngine::StageFlags(sfGraphics | sfCompute), 0, BindingType::UniformBuffer));
 			for (auto & v : typeSymbol->VarLayouts)
 			{
-				if (v.Value->Type != ShaderVariableType::Data)
+				if (v.Value.Type != ShaderVariableType::Data)
 				{
 					DescriptorLayout descLayout;
 					descLayout.Location = descs.Count();
-					switch (v.Value->Type)
+					switch (v.Value.Type)
 					{
                     case ShaderVariableType::Texture:
 						descLayout.Type = BindingType::Texture;

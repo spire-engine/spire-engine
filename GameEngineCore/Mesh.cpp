@@ -103,83 +103,28 @@ namespace GameEngine
 	ShaderTypeSymbol * MeshVertexFormat::GetTypeSymbol()
 	{
 		StringBuilder sbName;
-		sbName << "VertexAttributes_" << String((unsigned int)this->GetTypeId(), 36);
-		auto name = sbName.ToString();
-		if (auto rs = Engine::GetShaderCompiler()->LookupTypeSymbol(name.Buffer()))
-			return rs;
-		if (shaderDef.Length() == 0)
-		{
-			StringBuilder sb;
-			sb << "module " << name << "\n{\n";
-			sb << "public @MeshVertex vec3 vertPos;\n";
-			for (auto i = 0u; i < key.fields.numUVs; i++)
-				sb << "public @MeshVertex vec2 vertUV" << i << ";\n";
-			for (auto i = key.fields.numUVs; i < 8; i++)
-				sb << "public inline vec2 vertUV" << i << " = vec2(0.0);\n";
-			sb << "public vec2 vertUV = vertUV0;\n";
-			if (key.fields.hasTangent)
-			{
-				sb << R"(
-				@MeshVertex uint tangentFrame;
-				vec4 tangentFrameQuaternion
-				{
-					vec4 result;
-					float inv255 = 2.0 / 255.0;
-					result.x = float(tangentFrame & 255) * inv255 - 1.0;
-					result.y = float((tangentFrame >> 8) & 255) * inv255 - 1.0;
-					result.z = float((tangentFrame >> 16) & 255) * inv255 - 1.0;
-					result.w = float((tangentFrame >> 24) & 255) * inv255 - 1.0;
-					return result;
-				}
-				public @CoarseVertex float binormalSign = sign(tangentFrameQuaternion.w);
-				public @CoarseVertex vec3 vertNormal
-				{
-					return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(0.0, 1.0, 0.0)));
-				}
-				public @CoarseVertex vec3 vertTangent
-				{
-					return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(1.0, 0.0, 0.0)));
-				}
-				public vec3 vertBinormal = cross(vertTangent, vertNormal);
-				)";
-			}
-			else
-			{
-				sb << R"(
-				public @CoarseVertex vec3 vertNormal = vec3(0.0, 1.0, 0.0);
-				public @CoarseVertex vec3 vertTangent = vec3(1.0, 0.0, 0.0);
-				public vec3 vertBinormal = vec3(0.0, 0.0, 1.0);
-				)";
-			}
-			for (auto i = 0u; i < key.fields.numColors; i++)
-				sb << "public @MeshVertex vec4 vertColor" << i << ";\n";
-			for (auto i = key.fields.numColors; i < 8; i++)
-				sb << "public inline vec4 vertColor" << i << " = vec4(0.0);\n";
-			if (key.fields.hasSkinning)
-			{
-				sb << "public @MeshVertex uint boneIds;\n";
-				sb << "public @MeshVertex uint packedBoneWeights;\n";
-			}
-			else
-			{
-				sb << "public inline uint boneIds = 255;\n";
-				sb << "public inline uint packedBoneWeights = 0;\n";
-			}
-			sb << R"(
-			public @CoarseVertex vec4 boneWeights
-			{
-				vec4 rs;
-				rs.x = float((packedBoneWeights >> (0*8)) & 255) * (1.0/255.0);
-				rs.y = float((packedBoneWeights >> (1*8)) & 255) * (1.0/255.0);
-				rs.z = float((packedBoneWeights >> (2*8)) & 255) * (1.0/255.0);
-				rs.w = float((packedBoneWeights >> (3*8)) & 255) * (1.0/255.0);
-				return rs;
-			}
-			)";
-			sb << "}\n";
-			shaderDef = sb.ProduceString();
-		}
-        return Engine::GetShaderCompiler()->CreateTypeSymbol(name, shaderDef);
+		sbName << "StandardVertexFormat<";
+        if (key.fields.numUVs == 0)
+            sbName << "NoVertexUVSet";
+        else if (key.fields.numUVs == 1)
+            sbName << "SingleVertexUVSet";
+        else
+            sbName << "ArrayVertexUVSet<" << key.fields.numUVs << ">";
+        sbName << ",";
+        if (key.fields.numColors == 0)
+            sbName << "NoVertexColorSet";
+        else if (key.fields.numColors == 1)
+            sbName << "SingleVertexColorSet";
+        else
+            sbName << "ArrayVertexColorSet<" << key.fields.numColors << ">";
+        sbName << ",";
+        if (key.fields.hasSkinning)
+            sbName << "StandardBoneWeightSet";
+        else
+            sbName << "NoBoneWeightSet";
+        sbName << ">";
+        auto name = sbName.ToString();
+        return Engine::GetShaderCompiler()->LoadSystemTypeSymbol(name);
 	}
 	
 	struct SkeletonMeshVertex

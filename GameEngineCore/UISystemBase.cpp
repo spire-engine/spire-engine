@@ -260,7 +260,7 @@ namespace GameEngine
             clipRect = Vec4::Create(0.0f, 0.0f, 1e20f, 1e20f);
             rendererApi = hw;
 
-            auto shaderSet = CompileShader(hw, "UberUIShader.slang");
+            auto shaderSet = CompileGraphicsShader(hw, "UberUIShader.slang");
 
             if (!shaderSet.fragmentShader)
             {

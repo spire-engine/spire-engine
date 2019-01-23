@@ -690,7 +690,7 @@ namespace GameEngine
 
 	enum StageFlags
 	{
-		sfGraphics = 3, sfVertex = 1, sfFragment = 2, sfCompute = 8
+		sfNone = 0, sfGraphics = 3, sfVertex = 1, sfFragment = 2, sfCompute = 8
 	};
 
 	struct DescriptorLayout
