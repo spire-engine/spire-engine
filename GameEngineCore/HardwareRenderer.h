@@ -698,17 +698,12 @@ namespace GameEngine
 		int Location; //> location in the descritpor set
 		StageFlags Stages = sfGraphics;
 		BindingType Type; //< type of the resource binding this descriptor is about
-						  // LegacyBindingPoint is used by OpenGL renderer so that it knows what actual binding point this descriptor maps to.
-						  // This information is provided by the shader compiler.
-		CoreLib::List<int> LegacyBindingPoints;
 		DescriptorLayout() {}
-		DescriptorLayout(StageFlags stage,int loc, BindingType type, int legacyBinding = -1)
+		DescriptorLayout(StageFlags stage,int loc, BindingType type)
 		{
 			Stages = stage;
 			Location = loc;
 			Type = type;
-			if (legacyBinding != -1)
-				LegacyBindingPoints.Add(legacyBinding);
 		}
 	};
 
@@ -829,6 +824,12 @@ namespace GameEngine
 		int width, height;
 	};
 
+    enum class TargetShadingLanguage
+    {
+        SPIRV, HLSL
+    };
+
+
 	class HardwareRenderer : public CoreLib::RefObject
 	{
 	protected:
@@ -863,7 +864,7 @@ namespace GameEngine
 		virtual DescriptorSet* CreateDescriptorSet(DescriptorSetLayout* layout) = 0;
 		virtual int GetDescriptorPoolCount() = 0;
 		virtual CommandBuffer* CreateCommandBuffer() = 0;
-		virtual int GetSpireTarget() = 0;
+		virtual TargetShadingLanguage GetShadingLanguage() = 0;
 		virtual int UniformBufferAlignment() = 0;
 		virtual int StorageBufferAlignment() = 0;
         virtual WindowSurface * CreateSurface(void * windowHandle, int width, int height) = 0;
@@ -872,7 +873,6 @@ namespace GameEngine
 	};
 
 	// HardwareRenderer instance constructors
-	HardwareRenderer* CreateGLHardwareRenderer();
 	HardwareRenderer* CreateVulkanHardwareRenderer(int gpuId);
 }
 

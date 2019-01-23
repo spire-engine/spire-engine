@@ -37,7 +37,7 @@ namespace GameEngine
 		{
 			auto gizmoMesh = level->LoadMesh(gizmoName, mesh);
 			gizmoMaterial = *(level->LoadMaterial("Gizmo.material"));
-			gizmoMaterial.SetVariable("solidColor", DynamicVariable(Vec3::Create(0.3f, 0.3f, 1.0f)));
+			gizmoMaterial.SetVariable("solidColor", DynamicVariable(Vec4::Create(0.3f, 0.3f, 1.0f, 0.6f)));
 			model = new GameEngine::Model(gizmoMesh, &gizmoMaterial);
             physInstance = model->CreatePhysicsInstance(level->GetPhysicsScene(), ownerActor, nullptr, PhysicsChannels::Visiblity);
             if (modelInstance.Drawables.Count())
@@ -54,8 +54,7 @@ namespace GameEngine
 		}
 		void SetColor(VectorMath::Vec4 color)
 		{
-			gizmoMaterial.SetVariable("solidColor", color.xyz());
-			gizmoMaterial.SetVariable("alpha", color.w);
+			gizmoMaterial.SetVariable("solidColor", color);
 		}
 		void GetDrawables(const GetDrawablesParameter & params)
 		{

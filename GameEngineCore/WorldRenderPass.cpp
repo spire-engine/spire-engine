@@ -7,7 +7,7 @@ namespace GameEngine
 {
 	void WorldRenderPass::Bind()
 	{
-		sharedRes->pipelineManager.BindShader(shader, renderTargetLayout.Ptr(), &fixedFunctionStates);
+		sharedRes->pipelineManager.BindEntryPoint(vertShader, fragShader, renderTargetLayout.Ptr(), &fixedFunctionStates);
 	}
 
 	CoreLib::RefPtr<WorldPassRenderTask> WorldRenderPass::CreateInstance(RenderOutput * output, bool clearOutput)
@@ -30,7 +30,7 @@ namespace GameEngine
 
 	int WorldRenderPass::GetShaderId()
 	{
-		return spShaderGetId(shader);
+		return fragShader->Id;
 	}
 
 	AsyncCommandBuffer * WorldRenderPass::AllocCommandBuffer()
@@ -45,9 +45,10 @@ namespace GameEngine
 	void WorldRenderPass::Create(Renderer * renderer)
 	{
 		renderTargetLayout = CreateRenderTargetLayout();
-		shader = sharedRes->LoadSpireShader(GetName(), GetShaderSource());
-		SetPipelineStates(fixedFunctionStates);
-		renderPassId = renderer->RegisterWorldRenderPass(shader);
+        vertShader = Engine::GetShaderCompiler()->LoadShaderEntryPoint(GetShaderFileName(), "vs_main");
+        fragShader = Engine::GetShaderCompiler()->LoadShaderEntryPoint(GetShaderFileName(), "ps_main");
+        SetPipelineStates(fixedFunctionStates);
+		renderPassId = renderer->RegisterWorldRenderPass(GetShaderId());
 	}
 	WorldRenderPass::~WorldRenderPass()
 	{

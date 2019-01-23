@@ -6,19 +6,12 @@
     <ClCompile Include="VulkanAPI\vkel.c">
       <Filter>Renderer\RenderAPI\Vulkan API</Filter>
     </ClCompile>
-    <ClCompile Include="..\CoreLib\LibGL\glew\glew.c">
-      <Filter>Renderer\RenderAPI\OpenGL API</Filter>
-    </ClCompile>
     <ClCompile Include="Level.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="DynamicVariable.cpp" />
     <ClCompile Include="InputDispatcher.cpp" />
     <ClCompile Include="TextureCompressor.cpp" />
     <ClCompile Include="TextureTool\LibSquish.cpp" />
-    <ClCompile Include="GLAPI\GLHardwareRenderer.cpp">
-      <Filter>Renderer\RenderAPI\GL API</Filter>
-    </ClCompile>
-    <ClCompile Include="MotionGraph.cpp" />
     <ClCompile Include="CatmullSpline.cpp" />
     <ClCompile Include="MeshBuilder.cpp" />
     <ClCompile Include="Actor.cpp">
@@ -58,9 +51,6 @@
       <Filter>Renderer</Filter>
     </ClCompile>
     <ClCompile Include="GraphicsSettings.cpp" />
-    <ClCompile Include="SpireSource.cpp">
-      <Filter>Spire</Filter>
-    </ClCompile>
     <ClCompile Include="RenderPassRegistry.h">
       <Filter>Renderer</Filter>
     </ClCompile>
@@ -143,9 +133,6 @@
     <ClCompile Include="LevelEditor.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
-    <ClCompile Include="AnimationVisualizationActor.cpp">
-      <Filter>Actors</Filter>
-    </ClCompile>
     <ClCompile Include="Gizmo.cpp" />
     <ClCompile Include="LightActor.cpp">
       <Filter>Actors</Filter>
@@ -157,12 +144,10 @@
     <ClCompile Include="OutlinePostRenderPass.cpp">
       <Filter>Renderer\PostProcess</Filter>
     </ClCompile>
-    <ClCompile Include="AmbientLightActor.cpp" />
     <ClCompile Include="VideoEncoder.cpp" />
     <ClCompile Include="FrameIdDisplayActor.cpp">
       <Filter>Actors</Filter>
     </ClCompile>
-    <ClCompile Include="AnimationControllerActor.cpp" />
     <ClCompile Include="SimpleAnimationControllerActor.cpp">
       <Filter>Actors</Filter>
     </ClCompile>
@@ -181,6 +166,12 @@
     <ClCompile Include="HardwareInputInterface-Win32.cpp">
       <Filter>OS\Win32</Filter>
     </ClCompile>
+    <ClCompile Include="AmbientLightActor.cpp">
+      <Filter>Actors</Filter>
+    </ClCompile>
+    <ClCompile Include="AnimationControllerActor.cpp">
+      <Filter>Actors</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -191,22 +182,9 @@
     <ClInclude Include="VulkanAPI\vkel.h">
       <Filter>Renderer\RenderAPI\Vulkan API</Filter>
     </ClInclude>
-    <ClInclude Include="..\CoreLib\LibGL\glew\glew.h">
-      <Filter>Renderer\RenderAPI\OpenGL API</Filter>
-    </ClInclude>
-    <ClInclude Include="..\CoreLib\LibGL\glew\glxew.h">
-      <Filter>Renderer\RenderAPI\OpenGL API</Filter>
-    </ClInclude>
-    <ClInclude Include="..\CoreLib\LibGL\glew\wglew.h">
-      <Filter>Renderer\RenderAPI\OpenGL API</Filter>
-    </ClInclude>
-    <ClInclude Include="Spire\Spire.h">
-      <Filter>Spire</Filter>
-    </ClInclude>
     <ClInclude Include="InputDispatcher.h" />
     <ClInclude Include="TextureCompressor.h" />
     <ClInclude Include="TextureTool\LibSquish.h" />
-    <ClInclude Include="MotionGraph.h" />
     <ClInclude Include="CatmullSpline.h" />
     <ClInclude Include="MeshBuilder.h" />
     <ClInclude Include="Actor.h">
@@ -243,9 +221,6 @@
       <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="GraphicsSettings.h" />
-    <ClInclude Include="Spire\SpireAllSource.h">
-      <Filter>Spire</Filter>
-    </ClInclude>
     <ClInclude Include="DirectionalLightActor.h">
       <Filter>Actors</Filter>
     </ClInclude>
@@ -341,9 +316,6 @@
     <ClInclude Include="LevelEditor.h">
       <Filter>Editor</Filter>
     </ClInclude>
-    <ClInclude Include="AnimationVisualizationActor.h">
-      <Filter>Actors</Filter>
-    </ClInclude>
     <ClInclude Include="PropertyEditControl.h">
       <Filter>Editor</Filter>
     </ClInclude>
@@ -384,9 +356,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Spire">
-      <UniqueIdentifier>{740d680c-1f53-439f-b533-c02cdb37fa06}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Actors">
       <UniqueIdentifier>{fb7ee136-df35-40aa-8c74-91dd9fa0cc6b}</UniqueIdentifier>
     </Filter>
@@ -398,12 +367,6 @@
     </Filter>
     <Filter Include="Renderer\RenderAPI">
       <UniqueIdentifier>{dc5f3b14-2ee3-4ec3-90ef-775aa47bd1e3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\RenderAPI\OpenGL API">
-      <UniqueIdentifier>{4250cc45-c1d6-4d42-b563-dd64dfac0a01}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\RenderAPI\GL API">
-      <UniqueIdentifier>{cf8b8a6b-92d1-41a9-a172-5e08804be4fa}</UniqueIdentifier>
     </Filter>
     <Filter Include="Renderer\RenderAPI\Vulkan API">
       <UniqueIdentifier>{f375156a-adb5-480f-a4fb-48b8eefc1bb7}</UniqueIdentifier>
@@ -431,34 +394,43 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\EngineContent\Shaders\Atmosphere.shader">
+    <None Include="..\EngineContent\Shaders\Atmosphere.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\BoneHighlight.shader">
+    <None Include="ShaderLib.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\Default.shader">
+    <None Include="..\EngineContent\Shaders\DefaultMaterial.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\DeferredLighting.shader">
+    <None Include="..\EngineContent\Shaders\BoneHighlight.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\GlPipeline.shader">
+    <None Include="..\EngineContent\Shaders\SkeletalMesh.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\SkeletalMesh.shader">
+    <None Include="..\EngineContent\Shaders\ForwardBasePass.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\SkeletonVisualize.shader">
+    <None Include="..\EngineContent\Shaders\SolidColor.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\SolidColor.shader">
+    <None Include="..\EngineContent\Shaders\ToneMapping.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\ToneMapping.shader">
+    <None Include="..\EngineContent\Shaders\Outline.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\Utils.shader">
+    <None Include="..\EngineContent\Shaders\Gizmo.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\LightProbePrefilter.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\CopyPixel.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\UI.slang">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

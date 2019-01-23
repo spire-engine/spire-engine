@@ -9,12 +9,12 @@ namespace GameEngine
 	{
 	private:
 		FixedFunctionPipelineStates fixedFunctionStates;
-		SpireShader * shader = nullptr;
+		ShaderEntryPoint * vertShader = nullptr, * fragShader = nullptr;
 		int renderPassId = -1;
 	protected:
 		CoreLib::List<CoreLib::RefPtr<AsyncCommandBuffer>> commandBufferPool;
 		int poolAllocPtr = 0;
-		virtual const char * GetShaderSource() = 0;
+		virtual const char * GetShaderFileName() = 0;
 		virtual RenderTargetLayout * CreateRenderTargetLayout() = 0;
 		virtual void SetPipelineStates(FixedFunctionPipelineStates & state)
 		{

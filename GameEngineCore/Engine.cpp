@@ -123,6 +123,8 @@ namespace GameEngine
                 engineMode = EngineMode::Editor;
 		
             RegisterEngineActorClasses(this);
+            
+            this->shaderCompiler = CreateShaderCompiler();
 
             if (args.LaunchParams.Directory.ToLower().EndsWith("mp4"))
             {
@@ -196,9 +198,6 @@ namespace GameEngine
 			{
 			case RenderAPI::Vulkan:
 				Print("Vulkan: %s\n", renderer->GetHardwareRenderer()->GetRendererName().Buffer());
-				break;
-			case RenderAPI::OpenGL:
-				Print("OpenGL: %s\n", renderer->GetHardwareRenderer()->GetRendererName().Buffer());
 				break;
 			}
 

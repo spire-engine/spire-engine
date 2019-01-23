@@ -32,9 +32,9 @@ namespace GameEngine
             states.DepthCompareFunc = CompareFunc::LessEqual;
         }
     public:
-        virtual const char * GetShaderSource() override
+        virtual const char * GetShaderFileName() override
         {
-            return shaderSrc;
+            return "CustomDepthPass.slang";
         }
         virtual char * GetName() override
         {

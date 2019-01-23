@@ -4,7 +4,6 @@
 #include "CoreLib/WinForm/Debug.h"
 #include "CoreLib/VectorMath.h"
 #include "CoreLib/PerformanceCounter.h"
-#include "../Spire/Spire.h"
 
 //using glslang lib for now to generate spirv
 #include "../Engine.h"
@@ -4539,10 +4538,10 @@ namespace VK
 	private:
 		List<vk::Semaphore> transferSemaphores;
 		int pendingGraphicsQueueBarrierId = -1;
-	private:
-		virtual int GetSpireTarget() override
+	public:
+        virtual TargetShadingLanguage GetShadingLanguage() override
 		{
-			return SPIRE_GLSL_VULKAN;
+			return TargetShadingLanguage::SPIRV;
 		}
 		
 	public:

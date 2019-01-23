@@ -44,7 +44,7 @@ int __stdcall wWinMain(
 			int w = 1920;
 			int h = 1080;
 
-			args.API = RenderAPI::OpenGL;
+			args.API = RenderAPI::Vulkan;
 			args.GpuId = 0;
 			args.RecompileShaders = false;
 

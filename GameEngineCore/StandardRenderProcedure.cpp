@@ -181,7 +181,7 @@ namespace GameEngine
 			}
 			// initialize forwardBasePassModule and lightingModule
 			renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
-			sharedRes->CreateModuleInstance(forwardBasePassParams, spEnvFindModule(sharedRes->sharedSpireEnvironment, "ForwardBasePassParams"), &renderPassUniformMemory);
+			sharedRes->CreateModuleInstance(forwardBasePassParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ForwardBasePassParams"), &renderPassUniformMemory);
 			lighting.Init(*sharedRes, &renderPassUniformMemory, useEnvMap);
 			UpdateSharedResourceBinding();
 			sharedModules.View = &forwardBasePassParams;

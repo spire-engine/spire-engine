@@ -1,6 +1,7 @@
 #include "Mesh.h"
 #include "CoreLib/LibIO.h"
 #include "Skeleton.h"
+#include "Engine.h"
 
 using namespace CoreLib::Basic;
 using namespace CoreLib::IO;
@@ -99,12 +100,12 @@ namespace GameEngine
 		vertSize = CalcVertexSize();
 	}
 
-	SpireModule * MeshVertexFormat::GetSpireModule(SpireCompilationEnvironment * spireEnv)
+	ShaderTypeSymbol * MeshVertexFormat::GetTypeSymbol()
 	{
 		StringBuilder sbName;
 		sbName << "VertexAttributes_" << String((unsigned int)this->GetTypeId(), 36);
 		auto name = sbName.ToString();
-		if (auto rs = spEnvFindModule(spireEnv, name.Buffer()))
+		if (auto rs = Engine::GetShaderCompiler()->LookupTypeSymbol(name.Buffer()))
 			return rs;
 		if (shaderDef.Length() == 0)
 		{
@@ -178,8 +179,7 @@ namespace GameEngine
 			sb << "}\n";
 			shaderDef = sb.ProduceString();
 		}
-		spEnvLoadModuleLibraryFromSource(spireEnv, shaderDef.Buffer(), name.Buffer(), nullptr);
-		return spEnvFindModule(spireEnv, name.Buffer());
+        return Engine::GetShaderCompiler()->CreateTypeSymbol(name, shaderDef);
 	}
 	
 	struct SkeletonMeshVertex

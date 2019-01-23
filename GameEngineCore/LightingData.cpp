@@ -55,7 +55,7 @@ namespace GameEngine
 		else
 		{
 			shadowViewInstances.Add(ModuleInstance());
-			sharedRes->CreateModuleInstance(shadowViewInstances.Last(), spEnvFindModule(sharedRes->sharedSpireEnvironment, "ForwardBasePassParams"), uniformMemory);
+			sharedRes->CreateModuleInstance(shadowViewInstances.Last(), Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), uniformMemory);
 			shadowMapViewInstancePtr = shadowViewInstances.Count();
 			shadowMapPassModuleInstance = &shadowViewInstances.Last();
 			for (int j = 0; j < DynamicBufferLengthMultiplier; j++)
@@ -321,7 +321,7 @@ namespace GameEngine
 		this->useEnvMap = pUseEnvMap;
 		if (!useEnvMap)
 			emptyEnvMapArray = pSharedRes.hardwareRenderer->CreateTextureCubeArray(TextureUsage::Sampled, 2, 2, MaxEnvMapCount, StorageFormat::RGBA_F16);
-		sharedRes->CreateModuleInstance(moduleInstance, spEnvFindModule(sharedRes->sharedSpireEnvironment, "Lighting"), uniformMemory, sizeof(LightingUniform));
+		sharedRes->CreateModuleInstance(moduleInstance, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("LightingEnvironment"), uniformMemory, sizeof(LightingUniform));
 		lightBufferSize = Math::RoundUpToAlignment((int)sizeof(GpuLightData) * MaxLights, sharedRes->hardwareRenderer->UniformBufferAlignment());
 		lightBuffer = sharedRes->hardwareRenderer->CreateMappedBuffer(GameEngine::BufferUsage::StorageBuffer, lightBufferSize * DynamicBufferLengthMultiplier);
 		lightProbeBufferSize = Math::RoundUpToAlignment((int)sizeof(GpuLightProbeData) * MaxEnvMapCount, sharedRes->hardwareRenderer->UniformBufferAlignment());

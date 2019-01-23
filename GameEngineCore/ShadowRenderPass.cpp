@@ -35,9 +35,9 @@ namespace GameEngine
 			states.PolygonOffsetFactor = 2.0f;
 		}
 	public:
-		virtual const char * GetShaderSource() override
+		virtual const char * GetShaderFileName() override
 		{
-			return shaderSrc;
+			return "ShadowPass.slang";
 		}
 		virtual char * GetName() override
 		{

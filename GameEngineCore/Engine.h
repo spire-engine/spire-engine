@@ -14,6 +14,7 @@
 #include "OS.h"
 #include "UISystemBase.h"
 #include "VideoEncoder.h"
+#include "ShaderCompiler.h"
 
 namespace GameEngine
 {
@@ -83,6 +84,7 @@ namespace GameEngine
         CoreLib::RefPtr<SystemWindow> mainWindow;
         CoreLib::RefPtr<IVideoEncoder> videoEncoder;
         CoreLib::RefPtr<CoreLib::IO::Stream> videoEncodingStream;
+        CoreLib::RefPtr<IShaderCompiler> shaderCompiler;
 		EngineMode engineMode = EngineMode::Normal;
 		CoreLib::Array<RenderStat, 16> renderStats;
 		GraphicsUI::CommandForm * uiCommandForm = nullptr;
@@ -198,6 +200,10 @@ namespace GameEngine
 		static void Init(const EngineInitArguments & args);
         static void Run();
 		static void Destroy();
+        static IShaderCompiler* GetShaderCompiler()
+        {
+            return Instance()->shaderCompiler.Ptr();
+        }
 		template<typename ...Args>
 		static void Print(const char * message, Args... args)
 		{

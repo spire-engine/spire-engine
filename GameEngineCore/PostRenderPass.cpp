@@ -8,7 +8,7 @@ using namespace CoreLib::IO;
 
 namespace GameEngine
 {
-	void PostRenderPass::Create(Renderer * /*renderer*/)
+	void PostRenderPass::Create(Renderer * renderer)
 	{
 		// Create deferred pipeline
 		VertexFormat deferredVertexFormat;
@@ -18,22 +18,13 @@ namespace GameEngine
 		pipelineBuilder->SetVertexLayout(deferredVertexFormat);
 		ShaderCompilationResult rs;
 		auto shaderFileName = GetShaderFileName();
-		if (!CompileShader(rs, sharedRes->spireContext, sharedRes->sharedSpireEnvironment, hwRenderer->GetSpireTarget(), shaderFileName))
+        auto compiledShader = CompileShader(renderer->GetHardwareRenderer(), shaderFileName);
+		if (!compiledShader)
 			throw HardwareRendererException("Shader compilation failure");
 
-		for (auto& compiledShader : rs.Shaders)
-		{
-			Shader* shader = nullptr;
-			if (compiledShader.Key == "vs")
-			{
-				shader = hwRenderer->CreateShader(ShaderType::VertexShader, (char*)compiledShader.Value.Buffer(), compiledShader.Value.Count());
-			}
-			else if (compiledShader.Key == "fs")
-			{
-				shader = hwRenderer->CreateShader(ShaderType::FragmentShader, (char*)compiledShader.Value.Buffer(), compiledShader.Value.Count());
-			}
-			shaders.Add(shader);
-		}
+        shaders.Add(compiledShader.vertexShader);
+        shaders.Add(compiledShader.fragmentShader);
+
 		pipelineBuilder->SetShaders(From(shaders).Select([](auto x) { return x.Ptr(); }).ToList().GetArrayView());
 		pipelineBuilder->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
 		descLayouts.SetSize(rs.BindingLayouts.Count());

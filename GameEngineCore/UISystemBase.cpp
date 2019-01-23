@@ -260,44 +260,15 @@ namespace GameEngine
             clipRect = Vec4::Create(0.0f, 0.0f, 1e20f, 1e20f);
             rendererApi = hw;
 
-            SpireCompilationContext * spireCtx = spCreateCompilationContext(nullptr);
-            SpireDiagnosticSink * diagSink = spCreateDiagnosticSink(spireCtx);
-            spSetCodeGenTarget(spireCtx, rendererApi->GetSpireTarget());
-            String spireShaderSrc(uberSpireShader);
-            auto result = spCompileShaderFromSource(spireCtx, uberSpireShader, "ui_uber_shader", diagSink);
+            auto shaderSet = CompileShader(hw, "UberUIShader.slang");
 
-            if (!spDiagnosticSinkHasAnyErrors(diagSink))
-            {
-                int len = 0;
-                auto vsSrc = (char*)spGetShaderStageSource(result, "UberUIShader", "vs", &len);
-                uberVs = rendererApi->CreateShader(ShaderType::VertexShader, vsSrc, len);
-                auto fsSrc = (char*)spGetShaderStageSource(result, "UberUIShader", "fs", &len);
-                uberFs = rendererApi->CreateShader(ShaderType::FragmentShader, fsSrc, len);
-            }
-            else
-            {
-                int size = spGetDiagnosticOutput(diagSink, nullptr, 0);
-                List<char> buffer;
-                buffer.SetSize(size);
-                spGetDiagnosticOutput(diagSink, buffer.Buffer(), size);
-                OsApplication::DebugPrint(buffer.Buffer());
-                OsApplication::DebugPrint("\n");
-            }
-
-            ShaderCompilationResult compileResult;
-            GetShaderCompilationResult(compileResult, result, diagSink);
-
-            spDestroyDiagnosticSink(diagSink);
-            spDestroyCompilationResult(result);
-            spDestroyCompilationContext(spireCtx);
-
-            if (!uberVs)
+            if (!shaderSet.fragmentShader)
             {
                 throw InvalidProgramException("UI shader compilation failed.");
             }
 
             Array<Shader*, 2> shaderList;
-            shaderList.Add(uberVs.Ptr()); shaderList.Add(uberFs.Ptr());
+            shaderList.Add(shaderSet.vertexShader.Ptr()); shaderList.Add(shaderSet.fragmentShader.Ptr());
             RefPtr<PipelineBuilder> pipeBuilder = rendererApi->CreatePipelineBuilder();
             pipeBuilder->SetShaders(shaderList.GetArrayView());
             VertexFormat vformat;
@@ -305,11 +276,10 @@ namespace GameEngine
             vformat.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 8, 1));
             vformat.Attributes.Add(VertexAttributeDesc(DataType::Int, 0, 16, 2));
             pipeBuilder->SetVertexLayout(vformat);
-            auto & binding = compileResult.BindingLayouts["UberUIShaderParams"]();
             descLayout = rendererApi->CreateDescriptorSetLayout(MakeArray(
-                DescriptorLayout(sfGraphics, 0, BindingType::UniformBuffer, binding.Descriptors[0].LegacyBindingPoints.First()),
-                DescriptorLayout(sfGraphics, 1, BindingType::StorageBuffer, binding.Descriptors[1].LegacyBindingPoints.First()),
-                DescriptorLayout(sfGraphics, 2, BindingType::StorageBuffer, binding.Descriptors[2].LegacyBindingPoints.First())).GetArrayView());
+                DescriptorLayout(sfGraphics, 0, BindingType::UniformBuffer),
+                DescriptorLayout(sfGraphics, 1, BindingType::StorageBuffer),
+                DescriptorLayout(sfGraphics, 2, BindingType::StorageBuffer)).GetArrayView());
             pipeBuilder->SetBindingLayout(MakeArrayView(descLayout.Ptr()));
             pipeBuilder->FixedFunctionStates.PrimitiveRestartEnabled = true;
             pipeBuilder->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;

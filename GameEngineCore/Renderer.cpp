@@ -10,7 +10,6 @@
 #include "CoreLib/Imaging/TextureData.h"
 #include "CoreLib/WinForm/Debug.h"
 #include "LightProbeRenderer.h"
-#include "Spire/Spire.h"
 #include "TextureCompressor.h"
 #include <fstream>
 
@@ -59,7 +58,7 @@ namespace GameEngine
 			void CreateTransformModuleInstance(ModuleInstance & rs, const char * name, int uniformBufferSize)
 			{
 				auto sceneResources = renderer->sceneRes.Ptr();
-				renderer->sharedRes.CreateModuleInstance(rs, spEnvFindModule(renderer->sharedRes.sharedSpireEnvironment, name), &sceneResources->transformMemory, uniformBufferSize);
+				renderer->sharedRes.CreateModuleInstance(rs, Engine::GetShaderCompiler()->LoadSystemTypeSymbol(name), &sceneResources->transformMemory, uniformBufferSize);
 			}
 
 			virtual CoreLib::RefPtr<Drawable> CreateStaticDrawable(Mesh * mesh, int elementId, Material * material, bool cacheMesh) override
@@ -93,7 +92,7 @@ namespace GameEngine
 		RefPtr<ViewResource> mainView;
 		RefPtr<RendererServiceImpl> renderService;
 		RefPtr<IRenderProcedure> renderProcedure;
-		EnumerableDictionary<int, int> worldRenderPassIds;
+		EnumerableDictionary<uint32_t, int> worldRenderPassIds;
 		List<RefPtr<WorldRenderPass>> worldRenderPasses;
 		List<RefPtr<PostRenderPass>> postRenderPasses;
 		HardwareRenderer * hardwareRenderer = nullptr;
@@ -128,9 +127,6 @@ namespace GameEngine
 			{
 			case RenderAPI::Vulkan:
 				hardwareRenderer = CreateVulkanHardwareRenderer(Engine::Instance()->GpuId);
-				break;
-			case RenderAPI::OpenGL:
-				hardwareRenderer = CreateGLHardwareRenderer();
 				break;
 			}
 			hardwareRenderer->SetMaxTempBufferVersions(DynamicBufferLengthMultiplier);
@@ -168,9 +164,8 @@ namespace GameEngine
 			hardwareRenderer->Wait();
 		}
 
-		virtual int RegisterWorldRenderPass(SpireShader * renderPass) override
+		virtual int RegisterWorldRenderPass(uint32_t shaderId) override
 		{
-			int shaderId = spShaderGetId(renderPass);
 			int passId;
 			if (worldRenderPassIds.TryGetValue(shaderId, passId))
 				return passId;
@@ -247,47 +242,7 @@ namespace GameEngine
 			int offset;
 			int length;
 		};
-		/*RefPtr<Buffer> testBuf;
-		void TestCompute()
-		{
-			// debug test compute shader
-			hardwareRenderer->BeginDataTransfer();
-			const char * shaderSrc = R"(#version 430
-			layout(std430, binding=0) buffer storageBuf { float data[];};
-			layout(local_size_x=256) in;
-			void main() { data[gl_GlobalInvocationID.x] = float(gl_GlobalInvocationID.x);
-             }
-			)";
-			RefPtr<Shader> shader = hardwareRenderer->CreateShader(ShaderType::ComputeShader, shaderSrc, (int)strlen(shaderSrc));
-			RefPtr<PipelineBuilder> builder = hardwareRenderer->CreatePipelineBuilder();
-			RefPtr<DescriptorSetLayout> descLayout = hardwareRenderer->CreateDescriptorSetLayout(DescriptorLayout(StageFlags::sfCompute, 0, BindingType::StorageBuffer, 0));
-			RefPtr<Pipeline> pipeline = builder->CreateComputePipeline(MakeArrayView(descLayout.Ptr()), shader.Ptr());
-			RefPtr<AsyncCommandBuffer> cmdBuffer = new AsyncCommandBuffer(hardwareRenderer);
-			RefPtr<DescriptorSet> descSet = hardwareRenderer->CreateDescriptorSet(descLayout.Ptr());
-			descSet->BeginUpdate();
 
-			if (!testBuf)
-				testBuf = hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, sizeof(float) * 512);
-			float bufData[512];
-			bufData[0] = 2.0f;
-			testBuf->SetData(bufData, sizeof(float) * 512);
-			descSet->Update(0, testBuf.Ptr());
-			descSet->EndUpdate();
-			auto cmdBuf = cmdBuffer->BeginRecording();
-			cmdBuf->BindPipeline(pipeline.Ptr());
-			cmdBuf->BindDescriptorSet(0, descSet.Ptr());
-			cmdBuf->DispatchCompute(2, 1, 1);
-			cmdBuf->MemoryAccessBarrier(MemoryBarrierType::ShaderWriteToHostRead);
-			cmdBuf->EndRecording();
-			hardwareRenderer->EndDataTransfer();
-			hardwareRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(cmdBuf));
-			hardwareRenderer->Wait();
-
-			bufData[0] = 0.0f;
-			testBuf->GetData(bufData, 0, sizeof(float) * 512);
-			for (int i = 0; i < 512; i++)
-				printf("%f ", bufData[i]);
-		}*/
 		virtual void RenderFrame() override
 		{
 			if (!level) return;
@@ -298,8 +253,6 @@ namespace GameEngine
 			{
 				pass->Execute(hardwareRenderer, sharedRes.renderStats);
 			}
-
-			//TestCompute();
 		}
 		virtual RendererSharedResource * GetSharedResource() override
 		{

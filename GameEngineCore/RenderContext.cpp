@@ -16,15 +16,6 @@ namespace GameEngine
 	using namespace CoreLib::IO;
 	using namespace VectorMath;
 
-	String GetSpireOutput(SpireDiagnosticSink * sink)
-	{
-		int bufferSize = spGetDiagnosticOutput(sink, nullptr, 0);
-		List<char> buffer;
-		buffer.SetSize(bufferSize);
-		spGetDiagnosticOutput(sink, buffer.Buffer(), buffer.Count());
-		return String(buffer.Buffer());
-	}
-
 	PipelineClass * Drawable::GetPipeline(int passId, PipelineContext & pipelineManager)
 	{
 		if (!Engine::Instance()->GetGraphicsSettings().UsePipelineCache || pipelineCache[passId] == nullptr)
@@ -255,33 +246,30 @@ namespace GameEngine
 	void SceneResource::CreateMaterialModuleInstance(ModuleInstance & result, Material* material, const char * moduleName, bool isPatternModule)
 	{
 		bool isValid = true;
-		auto module = spEnvFindModule(spireEnv, moduleName);
+		auto module = Engine::GetShaderCompiler()->LoadTypeSymbol(material->ShaderFile, moduleName);
 		if (!module)
 		{
 			Print("Invalid material(%S): shader '%S' does not define '%s'.", material->Name.ToWString(), material->ShaderFile.ToWString(), moduleName);
 		}
 		else
 		{
-			int paramCount = spModuleGetParameterCount(module);
 			EnumerableDictionary<String, int> bindingLocs;
 			EnumerableDictionary<String, DynamicVariable*> vars;
-			int bufferSize = spModuleGetParameterBufferSize(module);
-			int loc = bufferSize == 0 ? 0 : 1;
-			for (int i = 0; i < paramCount; i++)
+			for (auto v : module->VarLayouts)
 			{
-				SpireComponentInfo param;
-				spModuleGetParameter(module, i, &param);
-				if (param.BindableResourceType != SPIRE_NON_BINDABLE)
+				if (v.Value->Type != ShaderVariableType::Data)
 				{
-					bindingLocs[param.Name] = loc++;
+					bindingLocs[v.Key] = v.Value->BindingOffset;
 				}
 				else
 				{
-					if (auto val = material->Variables.TryGetValue(param.Name))
-						vars[param.Name] = val;
+                    if (auto val = material->Variables.TryGetValue(v.Key))
+                    {
+						vars[v.Key] = val;
+                    }
 					else
 					{
-						Print("Invalid material(%S): shader parameter '%S' is not provided in material file.\n", material->Name.ToWString(), String(param.Name).ToWString());
+						Print("Invalid material(%S): shader parameter '%S' is not provided in material file.\n", material->Name.ToWString(),v.Key.ToWString());
 						isValid = false;
 					}
 				}
@@ -328,23 +316,11 @@ namespace GameEngine
 	{
 		if (!material->MaterialPatternModule)
 		{
-			auto shaderFile = Engine::Instance()->FindFile(material->ShaderFile, ResourceType::Shader);
-			auto patternShaderName = Path::GetFileNameWithoutEXT(shaderFile) + "Pattern";
-			auto geomShaderName = Path::GetFileNameWithoutEXT(shaderFile) + "Geometry";
-			auto patternModule = spEnvFindModule(spireEnv, patternShaderName.Buffer());
-			
-			if (!patternModule && shaderFile.Length())
-			{
-				SpireDiagnosticSink * spireSink = spCreateDiagnosticSink(spireContext);
-				spEnvLoadModuleLibrary(spireEnv, shaderFile.Buffer(), spireSink);
-				if (spDiagnosticSinkHasAnyErrors(spireSink))
-					Print("Invalid material(%S): cannot compile shader '%S'. Output message:\n%S", material->Name.ToWString(), shaderFile.ToWString(), GetSpireOutput(spireSink).ToWString());
-				spDestroyDiagnosticSink(spireSink);
-			}
-			CreateMaterialModuleInstance(material->MaterialPatternModule, material, patternShaderName.Buffer(), true);
-			auto geometryModuleName = Path::GetFileNameWithoutEXT(shaderFile) + "Geometry";
-			if (spEnvFindModule(spireEnv, geometryModuleName.Buffer()))
-				CreateMaterialModuleInstance(material->MaterialGeometryModule, material, geometryModuleName.Buffer(), false);
+			auto patternShaderName = Path::GetFileNameWithoutEXT(material->ShaderFile) + "Pattern";
+			auto geomShaderName = Path::GetFileNameWithoutEXT(material->ShaderFile) + "Geometry";
+            CreateMaterialModuleInstance(material->MaterialPatternModule, material, patternShaderName.Buffer(), true);
+            auto geometryModuleName = Path::GetFileNameWithoutEXT(material->ShaderFile) + "Geometry";
+            CreateMaterialModuleInstance(material->MaterialGeometryModule, material, geometryModuleName.Buffer(), false);
 		}
 		// use default material if failed to load
 		if (!material->MaterialPatternModule)
@@ -360,21 +336,18 @@ namespace GameEngine
 			if (!material->MaterialGeometryModule)
 				throw InvalidOperationException("failed to load default material.");
 		}
-		material->IsDoubleSided = spModuleHasAttrib(material->MaterialPatternModule.GetModule(), "DoubleSided") != 0;
-		material->IsTransparent = spModuleHasAttrib(material->MaterialPatternModule.GetModule(), "Transparent") != 0;
+        material->IsDoubleSided = material->MaterialPatternModule.GetTypeSymbol()->HasMember("DoubleSided");
+		material->IsTransparent = material->MaterialPatternModule.GetTypeSymbol()->HasMember("Transparent");
 
 	}
 	
 	SceneResource::SceneResource(RendererSharedResource * resource)
 		: rendererResource(resource)
 	{
-		spireContext = resource->spireContext;
-		sharedSpireEnv = resource->sharedSpireEnvironment;
 		auto hwRenderer = resource->hardwareRenderer.Ptr();
 		hardwareRenderer = hwRenderer;
 		instanceUniformMemory.Init(hwRenderer, BufferUsage::UniformBuffer, false, 24, hwRenderer->UniformBufferAlignment());
 		transformMemory.Init(hwRenderer, BufferUsage::UniformBuffer, false, 25, hwRenderer->UniformBufferAlignment());
-		spireEnv = nullptr;
 		Clear();
 	}
 	
@@ -383,10 +356,6 @@ namespace GameEngine
 		Destroy();
 		meshes = CoreLib::EnumerableDictionary<CoreLib::String, RefPtr<DrawableMesh>>();
 		textures = EnumerableDictionary<String, RefPtr<Texture2D>>();
-		if (spireEnv)
-			spReleaseEnvironment(spireEnv);
-		spireEnv = spCreateEnvironment(spireContext, sharedSpireEnv);
-		rendererResource->pipelineManager.SetSpireEnvironment(spireEnv);
 	}
 
 	// Converts StorageFormat to DataType
@@ -496,23 +465,13 @@ namespace GameEngine
 			shadowMapArrayFreeBits.Remove(i);
 		}
 	}
-
-	SpireShader * RendererSharedResource::LoadSpireShader(const char * key, const char * source)
+    
+	void RendererResource::CreateModuleInstance(ModuleInstance & rs, ShaderTypeSymbol * typeSymbol, DeviceMemory * uniformMemory, int uniformBufferSize)
 	{
-		SpireShader * rs = nullptr;
-		if (entryPointShaders.TryGetValue(key, rs))
-			return rs;
-		rs = spEnvCreateShaderFromSource(sharedSpireEnvironment, source, spireSink);
-		entryPointShaders[key] = rs;
-		return rs;
-	}
+		rs.Init(typeSymbol);
 
-	void RendererResource::CreateModuleInstance(ModuleInstance & rs, SpireModule * shaderModule, DeviceMemory * uniformMemory, int uniformBufferSize)
-	{
-		rs.Init(spireContext, shaderModule);
-
-		rs.BindingName = spGetModuleName(shaderModule);
-		rs.BufferLength = Math::Max(spModuleGetParameterBufferSize(shaderModule), uniformBufferSize);
+        rs.BindingName = typeSymbol->TypeName;
+		rs.BufferLength = Math::Max(typeSymbol->UniformBufferSize, uniformBufferSize);
 		if (rs.BufferLength > 0)
 		{
 			rs.BufferLength = Math::RoundUpToAlignment(rs.BufferLength, hardwareRenderer->UniformBufferAlignment());;
@@ -525,44 +484,37 @@ namespace GameEngine
 			rs.UniformMemory = nullptr;
 		
 		RefPtr<DescriptorSetLayout> layout;
-		if (!descLayouts.TryGetValue(spGetModuleUID(shaderModule), layout))
+		if (!descLayouts.TryGetValue(typeSymbol->TypeId, layout))
 		{
-			int paramCount = spModuleGetParameterCount(shaderModule);
 			List<DescriptorLayout> descs;
 			if (rs.UniformMemory)
-				descs.Add(DescriptorLayout(sfGraphics, 0, BindingType::UniformBuffer));
-			for (int i = 0; i < paramCount; i++)
+				descs.Add(DescriptorLayout(GameEngine::StageFlags(sfGraphics | sfCompute), 0, BindingType::UniformBuffer));
+			for (auto & v : typeSymbol->VarLayouts)
 			{
-				SpireComponentInfo info;
-				spModuleGetParameter(shaderModule, i, &info);
-				if (info.BindableResourceType != SPIRE_NON_BINDABLE)
+				if (v.Value->Type != ShaderVariableType::Data)
 				{
 					DescriptorLayout descLayout;
 					descLayout.Location = descs.Count();
-					switch (info.BindableResourceType)
+					switch (v.Value->Type)
 					{
-					case SPIRE_TEXTURE:
+                    case ShaderVariableType::Texture:
 						descLayout.Type = BindingType::Texture;
 						break;
-					case SPIRE_UNIFORM_BUFFER:
+                    case ShaderVariableType::UniformBuffer:
 						descLayout.Type = BindingType::UniformBuffer;
 						break;
-					case SPIRE_SAMPLER:
+                    case ShaderVariableType::Sampler:
 						descLayout.Type = BindingType::Sampler;
 						break;
-					case SPIRE_STORAGE_BUFFER:
+                    case ShaderVariableType::StorageBuffer:
 						descLayout.Type = BindingType::StorageBuffer;
 						break;
 					}
 					descs.Add(descLayout);
 				}
-				if (info.Specialize)
-				{
-					rs.SpecializeParamOffsets.Add(info.Offset);
-				}
 			}
 			layout = hardwareRenderer->CreateDescriptorSetLayout(descs.GetArrayView());
-			descLayouts[spGetModuleUID(shaderModule)] = layout;
+			descLayouts[typeSymbol->TypeId] = layout;
 		}
 		rs.SetDescriptorSetLayout(hardwareRenderer.Ptr(), layout.Ptr());
 		if (rs.UniformMemory)
@@ -580,32 +532,6 @@ namespace GameEngine
 	void RendererResource::Destroy()
 	{
 		descLayouts = CoreLib::EnumerableDictionary<unsigned int, CoreLib::RefPtr<GameEngine::DescriptorSetLayout>>();
-	}
-
-	void RendererSharedResource::LoadShaderLibrary()
-	{
-		spAddSearchPath(spireContext, Engine::Instance()->GetDirectory(true, ResourceType::Shader).Buffer());
-		spAddSearchPath(spireContext, Engine::Instance()->GetDirectory(false, ResourceType::Shader).Buffer());
-
-		auto pipelineDefFile = Engine::Instance()->FindFile("GlPipeline.shader", ResourceType::Shader);
-		if (!pipelineDefFile.Length())
-			throw InvalidOperationException("'Pipeline.shader' not found. Engine directory is not setup correctly.");
-		auto engineShaderDir = CoreLib::IO::Path::GetDirectoryName(pipelineDefFile);
-		auto utilDefFile = Engine::Instance()->FindFile("Utils.shader", ResourceType::Shader);
-		if (!utilDefFile.Length())
-			throw InvalidOperationException("'Utils.shader' not found. Engine directory is not setup correctly.");
-		spEnvLoadModuleLibrary(sharedSpireEnvironment, pipelineDefFile.Buffer(), spireSink);
-		spEnvLoadModuleLibrary(sharedSpireEnvironment, utilDefFile.Buffer(), spireSink);
-
-		auto defShaderFile = Engine::Instance()->FindFile("Default.shader", ResourceType::Shader);
-		if (!defShaderFile.Length())
-			throw InvalidOperationException("'Default.shader' not found. Engine directory is not setup correctly.");
-		spEnvLoadModuleLibrary(sharedSpireEnvironment, defShaderFile.Buffer(), spireSink);
-		if (spDiagnosticSinkHasAnyErrors(spireSink))
-		{
-			OsApplication::DebugWriteLine(GetSpireOutput(spireSink).Buffer());
-			throw HardwareRendererException("shader compilation error.");
-		}
 	}
 
 	void RendererSharedResource::Init(HardwareRenderer * phwRenderer)
@@ -644,17 +570,12 @@ namespace GameEngine
 		shadowSampler->SetDepthCompare(CompareFunc::LessEqual);
 
 		shadowMapResources.Init(hardwareRenderer.Ptr());
-
-		spireContext = spCreateCompilationContext("");
-		sharedSpireEnvironment = spGetCurrentEnvironment(spireContext);
-		LoadShaderLibrary();
-		
-		pipelineManager.Init(spireContext, sharedSpireEnvironment, hardwareRenderer.Ptr(), &renderStats);
+        		
+		pipelineManager.Init(hardwareRenderer.Ptr(), &renderStats);
 
 		indexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::IndexBuffer, false, 26, 256);
 		vertexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::ArrayBuffer, false, 28, 256);
 
-		spireSink = spCreateDiagnosticSink(spireContext);
 		envMapArray = hardwareRenderer->CreateTextureCubeArray(TextureUsage::SampledColorAttachment, EnvMapSize, Math::Log2Floor(EnvMapSize) + 1, MaxEnvMapCount, StorageFormat::RGBA_F16);
 	
 		// create default color lookup texture
@@ -678,7 +599,6 @@ namespace GameEngine
 	void RendererSharedResource::Destroy()
 	{
 		RendererResource::Destroy();
-		spDestroyDiagnosticSink(spireSink);
 		shadowMapResources.Destroy();
 		textureSampler = nullptr;
 		nearestSampler = nullptr;
@@ -687,9 +607,6 @@ namespace GameEngine
 		fullScreenQuadVertBuffer = nullptr;
 		envMapArray = nullptr;
 		//ModuleInstance::ClosePool();
-		spReleaseEnvironment(sharedSpireEnvironment);
-		spDestroyCompilationContext(spireContext);
-
 	}
 	
 	RenderTarget::RenderTarget(GameEngine::StorageFormat format, CoreLib::RefPtr<Texture2DArray> texArray, int layer, int w, int h)

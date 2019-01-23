@@ -2,7 +2,6 @@
 #define ANIMATION_SYNTHESIZER_H
 
 #include "Skeleton.h"
-#include "MotionGraph.h"
 #include "CoreLib/LibMath.h"
 #include "CatmullSpline.h"
 #include <queue>

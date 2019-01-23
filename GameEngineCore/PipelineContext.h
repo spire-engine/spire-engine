@@ -1,7 +1,7 @@
 #ifndef GAME_ENGINE_PIPELINE_CONTEXT_H
 #define GAME_ENGINE_PIPELINE_CONTEXT_H
 
-#include "Spire/Spire.h"
+#include "ShaderCompiler.h"
 #include "HardwareRenderer.h"
 #include "DeviceMemory.h"
 #include "EngineLimits.h"
@@ -58,30 +58,24 @@ namespace GameEngine
 		int ModuleId;
 		//USE_POOL_ALLOCATOR(ModuleInstance, MaxModuleInstances)
 	private:
-		SpireCompilationContext * spireContext = nullptr;
-		SpireModule * module = nullptr;
-		SpireModule * specializedModule = nullptr;
-		CoreLib::List<int> currentSpecializationKey;
+        ShaderTypeSymbol * typeSymbol = nullptr;
 		CoreLib::Array<CoreLib::RefPtr<DescriptorSet>, DynamicBufferLengthMultiplier> descriptors;
 		int currentDescriptor = 0;
 	public:
-		CoreLib::List<int> SpecializeParamOffsets;
 		DeviceMemory * UniformMemory = nullptr;
 		int BufferOffset = 0, BufferLength = 0;
 		CoreLib::String BindingName;
 		void SetUniformData(void * data, int length);
 		ModuleInstance() = default;
-		void Init(SpireCompilationContext * ctx, SpireModule * m)
+		void Init(ShaderTypeSymbol * m)
 		{
-			spireContext = ctx;
-			module = m;
-			specializedModule = module;
-			ModuleId = spGetModuleUID(specializedModule);
+            ModuleId = m->TypeId;
+            typeSymbol = m;
 		}
 		~ModuleInstance();
-		SpireModule * GetModule()
+        ShaderTypeSymbol * GetTypeSymbol()
 		{
-			return module;
+			return typeSymbol;
 		}
 		void SetDescriptorSetLayout(HardwareRenderer * hw, DescriptorSetLayout * layout);
 		DescriptorSet * GetDescriptorSet(int i)
@@ -98,7 +92,7 @@ namespace GameEngine
 		}
 		operator bool()
 		{
-			return module != nullptr;
+			return typeSymbol != nullptr;
 		}
 	};
 
@@ -121,11 +115,9 @@ namespace GameEngine
 		int modulePtr = 0;
 		ShaderKey lastKey; 
 		unsigned int lastVtxId = 0;
-		bool shaderKeyChanged = true;
-		SpireCompilationContext * spireContext = nullptr;
-		SpireCompilationEnvironment * spireEnv = nullptr;
+        bool shaderKeyChanged = true; 
+        ShaderEntryPoint* vertexShaderEntryPoint, *fragmentShaderEntryPoint;
 		ModuleInstance* modules[32];
-		SpireShader * shader = nullptr;
 		RenderTargetLayout * renderTargetLayout = nullptr;
 		PipelineClass * lastPipeline = nullptr;
 		FixedFunctionPipelineStates fixedFunctionStates;
@@ -138,25 +130,20 @@ namespace GameEngine
 		PipelineClass* CreatePipeline(MeshVertexFormat * vertFormat);
 	public:
 		PipelineContext() = default;
-		void Init(SpireCompilationContext * spireCtx, SpireCompilationEnvironment * pSpireEnv, HardwareRenderer * hw, RenderStat * pRenderStats)
+		void Init(HardwareRenderer * hw, RenderStat * pRenderStats)
 		{
-			spireContext = spireCtx;
-			spireEnv = pSpireEnv;
 			hwRenderer = hw;
 			renderStats = pRenderStats;
-		}
-		void SetSpireEnvironment(SpireCompilationEnvironment * pSpireEnv)
-		{
-			spireEnv = pSpireEnv;
 		}
 		inline RenderStat * GetRenderStat() 
 		{
 			return renderStats;
 		}
 		VertexFormat LoadVertexFormat(MeshVertexFormat vertFormat);
-		void BindShader(SpireShader * pShader, RenderTargetLayout * pRenderTargetLayout, FixedFunctionPipelineStates * states)
+		void BindEntryPoint(ShaderEntryPoint * pVS, ShaderEntryPoint * pFS, RenderTargetLayout * pRenderTargetLayout, FixedFunctionPipelineStates * states)
 		{
-			shader = pShader;
+			vertexShaderEntryPoint = pVS;
+            fragmentShaderEntryPoint = pFS;
 			renderTargetLayout = pRenderTargetLayout;
 			fixedFunctionStates = *states;
 			shaderKeyChanged = true;

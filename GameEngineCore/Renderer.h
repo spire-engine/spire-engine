@@ -3,7 +3,6 @@
 
 #include "CoreLib/Basic.h"
 #include "OS.h"
-#include "Spire/Spire.h"
 
 namespace GameEngine
 {
@@ -20,7 +19,7 @@ namespace GameEngine
 	class Renderer : public CoreLib::Object
 	{
 	public:
-		virtual int RegisterWorldRenderPass(SpireShader * pass) = 0;
+		virtual int RegisterWorldRenderPass(uint32_t shaderId) = 0;
 		virtual void UpdateLightProbes() = 0;
 		virtual void DestroyContext() = 0;
 		virtual void InitializeLevel(Level * level) = 0;

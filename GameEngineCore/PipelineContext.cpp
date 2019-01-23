@@ -60,7 +60,7 @@ namespace GameEngine
 		lastVtxId = vtxId;
 
 		shaderKeyBuilder.Clear();
-		shaderKeyBuilder.Append(spShaderGetId(shader));
+		shaderKeyBuilder.Append(fragmentShaderEntryPoint->Id);
 		shaderKeyBuilder.FlipLeadingByte(vtxId);
 		for (int i = 0; i < modulePtr; i++)
 			shaderKeyBuilder.Append(modules[i]->ModuleId);
@@ -90,81 +90,51 @@ namespace GameEngine
 		pipelineBuilder->SetVertexLayout(LoadVertexFormat(*vertFormat));
 
 		// Compile shaders
-		Array<SpireModule*, 32> spireModules;
-		for (int i = 0; i < modulePtr; i++)
-			spireModules.Add(modules[i]->specializedModule);
-		spireModules.Add(vertFormat->GetSpireModule(spireEnv));
-		SpireDiagnosticSink * sink = spCreateDiagnosticSink(spireContext);
-		auto compileRs = spEnvCompileShader(spireEnv, shader, spireModules.Buffer(), spireModules.Count(), "", sink);
-
-		int count = spGetDiagnosticCount(sink);
-		for (int i = 0; i < count; i++)
-		{
-			SpireDiagnostic diag;
-			spGetDiagnosticByIndex(sink, i, &diag);
-			Print("%S(%d): %S\n", String(diag.FileName).ToWString(), diag.Line, String(diag.Message).ToWString());
-		}
-
-		if (spDiagnosticSinkHasAnyErrors(sink))
-		{
-			spDestroyDiagnosticSink(sink);
-			spDestroyCompilationResult(compileRs);
-			return nullptr;
-		}
-
-		ShaderCompilationResult rs;
-		GetShaderCompilationResult(rs, compileRs, sink);
-
-		spDestroyDiagnosticSink(sink);
-		spDestroyCompilationResult(compileRs);
-
-		RefPtr<PipelineClass> pipelineClass = new PipelineClass();
-		static int pipelineClassId = 0;
-		pipelineClassId++;
-		pipelineClass->Id = pipelineClassId;
-
-		for (auto& compiledShader : rs.Shaders)
-		{
-			Shader* shaderObj = nullptr;
-			if (compiledShader.Key == "vs")
-			{
-				shaderObj = hwRenderer->CreateShader(ShaderType::VertexShader, compiledShader.Value.Buffer(), compiledShader.Value.Count());
-			}
-			else if (compiledShader.Key == "fs")
-			{
-				shaderObj = hwRenderer->CreateShader(ShaderType::FragmentShader, compiledShader.Value.Buffer(), compiledShader.Value.Count());
-			}
-			else if (compiledShader.Key == "tcs")
-			{
-				shaderObj = hwRenderer->CreateShader(ShaderType::HullShader, compiledShader.Value.Buffer(), compiledShader.Value.Count());
-			}
-			else if (compiledShader.Key == "tes")
-			{
-				shaderObj = hwRenderer->CreateShader(ShaderType::DomainShader, compiledShader.Value.Buffer(), compiledShader.Value.Count());
-			}
-			pipelineClass->shaders.Add(shaderObj);
-		}
-
-		//String keyStr = key;
-		//pipelineBuilder->SetDebugName(keyStr);
-
-		pipelineBuilder->SetShaders(From(pipelineClass->shaders).Select([](const RefPtr<Shader>& s) {return s.Ptr(); }).ToList().GetArrayView());
+        ShaderCompilationEnvironment env;
+		Array<ShaderTypeSymbol*, 32> spireModules;
+        for (int i = 0; i < modulePtr; i++)
+        {
+            env.SpecializationTypes.Add(modules[i]->typeSymbol);
+			spireModules.Add(modules[i]->typeSymbol);
+        }
+		spireModules.Add(vertFormat->GetTypeSymbol());
+        struct CompilationTask
+        {
+            ShaderEntryPoint * entryPoint;
+            ShaderType shaderType;
+        };
+        const CompilationTask tasks[] = { {vertexShaderEntryPoint, ShaderType::VertexShader}, {fragmentShaderEntryPoint, ShaderType::FragmentShader} };
+        RefPtr<PipelineClass> pipelineClass = new PipelineClass();
+        static int pipelineClassId = 0;
+        pipelineClassId++;
+        pipelineClass->Id = pipelineClassId;
 		List<RefPtr<DescriptorSetLayout>> descSetLayouts;
-		for (auto & descSet : rs.BindingLayouts)
-		{
-			if (descSet.Value.BindingPoint == -1)
-				continue;
-			if (descSet.Key == "NoAnimation")
-			{
-				for (auto & desc : descSet.Value.Descriptors)
-					desc.Stages = (StageFlags)(StageFlags::sfVertex | StageFlags::sfFragment);
-			}
-			auto layout = hwRenderer->CreateDescriptorSetLayout(descSet.Value.Descriptors.GetArrayView());
-			if (descSet.Value.BindingPoint >= descSetLayouts.Count())
-				descSetLayouts.SetSize(descSet.Value.BindingPoint + 1);
-			descSetLayouts[descSet.Value.BindingPoint] = layout;
+        for (auto task : tasks)
+        {
+            ShaderCompilationResult compileRs;
+            Engine::GetShaderCompiler()->CompileShader(compileRs, Engine::Instance()->GetRenderer()->GetHardwareRenderer()->GetShadingLanguage(),
+                task.shaderType, task.entryPoint, &env);
+            for (auto & diag : compileRs.Diagnostics)
+            {
+                Print("%S(%d): %S\n", String(diag.FileName).ToWString(), diag.Line, String(diag.Message).ToWString());
+            }
+            auto shaderObj = hwRenderer->CreateShader(tasks->shaderType, compileRs.ShaderCode.Buffer(), compileRs.ShaderCode.Count());
+            pipelineClass->shaders.Add(shaderObj);
 
-		}
+            for (auto & descSet : compileRs.BindingLayouts)
+            {
+                if (descSet.Value.BindingPoint == -1)
+                    continue;
+                for (auto & desc : descSet.Value.Descriptors)
+                    desc.Stages = (StageFlags)(StageFlags::sfVertex | StageFlags::sfFragment);
+                auto layout = hwRenderer->CreateDescriptorSetLayout(descSet.Value.Descriptors.GetArrayView());
+                if (descSet.Value.BindingPoint >= descSetLayouts.Count())
+                    descSetLayouts.SetSize(descSet.Value.BindingPoint + 1);
+                descSetLayouts[descSet.Value.BindingPoint] = layout;
+
+            }
+        }
+		pipelineBuilder->SetShaders(From(pipelineClass->shaders).Select([](const RefPtr<Shader>& s) {return s.Ptr(); }).ToList().GetArrayView());
 		pipelineBuilder->SetBindingLayout(From(descSetLayouts).Select([](auto x) {return x.Ptr(); }).ToList().GetArrayView());
 		pipelineClass->pipeline = pipelineBuilder->ToPipeline(renderTargetLayout);
 		pipelineObjects[shaderKeyBuilder.Key] = pipelineClass;
@@ -183,30 +153,6 @@ namespace GameEngine
 			currentDescriptor = currentDescriptor % DynamicBufferLengthMultiplier;
 			int alternateBufferOffset = currentDescriptor * BufferLength;
 			UniformMemory->SetDataAsync(BufferOffset + alternateBufferOffset, data, length);
-			//currentDescriptor = frameId;
-		}
-		bool keyChanged = false;
-		if (SpecializeParamOffsets.Count())
-		{
-			if (currentSpecializationKey.Count() != SpecializeParamOffsets.Count())
-			{
-				currentSpecializationKey.SetSize(SpecializeParamOffsets.Count());
-				keyChanged = true;
-			}
-			for (int i = 0; i < SpecializeParamOffsets.Count(); i++)
-			{
-				int param = *(int*)((char*)data + SpecializeParamOffsets[i]);
-				if (currentSpecializationKey[i] != param)
-				{
-					keyChanged = true;
-					currentSpecializationKey[i] = param;
-				}
-			}
-		}
-		if (keyChanged)
-		{
-			specializedModule = spSpecializeModule(spireContext, module, currentSpecializationKey.Buffer(), currentSpecializationKey.Count(), nullptr);
-			ModuleId = spGetModuleUID(specializedModule);
 		}
 	}
 
