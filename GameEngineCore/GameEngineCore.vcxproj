@@ -321,11 +321,15 @@
     <None Include="..\EngineContent\Shaders\Gizmo.slang" />
     <None Include="..\EngineContent\Shaders\LightProbePrefilter.slang" />
     <None Include="..\EngineContent\Shaders\Outline.slang" />
+    <None Include="..\EngineContent\Shaders\ShaderLib.slang" />
     <None Include="..\EngineContent\Shaders\SkeletalMesh.slang" />
     <None Include="..\EngineContent\Shaders\SolidColor.slang" />
     <None Include="..\EngineContent\Shaders\ToneMapping.slang" />
     <None Include="..\EngineContent\Shaders\UI.slang" />
-    <None Include="ShaderLib.slang" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="core.natvis" />
+    <Natvis Include="slang.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

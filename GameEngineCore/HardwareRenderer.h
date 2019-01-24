@@ -690,7 +690,7 @@ namespace GameEngine
 
 	enum StageFlags
 	{
-		sfNone = 0, sfGraphics = 3, sfVertex = 1, sfFragment = 2, sfCompute = 8
+		sfNone = 0, sfGraphics = 3, sfVertex = 1, sfFragment = 2, sfCompute = 8, sfGraphicsAndCompute = 11
 	};
 
 	struct DescriptorLayout
@@ -698,6 +698,7 @@ namespace GameEngine
 		int Location; //> location in the descritpor set
 		StageFlags Stages = sfGraphics;
 		BindingType Type; //< type of the resource binding this descriptor is about
+        CoreLib::String Name;
 		DescriptorLayout() {}
 		DescriptorLayout(StageFlags stage,int loc, BindingType type)
 		{

@@ -943,6 +943,7 @@ namespace VK
 		case StageFlags::sfFragment: return vk::ShaderStageFlagBits::eFragment;
 		case StageFlags::sfGraphics:return vk::ShaderStageFlagBits::eAllGraphics;
 		case StageFlags::sfCompute: return vk::ShaderStageFlagBits::eCompute;
+        case StageFlags::sfGraphicsAndCompute: return vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eAllGraphics;
 		default: throw CoreLib::NotImplementedException("TranslateStageFlags");
 		}
 	}
@@ -2548,60 +2549,12 @@ namespace VK
 			Destroy();
 		}
 
-		void Create(ShaderType pstage, const char* data, int /*size*/)
+		void Create(ShaderType pstage, const char* data, int size)
 		{
 			Destroy();
-
 			this->stage = pstage;
-			const char * postfix = "vert";
-			switch (pstage)
-			{
-			case ShaderType::VertexShader:
-				postfix = "vert";
-				break;
-			case ShaderType::FragmentShader:
-				postfix = "frag";
-				break;
-			case ShaderType::HullShader:
-				postfix = "tesc";
-				break;
-			case ShaderType::DomainShader:
-				postfix = "tese";
-				break;
-			case ShaderType::ComputeShader:
-				postfix = "comp";
-				break;
-			}
-			auto tempFileName = Path::Combine(Engine::Instance()->GetDirectory(false, ResourceType::ShaderCache), "temp." + String(postfix));
-			tempFileName = tempFileName.ReplaceAll("/", "\\");
-			File::WriteAllText(tempFileName, data);
-			auto glslc = Engine::Instance()->FindFile("glslangValidator.exe", ResourceType::ExtTools);
-			if (!glslc.Length())
-				throw HardwareRendererException("glslc not found.");
-			auto compiledFileName = tempFileName + ".spv";
-			DeleteFileW(compiledFileName.ToWString());
-			STARTUPINFO startupInfo;
-			PROCESS_INFORMATION procInfo;
-			memset(&startupInfo, 0, sizeof(STARTUPINFO));
-			memset(&procInfo, 0, sizeof(PROCESS_INFORMATION));
-			startupInfo.cb = sizeof(STARTUPINFO);
-			CreateProcessW(nullptr, (LPWSTR)("\"" + glslc + "\" -V \"" + Path::GetFileName(tempFileName) + "\" -o \"" + Path::GetFileName(compiledFileName) + "\"").ToWString(),
-				nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,	Path::GetDirectoryName(tempFileName).ToWString(), &startupInfo, &procInfo);
-			WaitForSingleObject(procInfo.hProcess, INFINITE);
-			DWORD exitCode = 0XFFFF;
-			GetExitCodeProcess(procInfo.hProcess, &exitCode);
-			CloseHandle(procInfo.hProcess);
-			CloseHandle(procInfo.hThread);
-			if (File::Exists(compiledFileName) && exitCode == 0)
-			{
-				auto code = File::ReadAllBytes(compiledFileName);
-				vk::ShaderModuleCreateInfo createInfo(vk::ShaderModuleCreateFlags(), code.Count(), (unsigned int *)code.Buffer());
-				this->module = RendererState::Device().createShaderModule(createInfo);
-			}
-			else
-			{
-				throw HardwareRendererException("spirv compilation failure.");
-			}
+			vk::ShaderModuleCreateInfo createInfo(vk::ShaderModuleCreateFlags(), (size_t)size, (const uint32_t*)data);
+			this->module = RendererState::Device().createShaderModule(createInfo);
 		}
 
 		void Destroy()

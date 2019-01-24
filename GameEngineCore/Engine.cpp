@@ -150,6 +150,7 @@ namespace GameEngine
 				graphicsSettings.LoadFromFile(graphicsSettingsFile);
             			
 			// initialize renderer
+            targetShadingLanguage = args.API == RenderAPI::Vulkan ? TargetShadingLanguage::SPIRV : TargetShadingLanguage::HLSL;
 			renderer = CreateRenderer(args.API);
 			renderer->Resize(args.Width, args.Height);
 			currentViewport.x = currentViewport.y = 0;

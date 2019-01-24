@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+<Type Name="Slang::String">
+    <DisplayString>{((char*) (buffer.pointer+1)),s}</DisplayString>
+	<StringView>((char*) (buffer.pointer+1)),s</StringView>
+</Type>
+
+<Type Name="Slang::ArrayView&lt;*&gt;">
+  <DisplayString>{{ size={_count} }}</DisplayString>
+  <Expand>
+    <Item Name="[size]">_count</Item>
+    <ArrayItems>
+      <Size>_count</Size>
+      <ValuePointer>_buffer</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+
+<Type Name="Slang::List&lt;*&gt;">
+    <DisplayString>{{ size={_count} }}</DisplayString>
+    <Expand>
+        <Item Name="[size]">_count</Item>
+        <Item Name="[capacity]">bufferSize</Item>
+        <ArrayItems>
+            <Size>_count</Size>
+            <ValuePointer>buffer</ValuePointer>
+        </ArrayItems>
+    </Expand>
+</Type>
+
+
+<Type Name="Slang::Array&lt;*,*&gt;">
+  <DisplayString>{{ size={_count} }}</DisplayString>
+  <Expand>
+    <Item Name="[size]">_count</Item>
+    <ArrayItems>
+      <Size>_count</Size>
+      <ValuePointer>_buffer</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+  
+<Type Name="Slang::Dictionary&lt;*,*&gt;">
+    <DisplayString>{{ size={_count} }}</DisplayString>
+    <Expand>
+        <Item Name="[size]">_count</Item>
+        <Item Name="[capacity]">bucketSizeMinusOne + 1</Item>
+        <ArrayItems>
+           <Size>bucketSizeMinusOne + 1</Size>
+           <ValuePointer>hashMap</ValuePointer>
+        </ArrayItems>
+    </Expand>
+</Type>
+
+<Type Name="Slang::RefPtr&lt;*&gt;">
+    <SmartPointer Usage="Minimal">pointer</SmartPointer>
+    <DisplayString Condition="pointer == 0">empty</DisplayString>
+    <DisplayString Condition="pointer != 0">RefPtr {*pointer}</DisplayString>
+    <Expand>
+      <ExpandedItem>pointer</ExpandedItem>
+    </Expand>
+</Type>
+</AutoVisualizer>

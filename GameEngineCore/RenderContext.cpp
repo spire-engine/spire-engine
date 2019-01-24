@@ -46,7 +46,7 @@ namespace GameEngine
 					unsigned char * ptr0 = (unsigned char*)moduleInstance.UniformMemory->BufferPtr() + moduleInstance.BufferOffset;
 					auto ptr = ptr0;
 					auto end = ptr + moduleInstance.BufferLength;
-					material->FillInstanceUniformBuffer(&moduleInstance, [](const String&) {},
+					material->FillInstanceUniformBuffer([](const String&) {},
 						[&](auto & val)
 					{
 						if (ptr + sizeof(val) > end)
@@ -65,8 +65,7 @@ namespace GameEngine
 					scene->instanceUniformMemory.Sync(ptr0, moduleInstance.BufferLength);
 				}
 			};
-			update(material->MaterialGeometryModule);
-			update(material->MaterialPatternModule);
+			update(material->MaterialModule);
 		}
 	}
 
@@ -243,10 +242,14 @@ namespace GameEngine
 		}
 	}
 
-	void SceneResource::CreateMaterialModuleInstance(ModuleInstance & result, Material* material, const char * moduleName, bool isPatternModule)
+	void SceneResource::CreateMaterialModuleInstance(ModuleInstance & result, Material* material, const char * moduleName)
 	{
 		bool isValid = true;
-		auto module = Engine::GetShaderCompiler()->LoadTypeSymbol(material->ShaderFile, moduleName);
+        ShaderTypeSymbol* module = nullptr;
+        if (strcmp(moduleName, "DefaultMaterial")==0)
+            Engine::GetShaderCompiler()->LoadTypeSymbol("DefaultMaterial.slang", moduleName);
+        else
+            Engine::GetShaderCompiler()->LoadTypeSymbol(material->ShaderFile, moduleName);
 		if (!module)
 		{
 			Print("Invalid material(%S): shader '%S' does not define '%s'.", material->Name.ToWString(), material->ShaderFile.ToWString(), moduleName);
@@ -302,42 +305,30 @@ namespace GameEngine
 						descSet->EndUpdate();
 					}
 				}
-				if (isPatternModule)
-					for (auto& v : vars)
-						material->PatternVariables.Add(v.Value);
-				else
-					for (auto& v : vars)
-						material->GeometryVariables.Add(v.Value);
+				for (auto& v : vars)
+					material->PatternVariables.Add(v.Value);
 			}
 		}
 	}
 
 	void SceneResource::RegisterMaterial(Material * material)
 	{
-		if (!material->MaterialPatternModule)
+		if (!material->MaterialModule)
 		{
-			auto patternShaderName = Path::GetFileNameWithoutEXT(material->ShaderFile) + "Pattern";
-			auto geomShaderName = Path::GetFileNameWithoutEXT(material->ShaderFile) + "Geometry";
-            CreateMaterialModuleInstance(material->MaterialPatternModule, material, patternShaderName.Buffer(), true);
-            auto geometryModuleName = Path::GetFileNameWithoutEXT(material->ShaderFile) + "Geometry";
-            CreateMaterialModuleInstance(material->MaterialGeometryModule, material, geometryModuleName.Buffer(), false);
+            auto patternShaderName = Path::GetFileNameWithoutEXT(material->ShaderFile);
+            if (!patternShaderName.EndsWith("Material"))
+                patternShaderName = patternShaderName + "Material";
+			CreateMaterialModuleInstance(material->MaterialModule, material, patternShaderName.Buffer());
 		}
 		// use default material if failed to load
-		if (!material->MaterialPatternModule)
+		if (!material->MaterialModule)
 		{
-			CreateMaterialModuleInstance(material->MaterialPatternModule, material, "DefaultPattern", true);
-			if (!material->MaterialPatternModule)
+			CreateMaterialModuleInstance(material->MaterialModule, material, "DefaultMaterial");
+			if (!material->MaterialModule)
 				throw InvalidOperationException("failed to load default material.");
 		}
-		// use default geometry if failed to load
-		if (!material->MaterialGeometryModule)
-		{
-			CreateMaterialModuleInstance(material->MaterialGeometryModule, material, "DefaultGeometry", false);
-			if (!material->MaterialGeometryModule)
-				throw InvalidOperationException("failed to load default material.");
-		}
-        material->IsDoubleSided = material->MaterialPatternModule.GetTypeSymbol()->HasMember("DoubleSided");
-		material->IsTransparent = material->MaterialPatternModule.GetTypeSymbol()->HasMember("Transparent");
+        material->IsDoubleSided = material->MaterialModule.GetTypeSymbol()->HasMember("DoubleSided");
+		material->IsTransparent = material->MaterialModule.GetTypeSymbol()->HasMember("Transparent");
 
 	}
 	
@@ -488,13 +479,15 @@ namespace GameEngine
 		{
 			List<DescriptorLayout> descs;
 			if (rs.UniformMemory)
-				descs.Add(DescriptorLayout(GameEngine::StageFlags(sfGraphics | sfCompute), 0, BindingType::UniformBuffer));
+				descs.Add(DescriptorLayout(sfGraphicsAndCompute, 0, BindingType::UniformBuffer));
 			for (auto & v : typeSymbol->VarLayouts)
 			{
 				if (v.Value.Type != ShaderVariableType::Data)
 				{
 					DescriptorLayout descLayout;
-					descLayout.Location = descs.Count();
+                    descLayout.Location = v.Value.BindingOffset;
+                    descLayout.Name = v.Value.Name;
+                    descLayout.Stages = sfGraphicsAndCompute;
 					switch (v.Value.Type)
 					{
                     case ShaderVariableType::Texture:
@@ -677,11 +670,9 @@ namespace GameEngine
 			pipelineManager.SetCullMode(lastMaterial->IsDoubleSided ? CullMode::Disabled : CullMode::CullBackFace);
 
 			cmdBuf->BindIndexBuffer(drawables[0]->GetMesh()->GetIndexBuffer(), 0);
-			pipelineManager.PushModuleInstance(&lastMaterial->MaterialGeometryModule);
-			pipelineManager.PushModuleInstance(&lastMaterial->MaterialPatternModule);
+			pipelineManager.PushModuleInstance(&lastMaterial->MaterialModule);
 			numMaterials++;
-			BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count(), lastMaterial->MaterialGeometryModule.GetCurrentDescriptorSet());
-			BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count() + 1, lastMaterial->MaterialPatternModule.GetCurrentDescriptorSet());
+			BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count(), lastMaterial->MaterialModule.GetCurrentDescriptorSet());
 			for (auto obj : drawables)
 			{
 				numDrawCalls++;
@@ -698,8 +689,7 @@ namespace GameEngine
 					for (int i = 0; i < bindings.Count(); i++)
 						cmdBuf->BindDescriptorSet(i, bindings[i]);
 					cmdBuf->BindIndexBuffer(obj->GetMesh()->GetIndexBuffer(), 0);
-					BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count(), lastMaterial->MaterialGeometryModule.GetCurrentDescriptorSet());
-					BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count() + 1, lastMaterial->MaterialPatternModule.GetCurrentDescriptorSet());
+					BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count(), lastMaterial->MaterialModule.GetCurrentDescriptorSet());
 					lastPipeline = nullptr;
 					lastMesh = nullptr;
 				}
@@ -708,9 +698,7 @@ namespace GameEngine
 				{
 					numMaterials++;
 					pipelineManager.PopModuleInstance();
-					pipelineManager.PopModuleInstance();
-					pipelineManager.PushModuleInstance(&newMaterial->MaterialGeometryModule);
-					pipelineManager.PushModuleInstance(&newMaterial->MaterialPatternModule);
+					pipelineManager.PushModuleInstance(&newMaterial->MaterialModule);
 					pipelineManager.SetCullMode(newMaterial->IsDoubleSided ? CullMode::Disabled : CullMode::CullBackFace);
 				}
 				pipelineManager.PushModuleInstanceNoShaderChange(obj->GetTransformModule());
@@ -725,8 +713,7 @@ namespace GameEngine
 					auto mesh = obj->GetMesh();
 					if (newMaterial != lastMaterial)
 					{
-						BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count(), newMaterial->MaterialGeometryModule.GetCurrentDescriptorSet());
-						BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count() + 1, newMaterial->MaterialPatternModule.GetCurrentDescriptorSet());
+						BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count(), newMaterial->MaterialModule.GetCurrentDescriptorSet());
 					}
 					BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count() + 2, obj->GetTransformModule()->GetCurrentDescriptorSet());
 					if (mesh != lastMesh)
@@ -757,8 +744,7 @@ namespace GameEngine
 		if (drawables.Count())
 		{
 			lastMaterial = drawables[0]->GetMaterial();
-			pipelineManager.PushModuleInstance(&lastMaterial->MaterialGeometryModule);
-			pipelineManager.PushModuleInstance(&lastMaterial->MaterialPatternModule);
+			pipelineManager.PushModuleInstance(&lastMaterial->MaterialModule);
 		}
 
 		for (auto obj : drawables)
@@ -768,9 +754,7 @@ namespace GameEngine
 			if (newMaterial != lastMaterial)
 			{
 				pipelineManager.PopModuleInstance();
-				pipelineManager.PopModuleInstance();
-				pipelineManager.PushModuleInstance(&newMaterial->MaterialGeometryModule);
-				pipelineManager.PushModuleInstance(&newMaterial->MaterialPatternModule);
+				pipelineManager.PushModuleInstance(&newMaterial->MaterialModule);
 				lastMaterial = newMaterial;
 			}
 			pipelineManager.PushModuleInstanceNoShaderChange(obj->GetTransformModule());
@@ -781,7 +765,6 @@ namespace GameEngine
 		}
 		if (drawables.Count())
 		{
-			pipelineManager.PopModuleInstance();
 			pipelineManager.PopModuleInstance();
 		}
 		reorderBuffer.Sort([](Drawable* d1, Drawable* d2) {return d1->ReorderKey < d2->ReorderKey; });

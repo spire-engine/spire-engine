@@ -18,7 +18,7 @@ namespace GameEngine
 		pipelineBuilder->SetVertexLayout(deferredVertexFormat);
 		ShaderCompilationResult rs;
 		auto shaderFileName = GetShaderFileName();
-        auto compiledShader = CompileGraphicsShader(renderer->GetHardwareRenderer(), shaderFileName);
+        auto compiledShader = CompileGraphicsShader(rs, renderer->GetHardwareRenderer(), shaderFileName);
 		if (!compiledShader)
 			throw HardwareRendererException("Shader compilation failure");
 
@@ -30,10 +30,10 @@ namespace GameEngine
 		descLayouts.SetSize(rs.BindingLayouts.Count());
 		for (auto & desc : rs.BindingLayouts)
 		{
-			if (desc.Value.BindingPoint == -1) continue;
-			if (desc.Value.BindingPoint >= descLayouts.Count())
-				descLayouts.SetSize(desc.Value.BindingPoint + 1);
-			descLayouts[desc.Value.BindingPoint] = hwRenderer->CreateDescriptorSetLayout(desc.Value.Descriptors.GetArrayView());
+			if (desc.BindingPoint == -1) continue;
+			if (desc.BindingPoint >= descLayouts.Count())
+				descLayouts.SetSize(desc.BindingPoint + 1);
+			descLayouts[desc.BindingPoint] = hwRenderer->CreateDescriptorSetLayout(desc.Descriptors.GetArrayView());
 		}
 		pipelineBuilder->SetBindingLayout(From(descLayouts).Select([](auto x) { return x.Ptr(); }).ToList().GetArrayView());
 		

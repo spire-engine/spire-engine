@@ -10,6 +10,7 @@ namespace GameEngine
 	{
 		CoreLib::List<DescriptorLayout> Descriptors;
 		int BindingPoint;
+        CoreLib::String Name;
 	};
 
     enum class ShaderVariableType
@@ -52,7 +53,7 @@ namespace GameEngine
 	public:
 		CoreLib::List<CoreLib::List<char>> ShaderCode;
 		CoreLib::String Diagnostics;
-		CoreLib::EnumerableDictionary<CoreLib::String, DescriptorSetInfo> BindingLayouts;
+		CoreLib::List<DescriptorSetInfo> BindingLayouts;
     };
 
     class ShaderCompilationEnvironment : public CoreLib::RefObject
@@ -82,7 +83,7 @@ namespace GameEngine
             return vertexShader && fragmentShader;
         }
     };
-    ShaderSet CompileGraphicsShader(HardwareRenderer * hw, CoreLib::String fileName);
+    ShaderSet CompileGraphicsShader(ShaderCompilationResult & crs, HardwareRenderer * hw, CoreLib::String fileName);
 }
 
 #endif

@@ -60,9 +60,12 @@ namespace GameEngine
 			DescriptorLayout(StageFlags::sfGraphics, 0, BindingType::Texture),
 			DescriptorLayout(StageFlags::sfGraphics, 1, BindingType::Sampler)).GetArrayView());
 		pb->SetBindingLayout(copyPassLayout.Ptr());
-		auto copyShaderSet = CompileGraphicsShader(hw, "CopyPixel.slang");
-        Shader* shaders[] = { copyShaderSet.vertexShader.Ptr(), copyShaderSet.fragmentShader.Ptr() };
-        pb->SetShaders(ArrayView<Shader*>(shaders, 2));
+        {
+            ShaderCompilationResult crs;
+            auto copyShaderSet = CompileGraphicsShader(crs, hw, "CopyPixel.slang");
+            Shader* shaders[] = { copyShaderSet.vertexShader.Ptr(), copyShaderSet.fragmentShader.Ptr() };
+            pb->SetShaders(ArrayView<Shader*>(shaders, 2));
+        }
 		RefPtr<RenderTargetLayout> copyRTLayout = hw->CreateRenderTargetLayout(MakeArrayView(AttachmentLayout(TextureUsage::ColorAttachment, StorageFormat::RGBA_F16)));
 		RefPtr<Pipeline> copyPipeline = pb->ToPipeline(copyRTLayout.Ptr());
 		RefPtr<DescriptorSet> copyDescSet = hw->CreateDescriptorSet(copyPassLayout.Ptr());
@@ -195,9 +198,12 @@ namespace GameEngine
 			DescriptorLayout(StageFlags::sfGraphics, 2, BindingType::Sampler)).GetArrayView());
 		RefPtr<Buffer> uniformBuffer = hw->CreateMappedBuffer(BufferUsage::UniformBuffer, sizeof(PrefilterUniform));
 		pb2->SetBindingLayout(prefilterPassLayout.Ptr());
-		auto prefilterShaderSet = CompileGraphicsShader(hw, "LightProbePrefilter.slang");
-        Shader* shaderList[] = { copyShaderSet.vertexShader.Ptr(), copyShaderSet.fragmentShader.Ptr() };
-        pb2->SetShaders(ArrayView<Shader*>(shaderList, 2));
+        {
+            ShaderCompilationResult crs;
+            auto prefilterShaderSet = CompileGraphicsShader(crs, hw, "LightProbePrefilter.slang");
+            Shader* shaderList[] = { prefilterShaderSet.vertexShader.Ptr(), prefilterShaderSet.fragmentShader.Ptr() };
+            pb2->SetShaders(ArrayView<Shader*>(shaderList, 2));
+        }
 		RefPtr<RenderTargetLayout> prefilterRTLayout = hw->CreateRenderTargetLayout(MakeArrayView(AttachmentLayout(TextureUsage::ColorAttachment, StorageFormat::RGBA_F16)));
 		RefPtr<Pipeline> prefilterPipeline = pb2->ToPipeline(prefilterRTLayout.Ptr());
 		RefPtr<DescriptorSet> prefilterDescSet = hw->CreateDescriptorSet(prefilterPassLayout.Ptr());

@@ -63,25 +63,25 @@ namespace GameEngine
 
 			virtual CoreLib::RefPtr<Drawable> CreateStaticDrawable(Mesh * mesh, int elementId, Material * material, bool cacheMesh) override
 			{
-				if (!material->MaterialPatternModule)
+				if (!material->MaterialModule)
 					renderer->sceneRes->RegisterMaterial(material);
 				RefPtr<Drawable> rs = CreateDrawableShared(mesh, material, cacheMesh);
 				rs->type = DrawableType::Static;
 				rs->elementRange = mesh->ElementRanges[elementId];
-				CreateTransformModuleInstance(*rs->transformModule, "NoAnimation", (int)(sizeof(Vec4) * 4));
+				CreateTransformModuleInstance(*rs->transformModule, "StaticMeshTransform", (int)(sizeof(Vec4) * 4));
 				rs->vertFormat = mesh->GetVertexFormat();
 				return rs;
 			}
 			virtual CoreLib::RefPtr<Drawable> CreateSkeletalDrawable(Mesh * mesh, int elementId, Skeleton * skeleton, Material * material, bool cacheMesh) override
 			{
-				if (!material->MaterialPatternModule)
+				if (!material->MaterialModule)
 					renderer->sceneRes->RegisterMaterial(material);
 				RefPtr<Drawable> rs = CreateDrawableShared(mesh, material, cacheMesh);
 				rs->type = DrawableType::Skeletal;
 				rs->elementRange = mesh->ElementRanges[elementId];
 				rs->skeleton = skeleton;
 				int poseMatrixSize = skeleton->Bones.Count() * (sizeof(Vec4) * 4);
-				CreateTransformModuleInstance(*rs->transformModule, "SkeletalAnimation", poseMatrixSize);
+				CreateTransformModuleInstance(*rs->transformModule, "SkeletalAnimationTransform", poseMatrixSize);
 				rs->vertFormat = mesh->GetVertexFormat();
 				return rs;
 			}

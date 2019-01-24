@@ -24,17 +24,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\ExternalLibs\Slang\bin\windows-x64\release\slang-glslang.dll">
+    <Library Include="..\ExternalLibs\Slang\bin\windows-x64\release\slang.dll">
       <Filter>Slang\x64</Filter>
-    </None>
-    <None Include="..\ExternalLibs\Slang\bin\windows-x64\release\slang.dll">
+    </Library>
+    <Library Include="..\ExternalLibs\Slang\bin\windows-x64\release\slang-glslang.dll">
       <Filter>Slang\x64</Filter>
-    </None>
-    <None Include="..\ExternalLibs\Slang\bin\windows-x86\release\slang.dll">
-      <Filter>Slang\x86</Filter>
-    </None>
-    <None Include="..\ExternalLibs\Slang\bin\windows-x86\release\slang-glslang.dll">
-      <Filter>Slang\x86</Filter>
-    </None>
+    </Library>
   </ItemGroup>
 </Project>

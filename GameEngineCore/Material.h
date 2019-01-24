@@ -18,18 +18,18 @@ namespace GameEngine
 		bool ParameterDirty = true;
 		bool IsTransparent = false;
 		bool IsDoubleSided = false;
-		ModuleInstance MaterialPatternModule, MaterialGeometryModule;
+		ModuleInstance MaterialModule;
 		CoreLib::EnumerableDictionary<CoreLib::String, DynamicVariable> Variables;
-		CoreLib::List<DynamicVariable*> PatternVariables, GeometryVariables;
+		CoreLib::List<DynamicVariable*> PatternVariables;
 		void SetVariable(CoreLib::String name, DynamicVariable value);
 		void Parse(CoreLib::Text::TokenReader & parser);
 		void Serialize(CoreLib::StringBuilder & sb);
 		void LoadFromFile(const CoreLib::String & fullFileName);
 		Material();
 		template<typename WriteTextureFunc, typename WriteFunc, typename AlignFunc>
-		void FillInstanceUniformBuffer(ModuleInstance * module, const WriteTextureFunc & writeTex, const WriteFunc & write, const AlignFunc & align)
+		void FillInstanceUniformBuffer(const WriteTextureFunc & writeTex, const WriteFunc & write, const AlignFunc & align)
 		{
-			auto& vars = module == &MaterialPatternModule ? PatternVariables : GeometryVariables;
+			auto& vars = PatternVariables;
 			for (auto & mvar : vars)
 			{
 				if (mvar->VarType == DynamicVariableType::Texture)

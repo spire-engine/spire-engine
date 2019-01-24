@@ -26,7 +26,7 @@ namespace GameEngine
     public:
         int GetSlangTarget()
         {
-            auto sl = Engine::Instance()->GetRenderer()->GetHardwareRenderer()->GetShadingLanguage();
+            auto sl = Engine::Instance()->GetTargetShadingLanguage();
             switch (sl)
             {
             case TargetShadingLanguage::HLSL:
@@ -52,22 +52,38 @@ namespace GameEngine
             }
             throw ArgumentException("Unknown shader type.");
         }
-        BindingType SlangCategoryToDescriptorType(int c)
+        BindingType SlangResourceKindToDescriptorType(slang::TypeReflection::Kind k, SlangResourceShape shape)
         {
-            switch (c)
+            switch (k)
             {
-            case SLANG_PARAMETER_CATEGORY_UNIFORM:
-                return BindingType::Unused;
-            case SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER:
+            case slang::TypeReflection::Kind::ConstantBuffer:
                 return BindingType::UniformBuffer;
-            case SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE:
-                return BindingType::Texture;
-            case SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS:
-                return BindingType::StorageBuffer;
-            case SLANG_PARAMETER_CATEGORY_SAMPLER_STATE:
+            case slang::TypeReflection::Kind::SamplerState:
                 return BindingType::Sampler;
+            case slang::TypeReflection::Kind::Resource:
+                switch (shape)
+                {
+                case SLANG_STRUCTURED_BUFFER:
+                case SLANG_BYTE_ADDRESS_BUFFER:
+                    return BindingType::StorageBuffer;
+                default:
+                    return BindingType::Texture;
+                    break;
+                }
             }
-            throw ArgumentException("Unknown slang category type.");
+            throw ArgumentException("Unknown slang resource kind.");
+        }
+        bool IsResourceParam(int slangCategory)
+        {
+            switch (slangCategory)
+            {
+            case SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER:
+            case SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE:
+            case SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS:
+            case SLANG_PARAMETER_CATEGORY_SAMPLER_STATE:
+                return true;
+            }
+            return false;
         }
         virtual bool CompileShader(ShaderCompilationResult & src,
             const CoreLib::ArrayView<ShaderEntryPoint*> entryPoints,
@@ -77,7 +93,7 @@ namespace GameEngine
             auto req = NewCompileRequest();
             for (auto ep : entryPoints)
             {
-                int unit = spAddTranslationUnit(req, GetSlangTarget(), ep->FileName.Buffer());
+                int unit = spAddTranslationUnit(req, SLANG_SOURCE_LANGUAGE_SLANG, ep->FileName.Buffer());
                 auto path = Engine::Instance()->FindFile(ep->FileName, ResourceType::Shader);
                 spAddTranslationUnitSourceFile(req, unit, path.Buffer());
                 spAddEntryPoint(req, unit, ep->FunctionName.Buffer(), GetSlangStage(ep->Stage));
@@ -107,28 +123,48 @@ namespace GameEngine
                 src.ShaderCode[i].SetSize((int)size);
                 memcpy(src.ShaderCode[i].Buffer(), code, size);
             }
+            // extract reflection data
             slang::ShaderReflection * reflection = slang::ShaderReflection::get(req);
-            auto entryPoint = reflection->getEntryPointByIndex(0);
-            int paramCount = (int)entryPoint->getParameterCount();
-            EnumerableDictionary<int, DescriptorSetInfo> descSets;
+            int paramCount = (int)reflection->getParameterCount();
             for (int i = 0; i < paramCount; i++)
             {
-                auto param = entryPoint->getParameterByIndex(i);
-                int space = param->getBindingSpace();
-                auto descSet = descSets.TryGetValue(space);
-                if (!descSet)
+                auto param = reflection->getParameterByIndex(i);
+                auto paramName = param->getName();
+                if (param->getType()->getKind() == slang::TypeReflection::Kind::ParameterBlock)
                 {
-                    descSets.Add(space, DescriptorSetInfo());
-                    descSet = descSets.TryGetValue(space);
-                    descSet->BindingPoint = space;
-                }
-                if (param->getCategory() != slang::Uniform)
-                {
-                    DescriptorLayout desc;
-                    desc.Location = param->getBindingIndex();
-                    desc.Type = SlangCategoryToDescriptorType(param->getCategory());
-                    desc.Stages = stageFlags;
-                    descSet->Descriptors.Add(desc);
+                    auto layout = param->getTypeLayout();
+                    DescriptorSetInfo set;
+                    set.BindingPoint = param->getBindingSpace();
+                    set.Name = paramName;
+                    auto resType = layout->getElementVarLayout()->getTypeLayout();
+                    auto reslayout = layout->getElementVarLayout();
+                    int slotOffset = (int)reslayout->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+                    bool hasUniform = false;
+                    for (auto f = 0u; f < resType->getFieldCount(); f++)
+                    {
+                        auto field = resType->getFieldByIndex(f);
+                        if (field->getCategory() == slang::Uniform)
+                        {
+                            if (!hasUniform)
+                            {
+                                DescriptorLayout desc;
+                                desc.Location = 0;
+                                desc.Type = BindingType::UniformBuffer;
+                                desc.Stages = stageFlags;
+                                desc.Name = field->getName();
+                                set.Descriptors.Add(desc);
+                                hasUniform = true;
+                            }
+                            continue;
+                        }
+                        DescriptorLayout desc;
+                        desc.Location = field->getBindingIndex() + slotOffset;
+                        desc.Name = field->getName();
+                        desc.Type = SlangResourceKindToDescriptorType(field->getType()->getKind(), field->getType()->getResourceShape());
+                        desc.Stages = stageFlags;
+                        set.Descriptors.Add(desc);
+                    }
+                    src.BindingLayouts.Add(set);
                 }
             }
             spDestroyCompileRequest(req);
@@ -147,6 +183,8 @@ namespace GameEngine
             spAddSearchPath(compileRequest, Engine::Instance()->GetDirectory(false, ResourceType::Material).Buffer());
             
             spAddCodeGenTarget(compileRequest, GetSlangTarget());
+            spAddCodeGenTarget(compileRequest, SLANG_GLSL);
+
             int shaderLibUnit = spAddTranslationUnit(compileRequest, SLANG_SOURCE_LANGUAGE_SLANG, "ShaderLib");
             auto shaderLibPath = Engine::Instance()->FindFile("ShaderLib.slang", ResourceType::Shader);
             spAddTranslationUnitSourceFile(compileRequest, shaderLibUnit, shaderLibPath.Buffer());
@@ -180,40 +218,51 @@ namespace GameEngine
                 return nullptr;
             }
             slang::ShaderReflection* shaderReflection = slang::ShaderReflection::get(compileRequest);
-            auto typeReflection = shaderReflection->findTypeByName(TypeName.Buffer());
+            auto typeReflection = shaderReflection->findTypeByName(("ParameterBlock<" + TypeName + " >").Buffer());
             if (!typeReflection)
             {
                 Print("Type %s not found in compiled shader library %s.\n", TypeName.Buffer(), fileName.Buffer());
                 spDestroyCompileRequest(compileRequest);
                 return nullptr;
             }
-            auto typeLayout = shaderReflection->getTypeLayout(typeReflection);
+            auto paramBlockLayout = shaderReflection->getTypeLayout(typeReflection)->getElementVarLayout();
+            auto typeLayout = paramBlockLayout->getTypeLayout();
+            int offset = (int)paramBlockLayout->getOffset(slang::DescriptorTableSlot);
             for (uint32_t i = 0u; i < typeLayout->getFieldCount(); i++)
             {
                 ShaderVariableLayout varLayout;
-                auto field = typeLayout->getFieldByIndex(i);
+                auto field = typeLayout->getFieldByIndex(i); 
                 varLayout.Name = field->getName();
-                varLayout.BindingOffset = field->getBindingIndex();
-                varLayout.BindingSpace = field->getBindingSpace();
-                varLayout.BindingLength = field->getCategoryCount();
-                switch (field->getCategory())
+                if (field->getCategory() == slang::Uniform)
                 {
-                case slang::ConstantBuffer:
-                    varLayout.Type = ShaderVariableType::UniformBuffer;
-                    break;
-                case slang::Uniform:
-                    varLayout.BindingOffset = (int)field->getOffset();
                     varLayout.Type = ShaderVariableType::Data;
-                    break;
-                case slang::SamplerState:
-                    varLayout.Type = ShaderVariableType::Sampler;
-                    break;
-                case slang::ShaderResource:
-                    varLayout.Type = ShaderVariableType::Texture;
-                    break;
-                case slang::UnorderedAccess:
-                    varLayout.Type = ShaderVariableType::StorageBuffer;
-                    break;
+                    varLayout.BindingOffset = (int)field->getOffset();
+                    varLayout.BindingLength = (int)field->getTypeLayout()->getSize();
+                    varLayout.BindingSpace = 0;
+                }
+                else
+                {
+                    auto bindingType = SlangResourceKindToDescriptorType(field->getType()->getKind(), field->getType()->getResourceShape());
+                    switch (bindingType)
+                    {
+                    case BindingType::UniformBuffer:
+                        varLayout.Type = ShaderVariableType::UniformBuffer;
+                        break;
+                    case BindingType::Sampler:
+                        varLayout.Type = ShaderVariableType::Sampler;
+                        break;
+                    case BindingType::Texture:
+                        varLayout.Type = ShaderVariableType::Texture;
+                        break;
+                    case BindingType::StorageBuffer:
+                        varLayout.Type = ShaderVariableType::StorageBuffer;
+                        break;
+                    default:
+                        throw InvalidProgramException("Unknown binding type.");
+                    }
+                    varLayout.BindingOffset = field->getBindingIndex() + offset;
+                    varLayout.BindingSpace = field->getBindingSpace();
+                    varLayout.BindingLength = field->getCategoryCount();
                 }
                 sym->VarLayouts.Add(varLayout.Name, varLayout);
             }
@@ -249,12 +298,11 @@ namespace GameEngine
 
     IShaderCompiler* CreateShaderCompiler()
     {
-        return nullptr;
+        return new SlangShaderCompiler();
     }
 
-    ShaderSet CompileGraphicsShader(HardwareRenderer * hw, String fileName)
+    ShaderSet CompileGraphicsShader(ShaderCompilationResult & crs, HardwareRenderer * hw, String fileName)
     {
-        ShaderCompilationResult crs;
         Array<ShaderEntryPoint*, 2> entryPoints;
         entryPoints.SetSize(2);
         entryPoints[0] = Engine::GetShaderCompiler()->LoadShaderEntryPoint(fileName, "vs_main");

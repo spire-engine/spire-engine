@@ -117,7 +117,7 @@ namespace GameEngine
 		}
 		virtual String GetShaderFileName() override
 		{
-			return "Atmosphere.shader";
+			return "Atmosphere.slang";
 		}
 		virtual char * GetName() override
 		{

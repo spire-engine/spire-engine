@@ -31,7 +31,7 @@ float3 RRTAndODTFit(float3 v)
 
 float3 transform(float3x3 m, float3 v)
 {
-    return float3(dot(m.x, v), dot(m.y, v), dot(m.z, v));
+    return float3(dot(m[0], v), dot(m[1], v), dot(m[2], v));
 }
 
 float3 ACESFitted(float3 color)
@@ -44,7 +44,7 @@ float3 ACESFitted(float3 color)
     color = transform(ACESOutputMat, color);
 
     // Clamp to [0, 1]
-    color = clamp(color, vec3(0.0), vec3(1.0));
+    color = clamp(color, float3(0.0), float3(1.0));
 
     return color;
 }

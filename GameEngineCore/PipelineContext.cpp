@@ -121,14 +121,14 @@ namespace GameEngine
 
         for (auto & descSet : compileRs.BindingLayouts)
         {
-            if (descSet.Value.BindingPoint == -1)
+            if (descSet.BindingPoint == -1)
                 continue;
-            for (auto & desc : descSet.Value.Descriptors)
+            for (auto & desc : descSet.Descriptors)
                 desc.Stages = (StageFlags)(StageFlags::sfVertex | StageFlags::sfFragment);
-            auto layout = hwRenderer->CreateDescriptorSetLayout(descSet.Value.Descriptors.GetArrayView());
-            if (descSet.Value.BindingPoint >= descSetLayouts.Count())
-                descSetLayouts.SetSize(descSet.Value.BindingPoint + 1);
-            descSetLayouts[descSet.Value.BindingPoint] = layout;
+            auto layout = hwRenderer->CreateDescriptorSetLayout(descSet.Descriptors.GetArrayView());
+            if (descSet.BindingPoint >= descSetLayouts.Count())
+                descSetLayouts.SetSize(descSet.BindingPoint + 1);
+            descSetLayouts[descSet.BindingPoint] = layout;
 
         }
 		pipelineBuilder->SetShaders(From(pipelineClass->shaders).Select([](const RefPtr<Shader>& s) {return s.Ptr(); }).ToList().GetArrayView());

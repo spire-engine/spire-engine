@@ -37,7 +37,7 @@ float ComputeLuminance(float3 color)
 float3 desaturate(float3 color, float factor)
 {
     float lum = ComputeLuminance(color);
-    return mix(color, float3(lum, lum, lum), factor);
+    return lerp(color, float3(lum, lum, lum), factor);
 }
 
 
@@ -47,6 +47,7 @@ struct TangentFrame
     float3 vertTangent;
     float3 vertBinormal;
 	float binormalSign;
+    [mutating]
 	void decode(uint frame)
 	{
 		float4 q;
@@ -67,7 +68,7 @@ struct TangentFrame
     }
     float3 TangentSpaceToWorldSpace(float3 v)
     {
-        return v.x * vTangent + v.y * vertBinormal * binormalSign + v.z * vNormal;        
+        return v.x * vertTangent + v.y * vertBinormal * binormalSign + v.z * vertNormal;        
     }
 };
 
@@ -88,15 +89,15 @@ struct StaticMeshTransform : IWorldSpaceTransform
   	VertexPositionInfo getWorldSpacePos(VertexPositionInfo input)
 	{
 		VertexPositionInfo rs;
-		rs.vertPos = (worldMat * float4(input.vertPos, 1.0)).xyz;
-		rs.vertTangent = (worldMat * float4(input.vertTangent, 0.0)).xyz;
-		rs.vertBinormal = (worldMat * float4(input.vertBinormal, 0.0)).xyz;
-		rs.vertNormal = cross(rs.vertBinormal, rs.vertTangent);
+		rs.vertPos = mul(worldMat, float4(input.vertPos, 1.0)).xyz;
+		rs.tangentFrame.vertTangent = mul(worldMat, float4(input.tangentFrame.vertTangent, 0.0)).xyz;
+		rs.tangentFrame.vertBinormal = mul(worldMat, float4(input.tangentFrame.vertBinormal, 0.0)).xyz;
+		rs.tangentFrame.vertNormal = cross(rs.tangentFrame.vertBinormal, rs.tangentFrame.vertTangent);
 		return rs;
 	}
 };
 
-struct SkeletalAnimation : IWorldSpaceTransform
+struct SkeletalAnimationTransform : IWorldSpaceTransform
 {
     require float3 vertPos;
     require float3 vertBinormal;
@@ -104,31 +105,31 @@ struct SkeletalAnimation : IWorldSpaceTransform
     require uint boneIds;
     require float4 boneWeights;
 
-    require mat4 viewProjectionTransform;
+    require float4x4 viewProjectionTransform;
 
-    float4x4[128] boneTransforms;
+    float4x4 boneTransforms[128];
     
     VertexPositionInfo getWorldSpacePos(VertexPositionInfo input, uint boneIds, float4 boneWeights)
     {
         VertexPositionInfo result;
         result.vertPos = float3(0.0);
-        result.vertBinormal = float3(0.0);
-        result.vertTangent = float3(0.0);
+        result.tangentFrame.vertBinormal = float3(0.0);
+        result.tangentFrame.vertTangent = float3(0.0);
         for (int i = 0; i < 4; i++)
         {
             uint boneId = (boneIds >> (i*8)) & 255;
             if (boneId == 255) break;
             float boneWeight = boneWeights[i];
-            float3 tp = (boneTransforms[boneId] * float4(vinput.vertPos, 1.0)).xyz;
+            float3 tp = mul(boneTransforms[boneId], float4(input.vertPos, 1.0)).xyz;
             result.vertPos += tp * boneWeight;
-            tp = float3x3(boneTransforms[boneId]) * input.vertBinormal;
-            result.vertBinormal += tp * boneWeight;
-            tp = float3x3(boneTransforms[boneId]) * input.vertTangent;
-            result.vertTangent += tp * boneWeight;
+            tp = mul(float3x3(boneTransforms[boneId]), input.tangentFrame.vertBinormal);
+            result.tangentFrame.vertBinormal += tp * boneWeight;
+            tp = mul(float3x3(boneTransforms[boneId]), input.tangentFrame.vertTangent);
+            result.tangentFrame.vertTangent += tp * boneWeight;
         }
-        result.vertBinormal = normalize(result.vertBinormal);
-        result.vertTangent = normalize(result.vertTangent);
-		result.vertNormal = cross(result.vertBinormal, result.vertTangent);
+        result.tangentFrame.vertBinormal = normalize(result.tangentFrame.vertBinormal);
+        result.tangentFrame.vertTangent = normalize(result.tangentFrame.vertTangent);
+		result.tangentFrame.vertNormal = cross(result.tangentFrame.vertBinormal, result.tangentFrame.vertTangent);
         return result;
     }
 };
@@ -142,6 +143,7 @@ struct ParallaxOcclusionMappingOutput
 {
     float2 uvOut;
     float heightOut;
+    float parallaxScale;
 
     float selfShadow<THeightField : IHeightField>(THeightField heightfield, float3 L_tangentSpace)
     {
@@ -159,7 +161,7 @@ struct ParallaxOcclusionMappingOutput
             // calculate initial parameters
             float numSamplesUnderSurface = 0;
             shadowMultiplier = 0;
-            float numLayers	= mix(maxLayers, minLayers, abs(L.z));
+            float numLayers	= lerp(maxLayers, minLayers, abs(L.z));
             float layerHeight = max(0.03, abs(initialHeight / numLayers));
             float2 texStep = parallaxScale * L.xy / L.z / numLayers;
             texStep.y = -texStep.y;        
@@ -212,7 +214,7 @@ ParallaxOcclusionMappingOutput ParallaxOcclusionMapping<THeightField : IHeightFi
     // determine optimal number of layers
     float minLayers = 10;
     float maxLayers = 15;
-    float numLayers = mix(maxLayers, minLayers, abs(V.z));
+    float numLayers = lerp(maxLayers, minLayers, abs(V.z));
 
     // height of each layer
     float layerHeight = 1.0 / numLayers;
@@ -276,6 +278,7 @@ ParallaxOcclusionMappingOutput ParallaxOcclusionMapping<THeightField : IHeightFi
     parallaxHeight = curLayerHeight; 
 	
 	ParallaxOcclusionMappingOutput rs;
+    rs.parallaxScale = parallaxScale;
     rs.uvOut = currentTextureCoords;
 	rs.heightOut = parallaxHeight;
 	return rs;
@@ -348,13 +351,13 @@ struct LightingEnvironment
     int numCascades;
     int lightCount;
     int lightProbeCount;
-    mat4[8] lightMatrix;
-    float4[2] zPlanes;
+    float4x4 lightMatrix[8];
+    float4 zPlanes[2];
     float4 ambient;
     StructuredBuffer<Light> lights;
     StructuredBuffer<LightProbe> lightProbes;
     SamplerState envMapSampler;
-    Texture2DArrayShadow shadowMapArray;
+    Texture2DArray shadowMapArray;
     SamplerComparisonState shadowMapSampler;
     TextureCubeArray envMap;
 };
@@ -368,12 +371,12 @@ interface IMaterialPattern
 
 interface ISelfShadow
 {
-	float getSelfShadow(float3 lightDir);
+	float get(float3 lightDir);
 };
 
 struct NoSelfShadow : ISelfShadow
 {
-	float getSelfShadow(float3 lightDir)
+	float get(float3 lightDir)
 	{
 		return 1.0;
 	}
@@ -396,43 +399,39 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 		VertexPositionInfo shadingPoint,
 		ViewParams viewParams)
 	{
-		float3 normal = shadingPoint.tangentFrame.TangentSpaceToWorldSpace(material.normal);
-		float3 view = normalize(viewParams.cameraPos - pos);
+		float3 wnormal = shadingPoint.tangentFrame.TangentSpaceToWorldSpace(normal);
+		float3 view = normalize(viewParams.cameraPos - shadingPoint.vertPos);
 		float3 lNormal;
         if (isDoubleSided)
         {
-            lNormal = dot(normal, view) < 0 ? -normal : normal;
+            lNormal = dot(wnormal, view) < 0 ? -wnormal : wnormal;
         }
         else
         {
-            lNormal = normal;
+            lNormal = wnormal;
         }
-
-		float roughness_in = material.roughness;
-		float metallic_in = material.metallic;
-		float specular_in = material.specular;
   
-        float dielectricSpecluar = 0.02*specular_in;
-        float3 diffuseColor = material.albedo - material.albedo * metallic_in;
-        float3 specularColor = float3(dielectricSpecluar - dielectricSpecluar * metallic_in) + material.albedo * metallic_in;
-        float3 viewPos = (viewParams.viewTransform * float4(shadingPoint.vertPos, 1.0)).xyz;
-        float3 color = diffuseColor * ambient.xyz;
+        float dielectricSpecluar = 0.02*specular;
+        float3 diffuseColor = albedo - albedo * metallic;
+        float3 specularColor = float3(dielectricSpecluar - dielectricSpecluar * metallic) + albedo * metallic;
+        float3 viewPos = mul(viewParams.viewTransform, float4(shadingPoint.vertPos, 1.0)).xyz;
+        float3 color = diffuseColor * lightEnv.ambient.xyz;
         float3 R = reflect(-view, lNormal);
 
-        if (sunLightEnabled != 0)
+        if (lightEnv.sunLightEnabled != 0)
         {
-            float shadow = selfShadow(sunLightDir);
+            float shadow = selfShadow.get(lightEnv.sunLightDir);
             
-            if (numCascades)
+            if (lightEnv.numCascades)
             {
-                for (int i = 0; i < numCascades; i++)
+                for (int i = 0; i < lightEnv.numCascades; i++)
                 {
-                    if (-viewPos.z < zPlanes[i>>2][i&3])
+                    if (-viewPos.z < lightEnv.zPlanes[i>>2][i&3])
                     {
-                        float4 lightSpacePosT = lightMatrix[i] * float4(shadingPoint.vertPos, 1.0);
+                        float4 lightSpacePosT = mul(lightEnv.lightMatrix[i], float4(shadingPoint.vertPos, 1.0));
                         float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
-                        float val = shadowMapArray.SampleCmp(shadowMapSampler, 
-                            float3(lightSpacePos.xy, i+shadowMapId), lightSpacePos.z);
+                        float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler, 
+                            float3(lightSpacePos.xy, i+lightEnv.shadowMapId), lightSpacePos.z);
                         shadow *= val;
                         break;
                     }
@@ -440,15 +439,15 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
             }
             
             float NoV = max(dot(lNormal, view), 0.0);
-            float3 fspecularColor = EnvBRDFApprox(specularColor, roughness_in, NoV);
+            float3 fspecularColor = EnvBRDFApprox(specularColor, roughness, NoV);
             float3 R = reflect(-view, lNormal);
-            float RoL = max(0, dot(R, sunLightDir));
-            float dotNL = clamp(dot(lNormal, sunLightDir), 0.01, 0.99);
-            color += sunLightColor.xyz * dotNL * 
-                    (diffuseColor + fspecularColor * PhongApprox(roughness_in, RoL)) * shadow;
+            float RoL = max(0, dot(R, lightEnv.sunLightDir));
+            float dotNL = clamp(dot(lNormal, lightEnv.sunLightDir), 0.01, 0.99);
+            color += lightEnv.sunLightColor.xyz * dotNL * 
+                    (diffuseColor + fspecularColor * PhongApprox(roughness, RoL)) * shadow;
         }
 
-        for (int i = 0; i < lightCount; i++)
+        for (int i = 0; i < lightEnv.lightCount; i++)
         {
             Light light = lightEnv.lights[i];
             uint lightType = light.lightType_shadowMapId & 65535;
@@ -464,30 +463,30 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
                 if (lightType == 2)
                 {
                     float ang = acos(dot(lightDir, UnpackDir(light.direction)));
-                    actualDecay *= mix(1.0, 0.0, clamp((ang-light.startAngle) / (light.endAngle-light.startAngle), 0.0, 1.0));
+                    actualDecay *= lerp(1.0, 0.0, clamp((ang-light.startAngle) / (light.endAngle-light.startAngle), 0.0, 1.0));
                 }
             }
             else if (lightType == 1) // directional light
             {
                 lightDir = UnpackDir(light.direction);
             }
-            float shadow = selfShadow(lightDir);
+            float shadow = selfShadow.get(lightDir);
             
             if (shadowMapId != 65535)
             {
-                float4 lightSpacePosT = light.lightMatrix * float4(pos, 1.0);
+                float4 lightSpacePosT = mul(light.lightMatrix, float4(shadingPoint.vertPos, 1.0));
                 float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
-                float val = shadowMapArray.SampleCmp(shadowMapSampler, 
+                float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler, 
                     float3(lightSpacePos.xy, shadowMapId), lightSpacePos.z);
                 shadow *= val;
             }
             
             float dotNL = clamp(dot(lNormal, lightDir), 0.01, 0.99);
             float NoV = max(dot(lNormal, view), 0.0);
-            float3 fspecularColor = EnvBRDFApprox(specularColor, roughness_in, NoV);
+            float3 fspecularColor = EnvBRDFApprox(specularColor, roughness, NoV);
             
             float RoL = max(0, dot(R, lightDir));
-            color += light.color * (diffuseColor * dotNL + fspecularColor * PhongApprox(roughness_in, RoL)) * (shadow * actualDecay);
+            color += light.color * (diffuseColor * dotNL + fspecularColor * PhongApprox(roughness, RoL)) * (shadow * actualDecay);
         }
 
         // find closest light probe
@@ -496,14 +495,14 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
         float minDist = 1e10;
         float3 lpTint = float3(1.0, 1.0, 1.0);
         
-        for (int i = 0; i < lightProbeCount; i++)
+        for (int i = 0; i < lightEnv.lightProbeCount; i++)
         {
             LightProbe lp = lightEnv.lightProbes[i];
             float dist = length(shadingPoint.vertPos-lp.position_radius.xyz);
             if (dist < lp.position_radius.w && dist < minDist)
             {
                 minDist = dist;
-                lightProbeId = floatBitsToInt(lp.tintColor_envMapId.w);
+                lightProbeId = asint(lp.tintColor_envMapId.w);
                 lpTint = lp.tintColor_envMapId.xyz;
             }
         }
@@ -511,14 +510,14 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
         if (lightProbeId != -1)
         {
             float3 specularIBL = specularColor * lightEnv.envMap.SampleLevel(lightEnv.envMapSampler, float4(R, float(lightProbeId)), 
-                                clamp(roughness_in, 0.0, 1.0) * 6.0).xyz;
+                                clamp(roughness, 0.0, 1.0) * 6.0).xyz;
             float3 diffuseIBL = diffuseColor * (lightEnv.envMap.SampleLevel(lightEnv.envMapSampler, float4(lNormal, float(lightProbeId)), 
                                 6.0).xyz);
             color += (specularIBL + diffuseIBL) * lpTint;
         }
         
         color *= ao;
-        return float4(color, material.opacity);
+        return float4(color, opacity);
     }
 };
 
@@ -544,7 +543,7 @@ interface IVertexAttribs
 	float3 getColor(int index);
 	float2 getUV(int index);
 	uint getBoneId(int index);
-	float getBoneWeights(int index);
+	float getBoneWeight(int index);
 }
 
 struct VertexAttribs<TColorSet : IVertexColorSet, TVertexUVSet : IVertexUVSet, TBoneWeightSet : IBoneWeightSet> : IVertexAttribs
@@ -577,7 +576,7 @@ struct SingleVertexColorSet : IVertexColorSet
 
 struct ArrayVertexColorSet<let n:int> : IVertexColorSet
 {
-    float3[n] values;
+    float3 values[n];
 	float3 getColor(int index) { return values[index]; }
 };
 
@@ -594,7 +593,7 @@ struct SingleVertexUVSet : IVertexUVSet
 
 struct ArrayVertexUVSet<let n : int> : IVertexUVSet
 {
-	float2[n] values;
+	float2 values[n];
 	float2 getUV(int index) { return values[index]; }
 };
 
@@ -625,14 +624,15 @@ struct StandardBoneWeightSet
 	};
 	PackedType value;
 	PackedType GetPackedRepresentation() { return value; }
+    [mutating]
 	void SetPackedRepresentation(PackedType val) { value = val; }
-	uint getBoneId(int index)
+	uint getBoneId(int i)
 	{
-		return (boneIds >> (i*8)) & 255;
+		return (value.boneIds >> (i*8)) & 255;
 	}
 	float getBoneWeight(int index)
 	{
-		return boneWeights[index];
+		return value.boneWeights[index];
 	}
 };
 
@@ -645,15 +645,15 @@ interface IVertexFormat
 	associatedtype UVSet : IVertexUVSet;
 	associatedtype BoneWeightSet : IBoneWeightSet;
 	ColorSet getColors();
-	UVSet GetUVs();
-	BoneWeightSet GetBoneWeightSet();
+	UVSet getUVs();
+	BoneWeightSet getBoneWeights();
 };
 
 struct StandardVertexFormat<TUVSet : IVertexUVSet, TColorSet : IVertexColorSet, TBoneWeightSet : IBoneWeightSet> : IVertexFormat
 {
 	typedef TUVSet UVSet;
 	typedef TColorSet ColorSet;
-	typedef TBoneWeightset BoneWeightSet;
+	typedef TBoneWeightSet BoneWeightSet;
 	float3 vertPos;
 	uint vertTangentFrame;
 	TUVSet uvSet;
@@ -663,18 +663,18 @@ struct StandardVertexFormat<TUVSet : IVertexUVSet, TColorSet : IVertexColorSet, 
 	TangentFrame getTangentFrame()
 	{
 		TangentFrame rs;
-		rs.decode(vertTnagentFrame);
+		rs.decode(vertTangentFrame);
 		return rs;
 	}
 	ColorSet getColors()
 	{
 		return colorSet;
 	}
-	UVSet GetUVs()
+	UVSet getUVs()
 	{
 		return uvSet;
 	}
-	BoneWeightSet GetBoneWeightSet()
+	BoneWeightSet getBoneWeights()
 	{
 		return boneWeightSet;
 	}

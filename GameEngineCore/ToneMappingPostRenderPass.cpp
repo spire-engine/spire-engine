@@ -55,7 +55,7 @@ namespace GameEngine
 		}
 		virtual CoreLib::String GetShaderFileName() override
 		{
-			return "ToneMapping.shader";
+			return "ToneMapping.slang";
 		}
 		virtual char * GetName() override
 		{

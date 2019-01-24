@@ -73,7 +73,7 @@ namespace GameEngine
         }
         virtual String GetShaderFileName() override
         {
-            return "Outline.shader";
+            return "Outline.slang";
         }
         virtual char * GetName() override
         {

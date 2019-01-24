@@ -397,9 +397,6 @@
     <None Include="..\EngineContent\Shaders\Atmosphere.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="ShaderLib.slang">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="..\EngineContent\Shaders\DefaultMaterial.slang">
       <Filter>Shaders</Filter>
     </None>
@@ -433,5 +430,12 @@
     <None Include="..\EngineContent\Shaders\UI.slang">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="..\EngineContent\Shaders\ShaderLib.slang">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="core.natvis" />
+    <Natvis Include="slang.natvis" />
   </ItemGroup>
 </Project>

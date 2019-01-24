@@ -20,5 +20,17 @@ Remove-Item 'slang-x64.zip'
 (New-Object Net.WebClient).DownloadFile("https://github.com/shader-slang/slang/releases/download/v$slangVersion/slang-$slangVersion-win32.zip", 'slang-32.zip')
 Expand-Archive -Path "slang-32.zip" -DestinationPath '.\ExternalLibs\Slang\' -Force
 Remove-Item 'slang-32.zip'
+New-Item .\x64\Debug -ItemType Directory
+New-Item .\x64\Release -ItemType Directory
+New-Item .\Debug -ItemType Directory
+New-Item .\Release -ItemType Directory
+Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang.dll" "x64\Debug\slang.dll"
+Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang.dll" "x64\Release\slang.dll"
+Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang-glslang.dll" "x64\Debug\slang-glslang.dll"
+Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang-glslang.dll" "x64\Release\slang-glslang.dll"
+Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x86\release\slang.dll" "Debug\slang.dll"
+Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x86\release\slang.dll" "Release\slang.dll"
+Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x86\release\slang-glslang.dll" "Debug\slang-glslang.dll"
+Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x86\release\slang-glslang.dll" "Release\slang-glslang.dll"
 "Done."
 cmd /c pause | out-null

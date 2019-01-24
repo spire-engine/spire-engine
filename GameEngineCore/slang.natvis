@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <Type Name="Slang::BCPtr&lt;*&gt;">
+    <SmartPointer Usage="Minimal">rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</SmartPointer>
+    <DisplayString Condition="rawVal == 0">BCPtr nullptr</DisplayString>
+    <DisplayString Condition="rawVal != 0">BCPtr {*($T1*)((char*)this + rawVal)}</DisplayString>
+    <Expand>
+      <ExpandedItem>rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</ExpandedItem>
+    </Expand>
+  </Type>
+  <Type Name="Slang::DeclRef&lt;*&gt;">
+    <SmartPointer Usage="Minimal">decl ? ($T1*)(decl) : ($T1*)0</SmartPointer>
+    <DisplayString Condition="decl == 0">DeclRef nullptr</DisplayString>
+    <DisplayString Condition="decl != 0">{(*(*(Slang::DeclRefBase*)this).decl).nameAndLoc}</DisplayString>
+    <Expand>
+      <ExpandedItem>decl ? ($T1*)(decl) : ($T1*)0</ExpandedItem>
+      <Item Name="[Substitutions]:">"========================="</Item>
+      <LinkedListItems>
+        <HeadPointer>substitutions.genericSubstitutions.pointer</HeadPointer>
+        <NextPointer>outer.pointer</NextPointer>
+        <ValueNode>this</ValueNode>
+      </LinkedListItems>
+        <LinkedListItems>
+            <HeadPointer>substitutions.globalGenParamSubstitutions.pointer</HeadPointer>
+            <NextPointer>outer.pointer</NextPointer>
+            <ValueNode>this</ValueNode>
+        </LinkedListItems>
+        <Item Name ="thisSubst">substitutions.thisTypeSubstitution</Item>
+    </Expand>
+  </Type>
+    <Type Name="Slang::DeclRefBase">
+        <SmartPointer Usage="Minimal">decl</SmartPointer>
+        <DisplayString Condition="decl == 0">DeclRefBase nullptr</DisplayString>
+        <DisplayString Condition="decl != 0">{(*(*(Slang::DeclRefBase*)this).decl).nameAndLoc}</DisplayString>
+        <Expand>
+            <ExpandedItem>decl</ExpandedItem>
+            <Item Name="[Substitutions]:">"========================="</Item>
+            <LinkedListItems>
+                <HeadPointer>substitutions.genericSubstitutions.pointer</HeadPointer>
+                <NextPointer>outer.pointer</NextPointer>
+                <ValueNode>this</ValueNode>
+            </LinkedListItems>
+            <LinkedListItems>
+                <HeadPointer>substitutions.globalGenParamSubstitutions.pointer</HeadPointer>
+                <NextPointer>outer.pointer</NextPointer>
+                <ValueNode>this</ValueNode>
+            </LinkedListItems>
+            <Item Name ="thisSubst">substitutions.thisTypeSubstitution</Item>
+        </Expand>
+    </Type>
+    <Type Name="Slang::GenericSubstitution">
+        <DisplayString>GenSubst {(*genericDecl).nameAndLoc}</DisplayString>
+        <Expand>
+            <Item Name="genericDecl">genericDecl</Item>
+            <ExpandedItem>args</ExpandedItem>
+        </Expand>
+    </Type>
+  <Type Name="Slang::DeclRefType">
+    <DisplayString>DeclRefType {declRef}</DisplayString>
+    <Expand>
+      <ExpandedItem>declRef</ExpandedItem>
+    </Expand>
+  </Type>
+    <Type Name="Slang::FuncDecl">
+        <DisplayString>FuncDecl {nameAndLoc}</DisplayString>
+    </Type>
+  <Type Name="Slang::Name">
+    <DisplayString>{{name={(char*)(text.buffer.pointer+1), s}}}</DisplayString>
+  </Type>
+  <Type Name="Slang::NameLoc">
+    <DisplayString>{{name={(char*)((*name).text.buffer.pointer+1), s} loc={loc.raw}}}</DisplayString>
+  </Type>
+  <Type Name="Slang::IRWitnessTableEntry">
+    <Expand>
+      <Item Name="[Key]">requirementKey</Item>
+      <Item Name="[Val]">satisfyingVal</Item>
+    </Expand>
+  </Type>
+  <Type Name="Slang::IRInst">
+    <DisplayString>{{{op}}}</DisplayString>
+    <Expand>
+      <Item Name="[op]">op</Item>
+      <Item Name="[type]">typeUse.usedValue</Item>
+      <Item Name="[value]" Condition="op == Slang::kIROp_StringLit">((IRStringLit*)this)->value.stringVal.chars,[((IRStringLit*)this)->value.stringVal.numChars]s8</Item>
+      <Item Name="[value]" Condition="op == Slang::kIROp_IntLit">((IRIntLit*)this)->value.intVal</Item>
+      <Synthetic Name="[operands]">
+        <DisplayString>{{count = {operandCount}}}</DisplayString>
+        <Expand>
+          <Item Name="[count]">operandCount</Item>
+          <ArrayItems>
+            <Size>operandCount</Size>
+            <ValuePointer>(IRUse*)(&amp;(typeUse) + 1)</ValuePointer>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+      <Item Name="[parent]">parent</Item>
+      <Synthetic Name="[decorations/children]">
+        <Expand>
+          <LinkedListItems>
+            <HeadPointer>m_decorationsAndChildren.first</HeadPointer>
+            <NextPointer>next</NextPointer>
+            <ValueNode>this</ValueNode>
+          </LinkedListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="[uses]">
+        <Expand>
+          <LinkedListItems>
+            <HeadPointer>firstUse</HeadPointer>
+            <NextPointer>nextUse</NextPointer>
+            <ValueNode>user</ValueNode>
+          </LinkedListItems>
+        </Expand>
+      </Synthetic>
+  </Expand>
+  </Type>
+  <Type Name="Slang::IRUse">
+    <DisplayString>{{IRUse {usedValue}}}</DisplayString>
+    <Expand>
+      <ExpandedItem>usedValue</ExpandedItem>
+    </Expand>
+  </Type>
+</AutoVisualizer>

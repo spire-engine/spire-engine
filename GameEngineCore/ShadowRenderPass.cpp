@@ -7,25 +7,6 @@ namespace GameEngine
 
 	class ShadowRenderPass : public WorldRenderPass
 	{
-	private:
-		const char * shaderSrc = R"(
-			template shader ShadowPass(
-                passParams:ForwardBasePassParams, 
-                geometryModule:IMaterialGeometry, 
-                materialModule:IMaterialPattern, 
-                animationModule, 
-                vertexAttribModule) targets StandardPipeline
-			{
-				public using vertexAttribModule;
-				public using passParams;
-				public using animationModule;
-				public using TangentSpaceTransform;
-				public using geometryModule;
-				public using VertexTransform;
-				public using materialModule;
-				out @Fragment vec3 ocolor { if (opacity < 0.8f) discard; return vec3(1.0); }
-			};
-		)";
 	protected:
 		virtual void SetPipelineStates(FixedFunctionPipelineStates & states) override
 		{

@@ -66,6 +66,7 @@ namespace GameEngine
 		float fixedFrameDuration = 1.0f / 30.0f;
 		unsigned int frameCounter = 0;
 		bool inDataTransfer = false;
+        TargetShadingLanguage targetShadingLanguage;
 		WindowBounds currentViewport;
 		GraphicsSettings graphicsSettings;
 		CoreLib::String levelToLoad;
@@ -153,6 +154,10 @@ namespace GameEngine
 		{
 			return renderStats.GetArrayView();
 		}
+        TargetShadingLanguage GetTargetShadingLanguage()
+        {
+            return targetShadingLanguage;
+        }
 	public:
 		Actor * CreateActor(const CoreLib::String & name);
 		void RegisterActorClass(const CoreLib::String &name, const CoreLib::Func<Actor*> & actorCreator);

@@ -207,7 +207,7 @@ namespace GameEngine
 		RendererSharedResource * rendererResource;
 		CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::RefPtr<DrawableMesh>> meshes;
 		CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::RefPtr<Texture2D>> textures;
-		void CreateMaterialModuleInstance(ModuleInstance & mInst, Material* material, const char * moduleName, bool isPatternModule);
+		void CreateMaterialModuleInstance(ModuleInstance & mInst, Material* material, const char * moduleName);
 	public:
 		CoreLib::RefPtr<DrawableMesh> LoadDrawableMesh(Mesh * mesh);
         CoreLib::RefPtr<DrawableMesh> CreateDrawableMesh(Mesh * mesh);

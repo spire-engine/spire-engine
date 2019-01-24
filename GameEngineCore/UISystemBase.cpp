@@ -259,8 +259,8 @@ namespace GameEngine
             system = pSystem;
             clipRect = Vec4::Create(0.0f, 0.0f, 1e20f, 1e20f);
             rendererApi = hw;
-
-            auto shaderSet = CompileGraphicsShader(hw, "UberUIShader.slang");
+            ShaderCompilationResult crs;
+            auto shaderSet = CompileGraphicsShader(crs, hw, "UI.slang");
 
             if (!shaderSet.fragmentShader)
             {
@@ -820,7 +820,7 @@ namespace GameEngine
         rs->indexBufferSize = rs->vertexBufferSize >> 2;
         rs->primitiveBuffer = rendererApi->CreateMappedBuffer(BufferUsage::StorageBuffer, rs->primitiveBufferSize * DynamicBufferLengthMultiplier);
         rs->vertexBuffer = rendererApi->CreateMappedBuffer(BufferUsage::ArrayBuffer, rs->vertexBufferSize * DynamicBufferLengthMultiplier);
-        rs->indexBuffer = rendererApi->CreateMappedBuffer(BufferUsage::ArrayBuffer, rs->indexBufferSize * DynamicBufferLengthMultiplier);
+        rs->indexBuffer = rendererApi->CreateMappedBuffer(BufferUsage::IndexBuffer, rs->indexBufferSize * DynamicBufferLengthMultiplier);
 
         for (int i = 0; i < rs->descSets.GetCapacity(); i++)
         {

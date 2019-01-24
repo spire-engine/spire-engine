@@ -61,7 +61,7 @@ namespace GameEngine
 
 		DeviceMemory renderPassUniformMemory;
 		SharedModuleInstances sharedModules;
-		ModuleInstance forwardBasePassParams;
+		ModuleInstance viewParams;
 		CoreLib::List<ModuleInstance> shadowViewInstances;
 
 		DrawableSink sink;
@@ -111,7 +111,7 @@ namespace GameEngine
 		{
 			for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
 			{
-				auto descSet = forwardBasePassParams.GetDescriptorSet(i);
+				auto descSet = viewParams.GetDescriptorSet(i);
 				descSet->BeginUpdate();
 				descSet->Update(1, sharedRes->textureSampler.Ptr());
 				descSet->EndUpdate();
@@ -181,10 +181,10 @@ namespace GameEngine
 			}
 			// initialize forwardBasePassModule and lightingModule
 			renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
-			sharedRes->CreateModuleInstance(forwardBasePassParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ForwardBasePassParams"), &renderPassUniformMemory);
+			sharedRes->CreateModuleInstance(viewParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), &renderPassUniformMemory);
 			lighting.Init(*sharedRes, &renderPassUniformMemory, useEnvMap);
 			UpdateSharedResourceBinding();
-			sharedModules.View = &forwardBasePassParams;
+			sharedModules.View = &viewParams;
 			shadowViewInstances.Reserve(1024);
 		}
         enum class PassType
@@ -296,14 +296,14 @@ namespace GameEngine
             }
 			lighting.GatherInfo(task, &sink, params, w, h, viewUniform, shadowRenderPass.Ptr());
 
-			forwardBasePassParams.SetUniformData(&viewUniform, (int)sizeof(viewUniform));
+			viewParams.SetUniformData(&viewUniform, (int)sizeof(viewUniform));
 			auto cameraCullFrustum = CullFrustum(params.view.GetFrustum(aspect));
 			
 
             customDepthOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
             task.AddImageTransferTask(textures.GetArrayView(), CoreLib::ArrayView<Texture*>());
             customDepthRenderPass->Bind();
-            sharedRes->pipelineManager.PushModuleInstance(&forwardBasePassParams);
+            sharedRes->pipelineManager.PushModuleInstance(&viewParams);
             customDepthPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::CustomDepth, cameraCullFrustum, false));
             sharedRes->pipelineManager.PopModuleInstance();
             task.AddTask(customDepthPassInstance);
@@ -312,7 +312,7 @@ namespace GameEngine
 			forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
 			task.AddImageTransferTask(textures.GetArrayView(), CoreLib::ArrayView<Texture*>());
 			forwardRenderPass->Bind();
-			sharedRes->pipelineManager.PushModuleInstance(&forwardBasePassParams);
+			sharedRes->pipelineManager.PushModuleInstance(&viewParams);
 			sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
 			forwardBaseInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
 			sharedRes->pipelineManager.PopModuleInstance();
@@ -348,7 +348,7 @@ namespace GameEngine
 				}
 
 				forwardRenderPass->Bind();
-				sharedRes->pipelineManager.PushModuleInstance(&forwardBasePassParams);
+				sharedRes->pipelineManager.PushModuleInstance(&viewParams);
 				sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
 
 				transparentPassInstance->SetFixedOrderDrawContent(sharedRes->pipelineManager, reorderBuffer.GetArrayView());

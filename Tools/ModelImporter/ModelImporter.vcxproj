@@ -97,7 +97,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(SolutionDir)ExternalLibs\FbxSDK\x86\debug\libfbxsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)ExternalLibs\FbxSDK\x86\debug\libfbxsdk.lib;%(AdditionalDependencies);$(SolutionDir)ExternalLibs\Slang\bin\windows-x86\release\slang.lib;</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(SolutionDIr)ExternalLibs\FbxSDK\$(PlatformShortName)\$(Configuration)\*.dll" $(OutDir)</Command>
@@ -115,7 +115,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(SolutionDir)ExternalLibs\FbxSDK\x64\debug\libfbxsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)ExternalLibs\FbxSDK\x64\debug\libfbxsdk.lib;%(AdditionalDependencies);$(SolutionDir)ExternalLibs\Slang\bin\windows-x64\release\slang.lib;</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(SolutionDIr)ExternalLibs\FbxSDK\$(PlatformShortName)\$(Configuration)\*.dll" $(OutDir)</Command>
