@@ -247,9 +247,9 @@ namespace GameEngine
 		bool isValid = true;
         ShaderTypeSymbol* module = nullptr;
         if (strcmp(moduleName, "DefaultMaterial")==0)
-            Engine::GetShaderCompiler()->LoadTypeSymbol("DefaultMaterial.slang", moduleName);
+            module = Engine::GetShaderCompiler()->LoadTypeSymbol("DefaultMaterial.slang", moduleName);
         else
-            Engine::GetShaderCompiler()->LoadTypeSymbol(material->ShaderFile, moduleName);
+            module = Engine::GetShaderCompiler()->LoadTypeSymbol(material->ShaderFile, moduleName);
 		if (!module)
 		{
 			Print("Invalid material(%S): shader '%S' does not define '%s'.", material->Name.ToWString(), material->ShaderFile.ToWString(), moduleName);

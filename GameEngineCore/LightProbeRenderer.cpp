@@ -59,10 +59,11 @@ namespace GameEngine
 		RefPtr<DescriptorSetLayout> copyPassLayout = hw->CreateDescriptorSetLayout(MakeArray(
 			DescriptorLayout(StageFlags::sfGraphics, 0, BindingType::Texture),
 			DescriptorLayout(StageFlags::sfGraphics, 1, BindingType::Sampler)).GetArrayView());
+        ShaderSet copyShaderSet;
 		pb->SetBindingLayout(copyPassLayout.Ptr());
         {
             ShaderCompilationResult crs;
-            auto copyShaderSet = CompileGraphicsShader(crs, hw, "CopyPixel.slang");
+            copyShaderSet = CompileGraphicsShader(crs, hw, "CopyPixel.slang");
             Shader* shaders[] = { copyShaderSet.vertexShader.Ptr(), copyShaderSet.fragmentShader.Ptr() };
             pb->SetShaders(ArrayView<Shader*>(shaders, 2));
         }
@@ -197,10 +198,11 @@ namespace GameEngine
 			DescriptorLayout(StageFlags::sfGraphics, 1, BindingType::Texture),
 			DescriptorLayout(StageFlags::sfGraphics, 2, BindingType::Sampler)).GetArrayView());
 		RefPtr<Buffer> uniformBuffer = hw->CreateMappedBuffer(BufferUsage::UniformBuffer, sizeof(PrefilterUniform));
+        ShaderSet prefilterShaderSet;
 		pb2->SetBindingLayout(prefilterPassLayout.Ptr());
         {
             ShaderCompilationResult crs;
-            auto prefilterShaderSet = CompileGraphicsShader(crs, hw, "LightProbePrefilter.slang");
+            prefilterShaderSet = CompileGraphicsShader(crs, hw, "LightProbePrefilter.slang");
             Shader* shaderList[] = { prefilterShaderSet.vertexShader.Ptr(), prefilterShaderSet.fragmentShader.Ptr() };
             pb2->SetShaders(ArrayView<Shader*>(shaderList, 2));
         }

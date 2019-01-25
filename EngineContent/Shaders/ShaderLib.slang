@@ -601,21 +601,23 @@ interface IBoneWeightSet
 {
 	associatedtype PackedType;
 	PackedType getPackedRepresentation();
+	[mutating]
 	void setPackedRepresentation(PackedType val);
 	float getBoneWeight(int index);
 	uint getBoneId(int index);
 }
 
-struct NoBoneWeightSet
+struct NoBoneWeightSet : IBoneWeightSet
 {
 	struct PackedType {};
 	PackedType getPackedRepresentation() { PackedType rs; return rs; }
+	[mutating]
 	void setPackedRepresentation(PackedType val) {}
 	float getBoneWeight(int index) {return 0.0;}
 	uint getBoneId(int index) {return 255;}
 };
 
-struct StandardBoneWeightSet
+struct StandardBoneWeightSet : IBoneWeightSet
 {
 	struct PackedType
 	{
@@ -623,9 +625,9 @@ struct StandardBoneWeightSet
 		float4 boneWeights;
 	};
 	PackedType value;
-	PackedType GetPackedRepresentation() { return value; }
+	PackedType getPackedRepresentation() { return value; }
     [mutating]
-	void SetPackedRepresentation(PackedType val) { value = val; }
+	void setPackedRepresentation(PackedType val) { value = val; }
 	uint getBoneId(int i)
 	{
 		return (value.boneIds >> (i*8)) & 255;
