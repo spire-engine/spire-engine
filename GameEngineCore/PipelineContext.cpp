@@ -91,13 +91,11 @@ namespace GameEngine
 
 		// Compile shaders
         ShaderCompilationEnvironment env;
-		Array<ShaderTypeSymbol*, 32> spireModules;
         for (int i = 0; i < modulePtr; i++)
         {
             env.SpecializationTypes.Add(modules[i]->typeSymbol);
-			spireModules.Add(modules[i]->typeSymbol);
         }
-		spireModules.Add(vertFormat->GetTypeSymbol());
+        env.SpecializationTypes.Add(vertFormat->GetTypeSymbol());
         struct CompilationTask
         {
             ShaderEntryPoint * entryPoint;

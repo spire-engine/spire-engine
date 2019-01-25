@@ -367,6 +367,9 @@ interface IMaterialPattern
 	float4 computeForwardLighting(LightingEnvironment lightEnv,
 		VertexPositionInfo shadingPoint,
 		ViewParams viewParams);
+    bool alphaTest();
+    [mutating]
+    void init();
 };
 
 interface ISelfShadow
@@ -391,9 +394,26 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
     float specular;
     float opacity;
     float ao;
+    float alphaTestThreshold;
     bool isDoubleSided;
 	TSelfShadow selfShadow;
-
+    [mutating]
+    void init()
+    {
+        albedo = float3(0.7,0.7,0.7);
+        normal = float3(0.0, 0.0, 1.0);
+        roughness = 1.0;
+        metallic = 0.0;
+        specular = 0.0;
+        opacity = 1.0;
+        ao = 1.0;
+        isDoubleSided = false;
+        alphaTestThreshold = 0.0;
+    }
+    bool alphaTest()
+    {
+        return opacity > alphaTestThreshold;
+    }
 	float4 computeForwardLighting(
 		LightingEnvironment lightEnv,
 		VertexPositionInfo shadingPoint,
@@ -546,10 +566,10 @@ interface IVertexAttribs
 	float getBoneWeight(int index);
 }
 
-struct VertexAttribs<TColorSet : IVertexColorSet, TVertexUVSet : IVertexUVSet, TBoneWeightSet : IBoneWeightSet> : IVertexAttribs
+struct VertexAttribs<TVertexUVSet : IVertexUVSet, TColorSet : IVertexColorSet, TBoneWeightSet : IBoneWeightSet> : IVertexAttribs
 {
-	TColorSet colorSet;
 	TVertexUVSet uvSet;
+	TColorSet colorSet;
 	TBoneWeightSet boneWeightSet;
 	float3 getColor(int index) {return colorSet.getColor(index);}
 	float2 getUV(int index) { return uvSet.getUV(index); }
@@ -646,9 +666,9 @@ interface IVertexFormat
 	associatedtype ColorSet : IVertexColorSet;
 	associatedtype UVSet : IVertexUVSet;
 	associatedtype BoneWeightSet : IBoneWeightSet;
-	ColorSet getColors();
-	UVSet getUVs();
-	BoneWeightSet getBoneWeights();
+	ColorSet getColorSet();
+	UVSet getUVSet();
+	BoneWeightSet getBoneWeightSet();
 };
 
 struct StandardVertexFormat<TUVSet : IVertexUVSet, TColorSet : IVertexColorSet, TBoneWeightSet : IBoneWeightSet> : IVertexFormat
@@ -668,15 +688,15 @@ struct StandardVertexFormat<TUVSet : IVertexUVSet, TColorSet : IVertexColorSet, 
 		rs.decode(vertTangentFrame);
 		return rs;
 	}
-	ColorSet getColors()
+	ColorSet getColorSet()
 	{
 		return colorSet;
 	}
-	UVSet getUVs()
+	UVSet getUVSet()
 	{
 		return uvSet;
 	}
-	BoneWeightSet getBoneWeights()
+	BoneWeightSet getBoneWeightSet()
 	{
 		return boneWeightSet;
 	}

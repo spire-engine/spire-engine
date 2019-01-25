@@ -11,6 +11,7 @@ struct SkeletalMeshMaterial : IMaterial
     MaterialPattern evalPattern<TVertexUVSet : IVertexUVSet, TVertexColorSet : IVertexColorSet>(VertexPositionInfo shadingPoint, TVertAttribs vertAttribs, ViewParams viewParams)
     {
         MaterialPattern rs;
+        rs.init();
         rs.albedo = float3(0.0, 0.2, 0.7);
         rs.normal = float3(0.0, 0.0, 1.0);
         rs.roughness = 0.4;

@@ -59,7 +59,7 @@ namespace GameEngine
     class ShaderCompilationEnvironment : public CoreLib::RefObject
     {
     public:
-        CoreLib::List<ShaderTypeSymbol*> SpecializationTypes;
+        CoreLib::Array<ShaderTypeSymbol*, 8> SpecializationTypes;
     };
 
     class IShaderCompiler : public CoreLib::RefObject

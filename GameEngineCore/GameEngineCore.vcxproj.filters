@@ -433,6 +433,12 @@
     <None Include="..\EngineContent\Shaders\ShaderLib.slang">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="..\EngineContent\Shaders\ShadowPass.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\CustomDepthPass.slang">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="core.natvis" />

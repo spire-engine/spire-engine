@@ -316,12 +316,14 @@
     <None Include="..\EngineContent\Shaders\Atmosphere.slang" />
     <None Include="..\EngineContent\Shaders\BoneHighlight.slang" />
     <None Include="..\EngineContent\Shaders\CopyPixel.slang" />
+    <None Include="..\EngineContent\Shaders\CustomDepthPass.slang" />
     <None Include="..\EngineContent\Shaders\DefaultMaterial.slang" />
     <None Include="..\EngineContent\Shaders\ForwardBasePass.slang" />
     <None Include="..\EngineContent\Shaders\Gizmo.slang" />
     <None Include="..\EngineContent\Shaders\LightProbePrefilter.slang" />
     <None Include="..\EngineContent\Shaders\Outline.slang" />
     <None Include="..\EngineContent\Shaders\ShaderLib.slang" />
+    <None Include="..\EngineContent\Shaders\ShadowPass.slang" />
     <None Include="..\EngineContent\Shaders\SkeletalMesh.slang" />
     <None Include="..\EngineContent\Shaders\SolidColor.slang" />
     <None Include="..\EngineContent\Shaders\ToneMapping.slang" />

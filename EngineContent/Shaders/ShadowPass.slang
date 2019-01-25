@@ -1,5 +1,4 @@
 import ShaderLib;
-
 #ifdef IMPORT_MODULE_0
 import IMPORT_MODULE_0;
 #endif
@@ -21,26 +20,21 @@ import IMPORT_MODULE_4;
 #endif
 
 #ifndef SPECIALIZATION_TYPE_1
-#define SPECIALIZATION_TYPE_1 LightingEnvironment
+import DefaultMaterial;
+#define SPECIALIZATION_TYPE_1 DefaultMaterial
 #endif
 
 #ifndef SPECIALIZATION_TYPE_2
-import DefaultMaterial;
-#define SPECIALIZATION_TYPE_2 DefaultMaterial
+#define SPECIALIZATION_TYPE_2 StaticMeshTransform 
 #endif
 
 #ifndef SPECIALIZATION_TYPE_3
-#define SPECIALIZATION_TYPE_3 StaticMeshTransform 
-#endif
-
-#ifndef SPECIALIZATION_TYPE_4
-#define SPECIALIZATION_TYPE_4 StandardVertexAttribs<SingleVertexUVSet, NoVertexColorSet, NoBoneWeightSet>
+#define SPECIALIZATION_TYPE_3 StandardVertexAttribs<SingleVertexUVSet, NoVertexColorSet, NoBoneWeightSet>
 #endif
 
 ParameterBlock<SPECIALIZATION_TYPE_0 > gView;
-ParameterBlock<SPECIALIZATION_TYPE_1 > gLighting;
-ParameterBlock<SPECIALIZATION_TYPE_2 > gMaterial;
-ParameterBlock<SPECIALIZATION_TYPE_3 > gWorldTransform;
+ParameterBlock<SPECIALIZATION_TYPE_1 > gMaterial;
+ParameterBlock<SPECIALIZATION_TYPE_2 > gWorldTransform;
 
 struct VSOutput
 {
@@ -48,12 +42,12 @@ struct VSOutput
     float3 worldPos;
     float3 normal, tangent;
     float binormalSign;
-    SPECIALIZATION_TYPE_4.ColorSet vertColorSet;
-    SPECIALIZATION_TYPE_4.UVSet vertUVSet;
-    SPECIALIZATION_TYPE_4.BoneWeightSet.PackedType vertBoneWeightSet;
+    SPECIALIZATION_TYPE_3.ColorSet vertColorSet;
+    SPECIALIZATION_TYPE_3.UVSet vertUVSet;
+    SPECIALIZATION_TYPE_3.BoneWeightSet.PackedType vertBoneWeightSet;
 };
 
-VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn)
+VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
 {
 	VSOutput rs;
     VertexPositionInfo vin;
@@ -67,7 +61,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn)
     rs.vertUVSet = vertexIn.getUVSet();
     rs.vertBoneWeightSet = vertexIn.getBoneWeightSet().getPackedRepresentation();
 
-    VertexAttribs<SPECIALIZATION_TYPE_4.UVSet, SPECIALIZATION_TYPE_4.ColorSet, SPECIALIZATION_TYPE_4.BoneWeightSet> vattribs;
+    VertexAttribs<SPECIALIZATION_TYPE_3.UVSet, SPECIALIZATION_TYPE_3.ColorSet, SPECIALIZATION_TYPE_3.BoneWeightSet> vattribs;
     vattribs.uvSet = rs.vertUVSet;
     vattribs.colorSet = rs.vertColorSet;
     vattribs.boneWeightSet.setPackedRepresentation(rs.vertBoneWeightSet);
@@ -77,7 +71,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn)
     return rs;
 }
 
-float4 ps_main(VSOutput vsOut)
+void ps_main(VSOutput vsOut)
 {
     VertexPositionInfo vin;
     vin.vertPos = vsOut.worldPos;
@@ -89,8 +83,7 @@ float4 ps_main(VSOutput vsOut)
     vattribs.uvSet = vsOut.vertUVSet;
     vattribs.colorSet = vsOut.vertColorSet;
     vattribs.boneWeightSet.setPackedRepresentation(vsOut.vertBoneWeightSet);
-    SPECIALIZATION_TYPE_2.MaterialPattern pattern = gMaterial.evalPattern(vin, vattribs, gView);
+    SPECIALIZATION_TYPE_1.MaterialPattern pattern = gMaterial.evalPattern(vin, vattribs, gView);
     if (!pattern.alphaTest())
         discard;
-    return pattern.computeForwardLighting(gLighting, vin, gView);
 }

@@ -104,6 +104,8 @@ namespace GameEngine
                 for (int i = 0; i < env->SpecializationTypes.Count(); i++)
                 {
                     spAddPreprocessorDefine(req, (String("SPECIALIZATION_TYPE_") + i).Buffer(), env->SpecializationTypes[i]->TypeName.Buffer());
+                    spAddPreprocessorDefine(req, (String("IMPORT_MODULE_") + i).Buffer(), Path::GetFileNameWithoutEXT(env->SpecializationTypes[i]->FileName).Buffer());
+
                 }
             }
             int anyErrors = spCompile(req);
@@ -242,7 +244,10 @@ namespace GameEngine
                 }
                 else
                 {
-                    auto bindingType = SlangResourceKindToDescriptorType(field->getType()->getKind(), field->getType()->getResourceShape());
+                    auto kind = field->getType()->getKind();
+                    if (kind == slang::TypeReflection::Kind::None)
+                        continue;
+                    auto bindingType = SlangResourceKindToDescriptorType(kind, field->getType()->getResourceShape());
                     switch (bindingType)
                     {
                     case BindingType::UniformBuffer:
