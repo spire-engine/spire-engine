@@ -34,7 +34,7 @@ import DefaultMaterial;
 #endif
 
 #ifndef SPECIALIZATION_TYPE_4
-#define SPECIALIZATION_TYPE_4 StandardVertexAttribs<SingleVertexUVSet, NoVertexColorSet, NoBoneWeightSet>
+#define SPECIALIZATION_TYPE_4 StandardVertexAttribs<VertexUVSet1, StandardTangentFrame, VertexColorSet0, NoBoneWeightSet>
 #endif
 
 ParameterBlock<SPECIALIZATION_TYPE_0 > gView;
@@ -85,7 +85,7 @@ float4 ps_main(VSOutput vsOut)
     vin.tangentFrame.vertTangent = normalize(vsOut.tangent);
     vin.tangentFrame.vertBinormal = cross(vin.tangentFrame.vertNormal, vin.tangentFrame.vertTangent);
     vin.tangentFrame.binormalSign = vsOut.binormalSign;
-    VertexAttribs<SPECIALIZATION_TYPE_3.UVSet, SPECIALIZATION_TYPE_3.ColorSet, SPECIALIZATION_TYPE_3.BoneWeightSet> vattribs;
+    VertexAttribs<SPECIALIZATION_TYPE_4.UVSet, SPECIALIZATION_TYPE_4.ColorSet, SPECIALIZATION_TYPE_4.BoneWeightSet> vattribs;
     vattribs.uvSet = vsOut.vertUVSet;
     vattribs.colorSet = vsOut.vertColorSet;
     vattribs.boneWeightSet.setPackedRepresentation(vsOut.vertBoneWeightSet);

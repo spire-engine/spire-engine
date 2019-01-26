@@ -24,13 +24,17 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="..\ExternalLibs\Slang\bin\windows-x64\release\slang-glslang.dll" />
-    <CopyFileToFolders Include="..\ExternalLibs\Slang\bin\windows-x64\release\slang.dll" />
     <CopyFileToFolders Include="..\ExternalLibs\Slang\bin\windows-x86\release\slang.dll">
       <Filter>Slang\x86</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="..\ExternalLibs\Slang\bin\windows-x86\release\slang-glslang.dll">
       <Filter>Slang\x86</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\ExternalLibs\Slang\bin\windows-x64\release\slang.dll">
+      <Filter>Slang\x64</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\ExternalLibs\Slang\bin\windows-x64\release\slang-glslang.dll">
+      <Filter>Slang\x64</Filter>
     </CopyFileToFolders>
   </ItemGroup>
 </Project>

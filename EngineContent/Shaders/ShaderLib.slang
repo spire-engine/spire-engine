@@ -583,38 +583,109 @@ struct VertexAttribs<TVertexUVSet : IVertexUVSet, TColorSet : IVertexColorSet, T
 	}
 };
 
-struct NoVertexColorSet : IVertexColorSet
+struct VertexColorSet0 : IVertexColorSet
 {
 	float3 getColor(int index) { return 0.0; }
 };
 
-struct SingleVertexColorSet : IVertexColorSet
+struct VertexColorSet1 : IVertexColorSet
 {
-    float3 value;
+    float3 value : COLOR0;
 	float3 getColor(int index) { return value; }
 };
 
-struct ArrayVertexColorSet<let n:int> : IVertexColorSet
+struct VertexColorSet2 : IVertexColorSet
 {
-    float3 values[n];
-	float3 getColor(int index) { return values[index]; }
+    float3 value0 : COLOR0;
+    float3 value1 : COLOR1;
+
+	float3 getColor(int index)
+	{
+		switch (index)
+		{
+		case 0:
+			return value0;
+		case 1:
+			return value1;
+		default:
+			return 0.0;
+		}
+	}
 };
 
-struct NoVertexUVSet : IVertexUVSet
+struct VertexColorSet3 : IVertexColorSet
+{
+    float3 value0 : COLOR0;
+    float3 value1 : COLOR1;
+	float3 value2 : COLOR2;
+	float3 getColor(int index)
+	{
+		switch (index)
+		{
+		case 0:
+			return value0;
+		case 1:
+			return value1;
+		case 2:
+			return value2;
+		default:
+			return 0.0;
+		}
+	}
+};
+
+struct VertexColorSet4 : IVertexColorSet
+{
+    float3 value0 : COLOR0;
+    float3 value1 : COLOR1;
+	float3 value2 : COLOR2;
+	float3 value3 : COLOR3;
+
+	float3 getColor(int index)
+	{
+		switch (index)
+		{
+		case 0:
+			return value0;
+		case 1:
+			return value1;
+		case 2:
+			return value2;
+		case 3:
+			return value3;
+		default:
+			return 0.0;
+		}
+	}
+};
+
+struct VertexUVSet0 : IVertexUVSet
 {
 	float2 getUV(int index) { return 0.0; }
 };
 
-struct SingleVertexUVSet : IVertexUVSet
+struct VertexUVSet1 : IVertexUVSet
 {
-	float2 value;
+	float2 value : TEXCOORD0;
 	float2 getUV(int index) { return value; }
 };
 
-struct ArrayVertexUVSet<let n : int> : IVertexUVSet
+struct VertexUVSet2 : IVertexUVSet
 {
-	float2 values[n];
-	float2 getUV(int index) { return values[index]; }
+	float2 value0: TEXCOORD0;
+	float2 value1: TEXCOORD1;
+	float2 getUV(int index)
+	{
+		switch (index)
+		{
+		case 0:
+			return value0;
+		case 1:
+			return value1;
+		default:
+			return 0.0;
+		}
+	}
 };
 
 interface IBoneWeightSet
@@ -671,22 +742,49 @@ interface IVertexFormat
 	BoneWeightSet getBoneWeightSet();
 };
 
-struct StandardVertexFormat<TUVSet : IVertexUVSet, TColorSet : IVertexColorSet, TBoneWeightSet : IBoneWeightSet> : IVertexFormat
+interface ITangentFrame
+{
+	TangentFrame get();
+};
+
+struct NoTangentFrame : ITangentFrame
+{
+	TangentFrame get()
+	{
+		TangentFrame t;
+		t.vertNormal = float3(0.0, 1.0, 0.0);
+		t.vertTangent = float3(1.0, 0.0, 0.0);
+		t.vertBinormal = float3(0.0, 0.0, 1.0);
+		t.binormalSign = 1.0;
+		return t;
+	}
+};
+
+struct StandardTangentFrame : ITangentFrame
+{
+	uint packedQuaternion;
+	TangentFrame get()
+	{
+		TangentFrame rs;
+		rs.decode(packedQuaternion);
+		return rs;
+	}
+};
+
+struct StandardVertexFormat<TUVSet : IVertexUVSet, TTangentFrame : ITangentFrame, TColorSet : IVertexColorSet, TBoneWeightSet : IBoneWeightSet> : IVertexFormat
 {
 	typedef TUVSet UVSet;
 	typedef TColorSet ColorSet;
 	typedef TBoneWeightSet BoneWeightSet;
 	float3 vertPos;
-	uint vertTangentFrame;
 	TUVSet uvSet;
+	TTangentFrame vertTangentFrame;
 	TColorSet colorSet;
 	TBoneWeightSet boneWeightSet;
 	float3 getPos() { return vertPos; }
 	TangentFrame getTangentFrame()
 	{
-		TangentFrame rs;
-		rs.decode(vertTangentFrame);
-		return rs;
+		return vertTangentFrame.get();
 	}
 	ColorSet getColorSet()
 	{

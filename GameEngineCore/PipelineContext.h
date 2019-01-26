@@ -176,8 +176,11 @@ namespace GameEngine
 		void GetBindings(DescriptorSetBindingArray & bindings)
 		{
 			bindings.Clear();
-			for (int i = 0; i < modulePtr; i++)
-				bindings.Add(modules[i]->GetCurrentDescriptorSet());
+            for (int i = 0; i < modulePtr; i++)
+            {
+                if (auto dset = modules[i]->GetCurrentDescriptorSet())
+				    bindings.Add(dset);
+            }
 		}
 		inline PipelineClass* GetPipeline(MeshVertexFormat * vertFormat)
 		{

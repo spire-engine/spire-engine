@@ -119,10 +119,10 @@ namespace GameEngine
 
         for (auto & descSet : compileRs.BindingLayouts)
         {
-            if (descSet.BindingPoint == -1)
+            if (descSet.BindingPoint == -1 || descSet.Descriptors.Count() == 0)
                 continue;
             for (auto & desc : descSet.Descriptors)
-                desc.Stages = (StageFlags)(StageFlags::sfVertex | StageFlags::sfFragment);
+                desc.Stages = StageFlags::sfGraphicsAndCompute;
             auto layout = hwRenderer->CreateDescriptorSetLayout(descSet.Descriptors.GetArrayView());
             if (descSet.BindingPoint >= descSetLayouts.Count())
                 descSetLayouts.SetSize(descSet.BindingPoint + 1);
@@ -162,8 +162,16 @@ namespace GameEngine
 	void ModuleInstance::SetDescriptorSetLayout(HardwareRenderer * hw, DescriptorSetLayout * layout)
 	{
 		descriptors.Clear();
-		for (int i = 0; i < descriptors.GetCapacity(); i++)
-			descriptors.Add(hw->CreateDescriptorSet(layout));
+        if (layout)
+        {
+            for (int i = 0; i < descriptors.GetCapacity(); i++)
+                descriptors.Add(hw->CreateDescriptorSet(layout));
+        }
+        else
+        {
+            for (int i = 0; i < descriptors.GetCapacity(); i++)
+                descriptors.Add(nullptr);
+        }
 	}
 
 }

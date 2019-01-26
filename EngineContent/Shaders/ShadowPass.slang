@@ -29,7 +29,7 @@ import DefaultMaterial;
 #endif
 
 #ifndef SPECIALIZATION_TYPE_3
-#define SPECIALIZATION_TYPE_3 StandardVertexAttribs<SingleVertexUVSet, NoVertexColorSet, NoBoneWeightSet>
+#define SPECIALIZATION_TYPE_3 StandardVertexAttribs<VertexUVSet1, StandardTangentFrame, VertexColorSet0, NoBoneWeightSet>
 #endif
 
 ParameterBlock<SPECIALIZATION_TYPE_0 > gView;

@@ -285,24 +285,26 @@ namespace GameEngine
 					// update all versions of descriptor set with material texture binding
 					for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
 					{
-						auto descSet = result.GetDescriptorSet(i);
-						descSet->BeginUpdate();
-						for (auto binding : bindingLocs)
-						{
-							DynamicVariable val;
-							if (material->Variables.TryGetValue(binding.Key, val))
-							{
-								auto tex = LoadTexture(val.StringValue);
-								if (tex)
-									descSet->Update(binding.Value, tex, TextureAspect::Color);
-							}
-							else
-							{
-								Print("Invalid material(%S): shader parameter '%S' is not provided in material file.\n", material->Name.ToWString(), binding.Key.ToWString());
-								descSet->Update(binding.Value, LoadTexture("error.texture"), TextureAspect::Color);
-							}
-						}
-						descSet->EndUpdate();
+                        if (auto descSet = result.GetDescriptorSet(i))
+                        {
+                            descSet->BeginUpdate();
+                            for (auto binding : bindingLocs)
+                            {
+                                DynamicVariable val;
+                                if (material->Variables.TryGetValue(binding.Key, val))
+                                {
+                                    auto tex = LoadTexture(val.StringValue);
+                                    if (tex)
+                                        descSet->Update(binding.Value, tex, TextureAspect::Color);
+                                }
+                                else
+                                {
+                                    Print("Invalid material(%S): shader parameter '%S' is not provided in material file.\n", material->Name.ToWString(), binding.Key.ToWString());
+                                    descSet->Update(binding.Value, LoadTexture("error.texture"), TextureAspect::Color);
+                                }
+                            }
+                            descSet->EndUpdate();
+                        }
 					}
 				}
 				for (auto& v : vars)
@@ -506,7 +508,8 @@ namespace GameEngine
 					descs.Add(descLayout);
 				}
 			}
-			layout = hardwareRenderer->CreateDescriptorSetLayout(descs.GetArrayView());
+            if (descs.Count())
+			    layout = hardwareRenderer->CreateDescriptorSetLayout(descs.GetArrayView());
 			descLayouts[typeSymbol->TypeId] = layout;
 		}
 		rs.SetDescriptorSetLayout(hardwareRenderer.Ptr(), layout.Ptr());
@@ -630,7 +633,7 @@ namespace GameEngine
 	
 	inline void BindDescSet(DescriptorSet** curStates, CommandBuffer* cmdBuf, int id, DescriptorSet * descSet)
 	{
-		if (curStates[id] != descSet)
+		if (descSet && curStates[id] != descSet)
 		{
 			curStates[id] = descSet;
 			cmdBuf->BindDescriptorSet(id, descSet);
@@ -715,13 +718,13 @@ namespace GameEngine
 					{
 						BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count(), newMaterial->MaterialModule.GetCurrentDescriptorSet());
 					}
-					BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count() + 2, obj->GetTransformModule()->GetCurrentDescriptorSet());
+                    int descOffset = newMaterial->MaterialModule.GetCurrentDescriptorSet() ? 1 : 0;
+					BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count() + descOffset, obj->GetTransformModule()->GetCurrentDescriptorSet());
 					if (mesh != lastMesh)
 					{
 						cmdBuf->BindVertexBuffer(mesh->GetVertexBuffer(), mesh->vertexBufferOffset);
 						lastMesh = mesh;
 					}
-					BindDescSet(boundSets.Buffer(), cmdBuf, bindings.Count() + 3, nullptr);
 
 					auto range = obj->GetElementRange();
 					cmdBuf->DrawIndexed(mesh->indexBufferOffset / sizeof(int) + range.StartIndex, range.Count);
@@ -731,7 +734,6 @@ namespace GameEngine
 				lastMaterial = newMaterial;
 				pipelineManager.PopModuleInstance();
 			}
-			pipelineManager.PopModuleInstance();
 			pipelineManager.PopModuleInstance();
 		}
 		cmdBuf->EndRecording();

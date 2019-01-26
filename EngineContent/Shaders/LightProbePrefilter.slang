@@ -44,14 +44,14 @@ float2 hammersley(uint i, uint N)
 	return float2(float(i)/float(N), radicalInverse_VdC(i));
 }
 
-float3 importanceSampleGGX(vec2 xi, float roughness, vec3 N)
+float3 importanceSampleGGX(float2 xi, float roughness, float3 N)
 {
 	float a = roughness * roughness;
 	float phi = 2 * 3.1415926f * xi.x;
 	float cosTheta = sqrt( (1-xi.y)/(1+(a*a-1)*xi.y));
 	float sinTheta = sqrt(1-cosTheta*cosTheta);
-	float3 H = vec3(sinTheta * cos(phi), sinTheta*sin(phi), cosTheta);
-	float3 upVector = abs(N.z) < 0.9 ? vec3(0,0,1) : vec3(1, 0 , 0);
+	float3 H = float3(sinTheta * cos(phi), sinTheta*sin(phi), cosTheta);
+	float3 upVector = abs(N.z) < 0.9 ? float3(0,0,1) : float3(1, 0 , 0);
 	float3 tangentX = normalize(cross(upVector, N));
 	float3 tangentY = cross(N, tangentX);
 	return tangentX * H.x + tangentY * H.y + N * H.z;
@@ -68,7 +68,7 @@ float4 ps_main(VertexOut vin)
 	for (int i = 0; i < numSamples; i++)
 	{
 		float2 xi = hammersley(uint(i), uint(numSamples));
-		float3 h = importanceSampleGGX(xi, roughness, N);
+		float3 h = importanceSampleGGX(xi, params.roughness, N);
 		float3 L = h * (2.0*dot(V, h)) - V;
 		float NoL = clamp(dot(N,L), 0.0f, 1.0f);
 		if (NoL > 0)
@@ -77,5 +77,5 @@ float4 ps_main(VertexOut vin)
 			totalWeight += NoL;
 		}            
 	}
-	return prefilteredColor / totalWeight;
+	return float4(prefilteredColor / totalWeight, 1.0);
 }

@@ -104,19 +104,11 @@ namespace GameEngine
 	{
 		StringBuilder sbName;
 		sbName << "StandardVertexFormat<";
-        if (key.fields.numUVs == 0)
-            sbName << "NoVertexUVSet";
-        else if (key.fields.numUVs == 1)
-            sbName << "SingleVertexUVSet";
-        else
-            sbName << "ArrayVertexUVSet<" << key.fields.numUVs << ">";
+        sbName << "VertexUVSet" << key.fields.numUVs;
         sbName << ",";
-        if (key.fields.numColors == 0)
-            sbName << "NoVertexColorSet";
-        else if (key.fields.numColors == 1)
-            sbName << "SingleVertexColorSet";
-        else
-            sbName << "ArrayVertexColorSet<" << key.fields.numColors << ">";
+        sbName << (key.fields.hasTangent ? "StandardTangentFrame" : "NoTangentFrame");
+        sbName << ",";
+        sbName << "VertexColorSet" << key.fields.numColors;
         sbName << ",";
         if (key.fields.hasSkinning)
             sbName << "StandardBoneWeightSet";
