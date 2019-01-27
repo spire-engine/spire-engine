@@ -1,7 +1,7 @@
 struct OutlinePassParams
 {
-    vec4 borderColor;
-    vec2 pixelSize;
+    float4 borderColor;
+    float2 pixelSize;
     float width;
     Texture2D srcColor;
     Texture2D srcDepth;
@@ -37,14 +37,14 @@ int getVal(float2 uv)
 float4 ps_main(VertexOut vin)
 {
     float4 src = params.srcColor.Sample(params.nearestSampler, vin.vertUV);
-    int thisVal = getVal(vertUV);
-    float4 bColor = vec4(0.0);
+    int thisVal = getVal(vin.vertUV);
+    float4 bColor = float4(0.0);
     if (thisVal)
     {
-        if (getVal(vin.vertUV - vec2(params.pixelSize.x, 0.0) * params.width) == 0 ||
-            getVal(vin.vertUV - vec2(0.0, params.pixelSize.y) * params.width) == 0 ||
-            getVal(vin.vertUV + vec2(params.pixelSize.x, 0.0) * params.width) == 0 ||
-            getVal(vin.vertUV + vec2(0.0, params.pixelSize.y) * params.width) == 0)
+        if (getVal(vin.vertUV - float2(params.pixelSize.x, 0.0) * params.width) == 0 ||
+            getVal(vin.vertUV - float2(0.0, params.pixelSize.y) * params.width) == 0 ||
+            getVal(vin.vertUV + float2(params.pixelSize.x, 0.0) * params.width) == 0 ||
+            getVal(vin.vertUV + float2(0.0, params.pixelSize.y) * params.width) == 0)
             bColor = params.borderColor;
     }
     return src * (1 - bColor.w) + bColor * bColor.w;

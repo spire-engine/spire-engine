@@ -5,15 +5,6 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Slang">
-      <UniqueIdentifier>{3f915fd8-3070-4701-bd13-5c27df4c3ca0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Slang\x64">
-      <UniqueIdentifier>{82b47ac1-baa3-4e83-a4f3-95a9bdd00858}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Slang\x86">
-      <UniqueIdentifier>{4f8a490a-e99b-4ad0-9d3c-fdd47ff071ca}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -22,19 +13,5 @@
     <ClCompile Include="TestUserActor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="..\ExternalLibs\Slang\bin\windows-x86\release\slang.dll">
-      <Filter>Slang\x86</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\ExternalLibs\Slang\bin\windows-x86\release\slang-glslang.dll">
-      <Filter>Slang\x86</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\ExternalLibs\Slang\bin\windows-x64\release\slang.dll">
-      <Filter>Slang\x64</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\ExternalLibs\Slang\bin\windows-x64\release\slang-glslang.dll">
-      <Filter>Slang\x64</Filter>
-    </CopyFileToFolders>
   </ItemGroup>
 </Project>

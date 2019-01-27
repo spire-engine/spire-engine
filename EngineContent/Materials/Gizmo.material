@@ -1,5 +1,5 @@
 material
 {
-    shader "Gizmo.shader"
+    shader "Gizmo.slang"
     var solidColor = vec4[0.4 0.4 0.1 0.8]
 }

@@ -11,9 +11,9 @@ struct DefaultMaterial : IMaterial
     {
         MaterialPattern rs;
         rs.init();
-        rs.albedo = float3(0.9, 0.45, 0.05);
+        rs.albedo = float3(0.9, 0.9, 0.9);
         rs.normal = float3(0.0, 0.0, 1.0);
-        rs.specular = 0.5;
+        rs.specular = 0.2;
         rs.roughness = 0.7;
         rs.metallic = 0.4;
         rs.isDoubleSided = false;

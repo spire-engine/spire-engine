@@ -264,7 +264,7 @@ namespace GameEngine
 				{
 					bindingLocs[v.Key] = v.Value.BindingOffset;
 				}
-				else
+				else if (v.Value.BindingLength) // make sure it is a non-empty struct (we use emtpy-typed fields, such as `Transparent` as material attributes)
 				{
                     if (auto val = material->Variables.TryGetValue(v.Key))
                     {

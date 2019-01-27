@@ -145,7 +145,7 @@ namespace GameEngine
                     for (auto f = 0u; f < resType->getFieldCount(); f++)
                     {
                         auto field = resType->getFieldByIndex(f);
-                        if (field->getCategory() == slang::Uniform)
+                        if (field->getCategory() == slang::Uniform || field->getType()->getKind() == slang::TypeReflection::Kind::Struct)
                         {
                             if (!hasUniform)
                             {
@@ -235,7 +235,9 @@ namespace GameEngine
                 ShaderVariableLayout varLayout;
                 auto field = typeLayout->getFieldByIndex(i); 
                 varLayout.Name = field->getName();
-                if (field->getCategory() == slang::Uniform)
+                // We currently do not support resource-typed fields in parameter blocks.
+                // Assuming all struct-typed fields as ordinary data
+                if (field->getCategory() == slang::Uniform || field->getType()->getKind() == slang::TypeReflection::Kind::Struct)
                 {
                     varLayout.Type = ShaderVariableType::Data;
                     varLayout.BindingOffset = (int)field->getOffset();

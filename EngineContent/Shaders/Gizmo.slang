@@ -12,6 +12,7 @@ struct GizmoMaterial : IMaterial
     MaterialPattern evalPattern<TVertAttribs : IVertexAttribs>(VertexPositionInfo shadingPoint, TVertAttribs vertAttribs, ViewParams viewParams)
     {
         MaterialPattern rs;
+        rs.init();
         rs.albedo = solidColor.xyz;
         rs.normal = float3(0.0, 0.0, 1.0);
         rs.specular = 0.0;
@@ -22,4 +23,4 @@ struct GizmoMaterial : IMaterial
         rs.ao = 1.0;
         return rs;
     }
-}
+};
