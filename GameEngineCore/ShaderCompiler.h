@@ -26,6 +26,12 @@ namespace GameEngine
         ShaderVariableType Type;
     };
 
+    struct ShaderAttribute : public CoreLib::RefObject
+    {
+    public:
+        CoreLib::String Name;
+    };
+
     struct ShaderTypeSymbol : public CoreLib::RefObject
     {
     public:
@@ -34,9 +40,10 @@ namespace GameEngine
         uint32_t TypeId;
         int UniformBufferSize = 0;
         CoreLib::EnumerableDictionary<CoreLib::String, ShaderVariableLayout> VarLayouts;
-        bool HasMember(CoreLib::String memberName)
+        CoreLib::EnumerableDictionary<CoreLib::String, ShaderAttribute> Attributes;
+        bool HasAttribute(CoreLib::String memberName)
         {
-            return VarLayouts.ContainsKey(memberName);
+            return Attributes.ContainsKey(memberName);
         }
     };
 

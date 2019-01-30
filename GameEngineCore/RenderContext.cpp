@@ -329,9 +329,8 @@ namespace GameEngine
 			if (!material->MaterialModule)
 				throw InvalidOperationException("failed to load default material.");
 		}
-        material->IsDoubleSided = material->MaterialModule.GetTypeSymbol()->HasMember("DoubleSided");
-		material->IsTransparent = material->MaterialModule.GetTypeSymbol()->HasMember("Transparent");
-
+        material->IsDoubleSided = material->MaterialModule.GetTypeSymbol()->HasAttribute("DoubleSided");
+		material->IsTransparent = material->MaterialModule.GetTypeSymbol()->HasAttribute("Transparent");
 	}
 	
 	SceneResource::SceneResource(RendererSharedResource * resource)

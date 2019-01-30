@@ -800,4 +800,11 @@ struct StandardVertexFormat<TUVSet : IVertexUVSet, TTangentFrame : ITangentFrame
 	}
 };
 
-struct Attrib {};
+[__AttributeUsage(_AttributeTargets.Struct)]
+struct TransparentAttribute
+{
+};
+[__AttributeUsage(_AttributeTargets.Struct)]
+struct DoubleSidedAttribute
+{
+};

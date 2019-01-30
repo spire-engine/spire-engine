@@ -1,8 +1,8 @@
 import ShaderLib;
 
+[Transparent]
 struct GizmoMaterial : IMaterial
 {
-    Attrib Transparent;
     float4 solidColor;
     typedef PbrMaterialPattern<NoSelfShadow> MaterialPattern;
     float3 getDisplacement<TVertAttribs : IVertexAttribs>(VertexPositionInfo shadingPoint, TVertAttribs vertAttribs, ViewParams viewParams)

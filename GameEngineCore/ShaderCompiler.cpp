@@ -274,6 +274,14 @@ namespace GameEngine
                 sym->VarLayouts.Add(varLayout.Name, varLayout);
             }
             sym->UniformBufferSize = (int)typeLayout->getSize();
+            unsigned int attribCount = typeLayout->getType()->getUserAttributeCount();
+            for (unsigned int i = 0; i < attribCount; i++)
+            {
+                auto attrib = typeLayout->getType()->getUserAttributeByIndex(i);
+                ShaderAttribute sa;
+                sa.Name = attrib->getName();
+                sym->Attributes.Add(sa.Name, sa);
+            }
             shaderTypeSymbols[str] = sym;
             spDestroyCompileRequest(compileRequest);
             return sym.Ptr();
