@@ -108,7 +108,7 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
         result.vertPos = float3(0.0);
         result.tangentFrame.vertBinormal = float3(0.0);
         result.tangentFrame.vertTangent = float3(0.0);
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < vertAttribs.getMaxBoneCount(); i++)
         {
             uint boneId = vertAttribs.getBoneId(i);
             if (boneId == 255) break;
@@ -579,6 +579,7 @@ interface IVertexAttribs
 	float2 getUV(int index);
 	uint getBoneId(int index);
 	float getBoneWeight(int index);
+	int getMaxBoneCount();
 }
 
 struct VertexAttribs<TVertexUVSet : IVertexUVSet, TColorSet : IVertexColorSet, TBoneWeightSet : IBoneWeightSet> : IVertexAttribs
@@ -595,6 +596,10 @@ struct VertexAttribs<TVertexUVSet : IVertexUVSet, TColorSet : IVertexColorSet, T
 	float getBoneWeight(int index)
 	{
 		return boneWeightSet.getBoneWeight(index);
+	}
+	int getMaxBoneCount()
+	{
+		return boneWeightSet.getMaxBoneCount();
 	}
 };
 
@@ -711,6 +716,7 @@ interface IBoneWeightSet
 	void setPackedRepresentation(PackedType val);
 	float getBoneWeight(int index);
 	uint getBoneId(int index);
+	int getMaxBoneCount();
 }
 
 struct NoBoneWeightSet : IBoneWeightSet
@@ -721,6 +727,7 @@ struct NoBoneWeightSet : IBoneWeightSet
 	void setPackedRepresentation(PackedType val) {}
 	float getBoneWeight(int index) {return 0.0;}
 	uint getBoneId(int index) {return 255;}
+	int getMaxBoneCount() {return 0;}
 };
 
 struct StandardBoneWeightSet : IBoneWeightSet
@@ -740,8 +747,9 @@ struct StandardBoneWeightSet : IBoneWeightSet
 	}
 	float getBoneWeight(int index)
 	{
-		return ((float)((value.boneIds >> (index*8)) & 255)) * (1.0/255.0);
+		return ((float)((value.boneWeights >> (index*8)) & 255)) * (1.0/255.0);
 	}
+	int getMaxBoneCount() {return 4;}
 };
 
 
