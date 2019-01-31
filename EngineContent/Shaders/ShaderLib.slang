@@ -100,14 +100,6 @@ struct StaticMeshTransform : IWorldSpaceTransform
 
 struct SkeletalAnimationTransform : IWorldSpaceTransform
 {
-    require float3 vertPos;
-    require float3 vertBinormal;
-    require float3 vertTangent;
-    require uint boneIds;
-    require float4 boneWeights;
-
-    require float4x4 viewProjectionTransform;
-
     float4x4 boneTransforms[128];
     
     VertexPositionInfo getWorldSpacePos<TVertAttribs : IVertexAttribs>(VertexPositionInfo input, TVertAttribs vertAttribs)
@@ -116,13 +108,13 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
         result.vertPos = float3(0.0);
         result.tangentFrame.vertBinormal = float3(0.0);
         result.tangentFrame.vertTangent = float3(0.0);
-        for (int i = 0; i < 1; i++)
+        for (int i = 0; i < 4; i++)
         {
             uint boneId = vertAttribs.getBoneId(i);
             if (boneId == 255) break;
             float boneWeight = vertAttribs.getBoneWeight(i);
             float3 tp = mul(boneTransforms[boneId], float4(input.vertPos, 1.0)).xyz;
-            result.vertPos += tp ;//* boneWeight;
+            result.vertPos += tp * boneWeight;
             tp = mul(float3x3(boneTransforms[boneId]), input.tangentFrame.vertBinormal);
             result.tangentFrame.vertBinormal += tp * boneWeight;
             tp = mul(float3x3(boneTransforms[boneId]), input.tangentFrame.vertTangent);
