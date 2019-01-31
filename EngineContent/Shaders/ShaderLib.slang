@@ -80,19 +80,20 @@ struct VertexPositionInfo
 
 interface IWorldSpaceTransform
 {
-	VertexPositionInfo getWorldSpacePos(VertexPositionInfo input);
+	VertexPositionInfo getWorldSpacePos<TVertAttribs : IVertexAttribs>(VertexPositionInfo input, TVertAttribs vertAttribs);
 };
 
 struct StaticMeshTransform : IWorldSpaceTransform
 {
 	float4x4 worldMat;
-  	VertexPositionInfo getWorldSpacePos(VertexPositionInfo input)
+  	VertexPositionInfo getWorldSpacePos<TVertAttribs : IVertexAttribs>(VertexPositionInfo input, TVertAttribs vertAttribs)
 	{
 		VertexPositionInfo rs;
 		rs.vertPos = mul(worldMat, float4(input.vertPos, 1.0)).xyz;
 		rs.tangentFrame.vertTangent = mul(worldMat, float4(input.tangentFrame.vertTangent, 0.0)).xyz;
 		rs.tangentFrame.vertBinormal = mul(worldMat, float4(input.tangentFrame.vertBinormal, 0.0)).xyz;
 		rs.tangentFrame.vertNormal = cross(rs.tangentFrame.vertBinormal, rs.tangentFrame.vertTangent);
+        rs.tangentFrame.binormalSign = input.tangentFrame.binormalSign;
 		return rs;
 	}
 };
@@ -109,19 +110,19 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
 
     float4x4 boneTransforms[128];
     
-    VertexPositionInfo getWorldSpacePos(VertexPositionInfo input, uint boneIds, float4 boneWeights)
+    VertexPositionInfo getWorldSpacePos<TVertAttribs : IVertexAttribs>(VertexPositionInfo input, TVertAttribs vertAttribs)
     {
         VertexPositionInfo result;
         result.vertPos = float3(0.0);
         result.tangentFrame.vertBinormal = float3(0.0);
         result.tangentFrame.vertTangent = float3(0.0);
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 1; i++)
         {
-            uint boneId = (boneIds >> (i*8)) & 255;
+            uint boneId = vertAttribs.getBoneId(i);
             if (boneId == 255) break;
-            float boneWeight = boneWeights[i];
+            float boneWeight = vertAttribs.getBoneWeight(i);
             float3 tp = mul(boneTransforms[boneId], float4(input.vertPos, 1.0)).xyz;
-            result.vertPos += tp * boneWeight;
+            result.vertPos += tp ;//* boneWeight;
             tp = mul(float3x3(boneTransforms[boneId]), input.tangentFrame.vertBinormal);
             result.tangentFrame.vertBinormal += tp * boneWeight;
             tp = mul(float3x3(boneTransforms[boneId]), input.tangentFrame.vertTangent);
@@ -130,6 +131,7 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
         result.tangentFrame.vertBinormal = normalize(result.tangentFrame.vertBinormal);
         result.tangentFrame.vertTangent = normalize(result.tangentFrame.vertTangent);
 		result.tangentFrame.vertNormal = cross(result.tangentFrame.vertBinormal, result.tangentFrame.vertTangent);
+        result.tangentFrame.binormalSign = input.tangentFrame.binormalSign;
         return result;
     }
 };
@@ -137,6 +139,16 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
 interface IHeightField
 {
 	float GetHeight(float2 uvCoord);
+};
+
+struct TextureHeightField : IHeightField
+{
+    Texture2D texHeightField;
+    SamplerState sampler;
+    float GetHeight(float2 uv)
+    {
+        return texHeightField.Sample(sampler, uv).x;
+    }
 };
 
 struct ParallaxOcclusionMappingOutput
@@ -385,6 +397,17 @@ struct NoSelfShadow : ISelfShadow
 	}
 };
 
+struct PomSelfShadow<THeightField : IHeightField> : ISelfShadow
+{
+    ParallaxOcclusionMappingOutput pom;
+    THeightField heightField;
+    TangentFrame tangentFrame;
+    float get(float3 lightDir)
+	{
+		return pom.selfShadow(heightField, tangentFrame.WorldSpaceToTangentSpace(lightDir));
+	}
+};
+
 struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 {
 	float3 albedo;
@@ -555,7 +578,7 @@ interface IVertexColorSet
 
 interface IVertexUVSet
 {
-	float getUV(int index);
+	float2 getUV(int index);
 };
 
 interface IVertexAttribs
@@ -661,7 +684,7 @@ struct VertexColorSet4 : IVertexColorSet
 
 struct VertexUVSet0 : IVertexUVSet
 {
-	float2 getUV(int index) { return 0.0; }
+	float2 getUV(int index) { return float2(0.0); }
 };
 
 struct VertexUVSet1 : IVertexUVSet
@@ -683,7 +706,7 @@ struct VertexUVSet2 : IVertexUVSet
 		case 1:
 			return value1;
 		default:
-			return 0.0;
+			return float2(0.0);
 		}
 	}
 };
@@ -713,7 +736,7 @@ struct StandardBoneWeightSet : IBoneWeightSet
 	struct PackedType
 	{
 		uint boneIds;
-		float4 boneWeights;
+		uint boneWeights;
 	};
 	PackedType value;
 	PackedType getPackedRepresentation() { return value; }
@@ -725,7 +748,7 @@ struct StandardBoneWeightSet : IBoneWeightSet
 	}
 	float getBoneWeight(int index)
 	{
-		return value.boneWeights[index];
+		return ((float)((value.boneIds >> (index*8)) & 255)) * (1.0/255.0);
 	}
 };
 
@@ -780,7 +803,7 @@ struct StandardVertexFormat<TUVSet : IVertexUVSet, TTangentFrame : ITangentFrame
 	TUVSet uvSet;
 	TTangentFrame vertTangentFrame;
 	TColorSet colorSet;
-	TBoneWeightSet boneWeightSet;
+	TBoneWeightSet.PackedType boneWeightSet;
 	float3 getPos() { return vertPos; }
 	TangentFrame getTangentFrame()
 	{
@@ -796,7 +819,9 @@ struct StandardVertexFormat<TUVSet : IVertexUVSet, TTangentFrame : ITangentFrame
 	}
 	BoneWeightSet getBoneWeightSet()
 	{
-		return boneWeightSet;
+        TBoneWeightSet rs;
+        rs.setPackedRepresentation(boneWeightSet);
+		return rs;
 	}
 };
 

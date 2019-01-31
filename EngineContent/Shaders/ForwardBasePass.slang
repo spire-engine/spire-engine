@@ -56,13 +56,6 @@ struct VSOutput
 VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn)
 {
 	VSOutput rs;
-    VertexPositionInfo vin;
-    vin.vertPos = vertexIn.getPos();
-    vin.tangentFrame = vertexIn.getTangentFrame();
-    VertexPositionInfo worldPos = gWorldTransform.getWorldSpacePos(vin);
-    rs.normal = worldPos.tangentFrame.vertNormal;
-    rs.tangent = worldPos.tangentFrame.vertTangent;
-    rs.binormalSign = worldPos.tangentFrame.binormalSign;
     rs.vertColorSet = vertexIn.getColorSet();
     rs.vertUVSet = vertexIn.getUVSet();
     rs.vertBoneWeightSet = vertexIn.getBoneWeightSet().getPackedRepresentation();
@@ -71,6 +64,15 @@ VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn)
     vattribs.uvSet = rs.vertUVSet;
     vattribs.colorSet = rs.vertColorSet;
     vattribs.boneWeightSet.setPackedRepresentation(rs.vertBoneWeightSet);
+
+    VertexPositionInfo vin;
+    vin.vertPos = vertexIn.getPos();
+    vin.tangentFrame = vertexIn.getTangentFrame();
+    VertexPositionInfo worldPos = gWorldTransform.getWorldSpacePos(vin, vattribs);
+    rs.normal = worldPos.tangentFrame.vertNormal;
+    rs.tangent = worldPos.tangentFrame.vertTangent;
+    rs.binormalSign = worldPos.tangentFrame.binormalSign;
+    
     float3 displacement = gMaterial.getDisplacement(worldPos, vattribs, gView);
     rs.worldPos = worldPos.vertPos + displacement;
     rs.projPos = mul(gView.viewProjectionTransform, float4(rs.worldPos, 1.0));
@@ -83,7 +85,7 @@ float4 ps_main(VSOutput vsOut)
     vin.vertPos = vsOut.worldPos;
     vin.tangentFrame.vertNormal = normalize(vsOut.normal);
     vin.tangentFrame.vertTangent = normalize(vsOut.tangent);
-    vin.tangentFrame.vertBinormal = cross(vin.tangentFrame.vertNormal, vin.tangentFrame.vertTangent);
+    vin.tangentFrame.vertBinormal = cross(vin.tangentFrame.vertTangent, vin.tangentFrame.vertNormal);
     vin.tangentFrame.binormalSign = vsOut.binormalSign;
     VertexAttribs<SPECIALIZATION_TYPE_4.UVSet, SPECIALIZATION_TYPE_4.ColorSet, SPECIALIZATION_TYPE_4.BoneWeightSet> vattribs;
     vattribs.uvSet = vsOut.vertUVSet;

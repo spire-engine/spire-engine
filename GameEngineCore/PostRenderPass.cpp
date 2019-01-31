@@ -33,6 +33,8 @@ namespace GameEngine
 			if (desc.BindingPoint == -1) continue;
 			if (desc.BindingPoint >= descLayouts.Count())
 				descLayouts.SetSize(desc.BindingPoint + 1);
+            for (auto & d : desc.Descriptors)
+                d.Stages = sfGraphicsAndCompute;
 			descLayouts[desc.BindingPoint] = hwRenderer->CreateDescriptorSetLayout(desc.Descriptors.GetArrayView());
 		}
 		pipelineBuilder->SetBindingLayout(From(descLayouts).Select([](auto x) { return x.Ptr(); }).ToList().GetArrayView());
