@@ -2,6 +2,7 @@
 #include "CoreLib/LibIO.h"
 #include "Skeleton.h"
 #include "Engine.h"
+#include "ShaderCompiler.h"
 
 using namespace CoreLib::Basic;
 using namespace CoreLib::IO;

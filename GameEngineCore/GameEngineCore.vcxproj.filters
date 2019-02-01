@@ -172,6 +172,9 @@
     <ClCompile Include="AnimationControllerActor.cpp">
       <Filter>Actors</Filter>
     </ClCompile>
+    <ClCompile Include="LightmapUVGeneration.cpp">
+      <Filter>Geometry</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -354,6 +357,9 @@
     <ClInclude Include="HardwareInputInterface.h">
       <Filter>OS</Filter>
     </ClInclude>
+    <ClInclude Include="LightmapUVGeneration.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Actors">
@@ -391,6 +397,9 @@
     </Filter>
     <Filter Include="OS\Win32">
       <UniqueIdentifier>{2133fcad-31c4-46a6-b793-c47ee61c2391}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Geometry">
+      <UniqueIdentifier>{00f671f8-688c-415a-8049-97fe129e2d2f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

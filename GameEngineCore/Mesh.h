@@ -5,11 +5,12 @@
 #include "CoreLib/VectorMath.h"
 #include "CoreLib/Graphics/BBox.h"
 #include "CoreLib/LibIO.h"
-#include "ShaderCompiler.h"
 #include <assert.h>
 
 namespace GameEngine
 {
+    class ShaderTypeSymbol;
+
 	class MeshVertexFormat
 	{
 	private:

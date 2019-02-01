@@ -188,6 +188,7 @@
     <ClCompile Include="LevelEditor.cpp" />
     <ClCompile Include="LightActor.cpp" />
     <ClCompile Include="LightingData.cpp" />
+    <ClCompile Include="LightmapUVGeneration.cpp" />
     <ClCompile Include="LightProbeRenderer.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
@@ -268,6 +269,7 @@
     <ClInclude Include="Level.h" />
     <ClInclude Include="LightActor.h" />
     <ClInclude Include="LightingData.h" />
+    <ClInclude Include="LightmapUVGeneration.h" />
     <ClInclude Include="LightProbeRenderer.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
