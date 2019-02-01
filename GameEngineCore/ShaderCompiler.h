@@ -32,7 +32,7 @@ namespace GameEngine
         CoreLib::String Name;
     };
 
-    struct ShaderTypeSymbol : public CoreLib::RefObject
+    class ShaderTypeSymbol : public CoreLib::RefObject
     {
     public:
         CoreLib::String TypeName;

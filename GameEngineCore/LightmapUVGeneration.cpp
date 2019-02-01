@@ -1,4 +1,5 @@
 #include "LightmapUVGeneration.h"
+#include "Mesh.h"
 
 using namespace VectorMath;
 
@@ -117,7 +118,6 @@ namespace GameEngine
         {
             for (int i = 0; i < g.faces.Count(); i++)
             {
-                bool inserted = false;
                 auto & face = faces[g.faces[i]];
                 bool connects = false;
                 if (FaceOverlaps(face, f, connects))
@@ -181,18 +181,19 @@ namespace GameEngine
                 Vec2 size = (g.maxUV - g.minUV) * g.packScale;
                 float minArea = 1e20f;
                 int bestPlacementPoint = -1;
-                Vec2 bestExtent;
+                Vec2 bestExtent = curMax;
                 for (int i = 0; i < placementPoints.Count(); i++)
                 {
                     // find the new extent as a result of placing the group at this placement point
                     Vec2 vmax = placementPoints[i] + size;
                     Vec2 newMax = Vec2::Create(Math::Max(curMax.x, vmax.x), Math::Max(curMax.y, vmax.y));
-                    float area = newMax.x*newMax.y;
+                    float squareSize = Math::Max(newMax.x, newMax.y);
+                    float area = squareSize * squareSize;
                     if (area < minArea)
                     {
                         minArea = area;
                         bestPlacementPoint = i;
-                        bestExtent = newMax;
+                        bestExtent = Vec2::Create(squareSize, squareSize);
                     }
                 }
                 Vec2 p = placementPoints[bestPlacementPoint];
@@ -268,7 +269,7 @@ namespace GameEngine
                 g.maxUV = Vec2::Create(-1e9f, -1e9f);
                 for (auto f : g.faces)
                 {
-                    auto & face = faces[g.faces[f]];
+                    auto & face = faces[f];
                     g.surfaceArea += face.GetSurfaceArea(mesh);
                     g.uvSurfaceArea += face.uvSurfaceArea;
                     for (int i = 0; i < 3; i++)
