@@ -201,6 +201,7 @@
     <ClCompile Include="PointLightActor.cpp" />
     <ClCompile Include="PostRenderPass.cpp" />
     <ClCompile Include="Property.cpp" />
+    <ClCompile Include="Rasterizer.cpp" />
     <ClCompile Include="RenderContext.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RenderPass.cpp" />
@@ -283,6 +284,7 @@
     <ClInclude Include="PostRenderPass.h" />
     <ClInclude Include="Property.h" />
     <ClInclude Include="PropertyEditControl.h" />
+    <ClInclude Include="Rasterizer.h" />
     <ClInclude Include="RenderContext.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RendererService.h" />

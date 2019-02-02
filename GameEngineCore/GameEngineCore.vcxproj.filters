@@ -175,6 +175,9 @@
     <ClCompile Include="LightmapUVGeneration.cpp">
       <Filter>Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="Rasterizer.cpp">
+      <Filter>Geometry</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -358,6 +361,9 @@
       <Filter>OS</Filter>
     </ClInclude>
     <ClInclude Include="LightmapUVGeneration.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="Rasterizer.h">
       <Filter>Geometry</Filter>
     </ClInclude>
   </ItemGroup>
