@@ -366,6 +366,9 @@
     <ClInclude Include="Rasterizer.h">
       <Filter>Geometry</Filter>
     </ClInclude>
+    <ClInclude Include="DisjointSet.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Actors">

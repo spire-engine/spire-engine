@@ -247,6 +247,7 @@
     <ClInclude Include="AtmosphereActor.h" />
     <ClInclude Include="CameraActor.h" />
     <ClInclude Include="CatmullSpline.h" />
+    <ClInclude Include="DisjointSet.h" />
     <ClInclude Include="EnvMapActor.h" />
     <ClInclude Include="FrameIdDisplayActor.h" />
     <ClInclude Include="Gizmo.h" />

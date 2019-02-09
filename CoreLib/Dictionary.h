@@ -81,7 +81,7 @@ namespace CoreLib
 				return 1;
 			}
 		private:
-			int bucketSizeMinusOne, shiftBits;
+			int bucketSizeMinusOne;
 			int _count;
 			IntSet marks;
 			KeyValuePair<TKey, TValue>* hashMap;
@@ -132,7 +132,7 @@ namespace CoreLib
 			template<typename T>
 			inline int GetHashPos(T & key) const
 			{
-				return ((unsigned int)(GetHashCode(key) * 2654435761)) >> shiftBits;
+				return ((unsigned int)(GetHashCode(key) * 2654435761)) % bucketSizeMinusOne;
 			}
 			template<typename T>
 			FindPositionResult FindPosition(const T & key) const
@@ -177,14 +177,11 @@ namespace CoreLib
 				if (bucketSizeMinusOne == -1 || _count / (float)bucketSizeMinusOne >= MaxLoadFactor)
 				{
 					int newSize = (bucketSizeMinusOne + 1) * 2;
-					int newShiftBits = shiftBits - 1;
 					if (newSize == 0)
 					{
 						newSize = 16;
-						newShiftBits = 28;
 					}
 					Dictionary<TKey, TValue> newDict;
-					newDict.shiftBits = newShiftBits;
 					newDict.bucketSizeMinusOne = newSize - 1;
 					newDict.hashMap = new KeyValuePair<TKey, TValue>[newSize];
 					newDict.marks.SetMax(newSize * 2);
@@ -435,7 +432,6 @@ namespace CoreLib
 			Dictionary()
 			{
 				bucketSizeMinusOne = -1;
-				shiftBits = 32;
 				_count = 0;
 				hashMap = 0;
 			}
@@ -461,7 +457,6 @@ namespace CoreLib
 				Free();
 				bucketSizeMinusOne = other.bucketSizeMinusOne;
 				_count = other._count;
-				shiftBits = other.shiftBits;
 				hashMap = new KeyValuePair<TKey, TValue>[other.bucketSizeMinusOne + 1];
 				marks = other.marks;
 				for (int i = 0; i <= bucketSizeMinusOne; i++)
@@ -476,7 +471,6 @@ namespace CoreLib
 				bucketSizeMinusOne = other.bucketSizeMinusOne;
 				_count = other._count;
 				hashMap = other.hashMap;
-				shiftBits = other.shiftBits;
 				marks = _Move(other.marks);
 				other.hashMap = 0;
 				other._count = 0;
@@ -501,7 +495,7 @@ namespace CoreLib
 				return 1;
 			}
 		private:
-			int bucketSizeMinusOne, shiftBits;
+			int bucketSizeMinusOne;
 			int _count;
 			IntSet marks;
 
@@ -568,7 +562,7 @@ namespace CoreLib
 			template<typename T>
 			inline int GetHashPos(T & key) const
 			{
-				return ((unsigned int)(GetHashCode(key) * 2654435761)) >> shiftBits;
+				return ((unsigned int)(GetHashCode(key) * 2654435761)) % bucketSizeMinusOne;
 			}
 			template<typename T>
 			FindPositionResult FindPosition(const T & key) const
@@ -615,14 +609,11 @@ namespace CoreLib
 				if (bucketSizeMinusOne == -1 || _count / (float)bucketSizeMinusOne >= MaxLoadFactor)
 				{
 					int newSize = (bucketSizeMinusOne + 1) * 2;
-					int newShiftBits = shiftBits - 1;
 					if (newSize == 0)
 					{
 						newSize = 16;
-						newShiftBits = 28;
 					}
 					EnumerableDictionary<TKey, TValue> newDict;
-					newDict.shiftBits = newShiftBits;
 					newDict.bucketSizeMinusOne = newSize - 1;
 					newDict.hashMap = new LinkedNode<KeyValuePair<TKey, TValue>>*[newSize];
 					newDict.marks.SetMax(newSize * 2);
@@ -831,7 +822,6 @@ namespace CoreLib
 			EnumerableDictionary()
 			{
 				bucketSizeMinusOne = -1;
-				shiftBits = 32;
 				_count = 0;
 				hashMap = 0;
 			}
@@ -867,7 +857,6 @@ namespace CoreLib
 				bucketSizeMinusOne = other.bucketSizeMinusOne;
 				_count = other._count;
 				hashMap = other.hashMap;
-				shiftBits = other.shiftBits;
 				marks = _Move(other.marks);
 				other.hashMap = 0;
 				other._count = 0;

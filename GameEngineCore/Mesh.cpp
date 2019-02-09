@@ -126,6 +126,14 @@ namespace GameEngine
 		Quaternion tangentFrame;
 		int boneId;
 	};
+    void Mesh::UpdateBounds()
+    {
+        Bounds.Init();
+        for (int i = 0; i < vertCount; i++)
+        {
+            Bounds.Union(GetVertexPosition(i));
+        }
+    }
 	void Mesh::FromSkeleton(Skeleton * skeleton, float width)
 	{
 		Bounds.Init();

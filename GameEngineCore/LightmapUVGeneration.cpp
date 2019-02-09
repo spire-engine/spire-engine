@@ -1,8 +1,8 @@
 #include "LightmapUVGeneration.h"
+#include "DisjointSet.h"
 #include "Mesh.h"
 #include "Rasterizer.h"
 #include "CoreLib/Imaging/Bitmap.h"
-
 using namespace VectorMath;
 
 namespace GameEngine
@@ -14,6 +14,7 @@ namespace GameEngine
     struct Face
     {
         int Id;
+        int chartId;
         float uvSurfaceArea;
         Vec3 edges[3];  //edge equations (A,B,C)
         Vec2i quantizedUVs[3];
@@ -52,14 +53,9 @@ namespace GameEngine
             }
 
             // compute uv surface area
-            uvSurfaceArea = 0.0f;
-            Vec2 e0 = Vec2::Create(edges[0].x, edges[0].y);
-            float l = e0.Length();
-            if (l > 0.0f)
-            {
-                e0.x /= l; e0.y /= l;
-                uvSurfaceArea = 0.5f * l * fabs(e0.x * (verts[2].x - verts[0].x) + e0.y * (verts[2].y - verts[0].y));
-            }
+            auto e0 = verts[1] - verts[0];
+            auto e1 = verts[2] - verts[0];
+            uvSurfaceArea = 0.5f * (e0.x * e1.y - e0.y * e1.x);
             Rasterizer::SetupTriangle(ptri, verts[0], verts[1], verts[2], RasterizeResolution, RasterizeResolution);
         }
         float GetSurfaceArea(Mesh * mesh)
@@ -85,16 +81,6 @@ namespace GameEngine
         }
     };
 
-    struct FaceGroup
-    {
-        List<int> faces;
-        Canvas canvas;
-        FaceGroup()
-            : canvas(RasterizeResolution, RasterizeResolution)
-        {
-        }
-    };
-
     struct Chart
     {
         List<int> faces;
@@ -102,63 +88,186 @@ namespace GameEngine
         float packScale = 1.0f;
         Vec2 size, innerSize, packOrigin;
     };
+
+    struct VertexOverlapList
+    {
+        List<List<int>> lists; // a list of overlapping vertex lists
+        List<int> vertexListId;  // for each vertex, stores the list id it belongs to
+        DisjointSet disjointSet;
+        EnumerableDictionary<int, int> disjointSetIdToListId;
+
+        bool PositionOverlaps(Vec3 p0, Vec3 p1)
+        {
+            return (p0 - p1).Length2() < 1e-6f;
+        }
+        List<int> & GetOverlappedIndices(int idx)
+        {
+            int setId = disjointSet.Find(idx);
+            int listId = disjointSetIdToListId[setId]();
+            return lists[listId];
+        }
+        float safeInv(float x)
+        {
+            if (fabs(x) < 1e-5f)
+                return 0.0f;
+            return 1.0f / x;
+        }
+        void Build(Mesh& mesh)
+        {
+            mesh.UpdateBounds();
+            // classify vertices in to a 256^3 grid
+            EnumerableDictionary<int, List<int>> vertexGrid;
+            auto invMeshSize = (mesh.Bounds.Max - mesh.Bounds.Min);
+            invMeshSize = Vec3::Create(safeInv(invMeshSize.x), safeInv(invMeshSize.y), safeInv(invMeshSize.z));
+            auto getVertexGridId = [&](int faceVert)
+            {
+                int vid = mesh.Indices[faceVert];
+                auto p = mesh.GetVertexPosition(vid);
+                auto op = (p - mesh.Bounds.Min);
+                op *= invMeshSize;
+                int ix = Math::Clamp((int)(op.x * 256.0f), 0, 255);
+                int iy = Math::Clamp((int)(op.y * 256.0f), 0, 255);
+                int iz = Math::Clamp((int)(op.z * 256.0f), 0, 255);
+                int gridId = ix + (iy << 8) + (iz << 16);
+                return gridId;
+            };
+            auto getNeighborGridId = [](int gridId, int gx, int gy, int gz)
+            {
+                int ix = gridId & 255;
+                int iy = (gridId >> 8) & 255;
+                int iz = (gridId >> 16) & 255;
+                ix += gx;
+                iy += gy;
+                iz += gz;
+                ix = Math::Clamp(ix, 0, 255);
+                iy = Math::Clamp(iy, 0, 255);
+                iz = Math::Clamp(iz, 0, 255);
+                gridId = ix + (iy << 8) + (iz << 16);
+                return gridId;
+            };
+            for (int i = 0; i < mesh.Indices.Count(); i++)
+            {
+                int gridId = getVertexGridId(i);
+                auto list = vertexGrid.TryGetValue(gridId);
+                if (!list)
+                {
+                    vertexGrid.Add(gridId, List<int>());
+                    list = vertexGrid.TryGetValue(gridId);
+                }
+                list->Add(i);
+            }
+            disjointSet.Init(mesh.Indices.Count());
+            for (int i = 0; i < mesh.Indices.Count(); i++)
+            {
+                // check if nearby vertices overlap
+                int thisGridId = getVertexGridId(i);
+                for (int gx = -1; gx <= 1; gx++)
+                {
+                    for (int gy = -1; gy <= 1; gy++)
+                    {
+                        for (int gz = -1; gz <= 1; gz++)
+                        {
+                            int gridId = getNeighborGridId(thisGridId, gx, gy, gz);
+                            auto verts = vertexGrid.TryGetValue(gridId);
+                            if (verts)
+                            {
+                                for (auto faceVert : *verts)
+                                {
+                                    if (PositionOverlaps(mesh.GetVertexPosition(mesh.Indices[i]), mesh.GetVertexPosition(mesh.Indices[faceVert])))
+                                    {
+                                        disjointSet.Union(i, faceVert);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            for (int i = 0; i < mesh.Indices.Count(); i++)
+            {
+                int disjointSetId = disjointSet.Find(i);
+                int listId = -1;
+                if (!disjointSetIdToListId.TryGetValue(disjointSetId, listId))
+                {
+                    listId = disjointSetIdToListId.Count();
+                    disjointSetIdToListId.Add(disjointSetId, listId);
+                }
+            }
+            lists.SetSize(disjointSetIdToListId.Count());
+            for (int i = 0; i < mesh.Indices.Count(); i++)
+            {
+                int disjointSetId = disjointSet.Find(i);
+                int listId = -1;
+                disjointSetIdToListId.TryGetValue(disjointSetId, listId);
+                lists[listId].Add(i);
+            }
+        }
+    };
     
     struct LightmapUVGenerationContext
     {
         Mesh * mesh;
         Mesh * meshOut;
         List<Face> faces;
-        List<FaceGroup> groups;
         List<Chart> charts;
         Dictionary<Vec2i, List<int>> faceList;
-
+        VertexOverlapList overlapList;
+        DisjointSet faceSets;
+        bool VertexOverlaps(int v0, int v1)
+        {
+            int i0 = mesh->Indices[v0];
+            int i1 = mesh->Indices[v1];
+            return (mesh->GetVertexPosition(i0) - mesh->GetVertexPosition(i1)).Length2() < 1e-6f &&
+                (mesh->GetVertexUV(i0, 0) - mesh->GetVertexUV(i1, 0)).Length() < 1e-4f;
+        }
         void BuildCharts()
         {
-            IntSet insertedFaces;
-            IntSet queuedFaces;
-            queuedFaces.SetMax(faces.Count());
-
-            for (auto & g : groups)
+            faceSets.Init(mesh->Indices.Count() / 3);
+            overlapList.Build(*mesh);
+            for (auto range : mesh->ElementRanges)
             {
-                IntSet groupFaceSet;
-                for (auto & f : g.faces)
-                    groupFaceSet.Add(f);
-                for (auto & f : g.faces)
+                int rangeEnd = range.StartIndex + range.Count;
+                for (int i = range.StartIndex; i < rangeEnd; i++)
                 {
-                    if (!insertedFaces.Contains(f))
+                    int faceI = i / 3;
+                    auto & overlappingFaceVerts = overlapList.GetOverlappedIndices(i);
+                    for (auto j : overlappingFaceVerts)
                     {
-                        Chart chart;
-                        List<int> queue;
-                        chart.faces.Clear();
-                        queue.Add(f);
-                        queuedFaces.Clear();
-                        queuedFaces.Add(f);
-
-                        int qptr = 0;
-                        while (qptr < queue.Count())
+                        if (j > i && j < rangeEnd)
                         {
-                            int fid = queue[qptr++];
-                            if (!insertedFaces.Contains(fid) && groupFaceSet.Contains(fid))
+                            int faceJ = j / 3;
+                            if (VertexOverlaps(i, j))
                             {
-                                insertedFaces.Add(fid);
-                                chart.faces.Add(fid);
-                            }
-                            for (auto qv : faces[fid].quantizedUVs)
-                            {
-                                auto & nlist = faceList[qv].GetValue();
-                                for (auto neighborId : nlist)
+                                if (VertexOverlaps(faceI * 3 + (i + 2) % 3, faceJ * 3 + (j + 1) % 3) ||
+                                    VertexOverlaps(faceI * 3 + (i + 1) % 3, faceJ * 3 + (j + 2) % 3))
                                 {
-                                    if (!queuedFaces.Contains(neighborId) && groupFaceSet.Contains(neighborId))
+                                    if (faces[faceI].uvSurfaceArea * faces[faceJ].uvSurfaceArea >= 0.0f)
                                     {
-                                        queue.Add(neighborId);
-                                        queuedFaces.Add(neighborId);
+                                        faceSets.Union(faceI, faceJ);
                                     }
                                 }
                             }
                         }
-                        charts.Add(chart);
                     }
+
                 }
+            }
+            EnumerableDictionary<int, int> faceSetIdToChartId;
+            for (int i = 0; i < mesh->Indices.Count() / 3; i++)
+            {
+                int faceSetId = faceSets.Find(i);
+                int chartId = -1;
+                if (!faceSetIdToChartId.TryGetValue(faceSetId, chartId))
+                {
+                    chartId = faceSetIdToChartId.Count();
+                    faceSetIdToChartId.Add(faceSetId, chartId);
+                }
+                faces[i].chartId = chartId;
+            }
+            charts.SetSize(faceSetIdToChartId.Count());
+            for (int i = 0; i < mesh->Indices.Count() / 3; i++)
+            {
+                charts[faces[i].chartId].faces.Add(i);
             }
             for (auto & chart : charts)
             {
@@ -190,35 +299,6 @@ namespace GameEngine
                 }
             }
         }
-
-        bool FaceOverlaps(Face& f0, Face& f1, bool & hasConnection)
-        {
-            hasConnection = false;
-            for (int e = 0; e < 3; e++)
-            {
-                Vec3 edge = f0.edges[e];
-                Vec2 v = mesh->GetVertexUV(mesh->Indices[f1.Id * 3 + 0], 0);
-                float s0 = edge.x * v.x + edge.y * v.y + edge.z;
-
-                v = mesh->GetVertexUV(mesh->Indices[f1.Id * 3 + 1], 0);
-                float s1 = edge.x * v.x + edge.y * v.y + edge.z;
-
-                v = mesh->GetVertexUV(mesh->Indices[f1.Id * 3 + 2], 0);
-                float s2 = edge.x * v.x + edge.y * v.y + edge.z;
-
-                if (s0 >= -1e-3f && s1 >= -1e-3f && s2 >= -1e-3f)
-                {
-                    hasConnection = (s0 <= 1e-3f) || (s1 <= 1e-3f) || (s2 <= 1e-3f);
-                    return false;
-                }
-            }
-            return true;
-        }
-        void AddFaceToGroup(int faceId, int groupId)
-        {
-            Rasterizer::Rasterize(groups[groupId].canvas, faces[faceId].ptri);
-            groups[groupId].faces.Add(faceId);
-        }
         template<typename SetPixelFunc>
         void RasterizeLine(VectorMath::Vec2 s0, VectorMath::Vec2 s1, const SetPixelFunc & setPixel)
         {
@@ -237,134 +317,6 @@ namespace GameEngine
                 e2 = err;
                 if (e2 > -dx) { err -= dy; x0 += sx; }
                 if (e2 < dy) { err += dx; y0 += sy; }
-            }
-        }
-
-        void FaceGroupOverlapTest(FaceGroup & g, Face & f, bool & hasOverlap, bool & hasConnection)
-        {
-            hasConnection = false;
-            int overlaps = Rasterizer::CountOverlap(g.canvas, f.ptri);
-            if (overlaps > 16)
-                hasOverlap = true;
-            else
-            {
-                return;
-                for (int i = 0; i < 3; i++)
-                {
-                    Vec2 v0 = f.verts[i];
-                    Vec2 v1 = f.verts[(i + 1) % 3];
-                    RasterizeLine(v0, v1, [&](int x, int y)
-                    {
-                        for (int ox = x - 1; ox <= x + 1; ox++)
-                        {
-                            int cx = Math::Clamp(ox, 0, RasterizeResolution - 1);
-
-                            for (int oy = y - 1; oy <= y + 1; oy++)
-                            {
-                                int cy = Math::Clamp(oy, 0, RasterizeResolution - 1);
-                                if (g.canvas.bitmap.Contains(cy*RasterizeResolution + cx))
-                                {
-                                    hasConnection = true;
-                                    return true;
-                                }
-                            }
-                        }
-                        return false;
-                    });
-                    if (hasConnection)
-                        return;
-                }
-            }
-#if 0
-            for (int i = 0; i < g.faces.Count(); i++)
-            {
-                auto & face = faces[g.faces[i]];
-                bool connects = false;
-                if (FaceOverlaps(face, f, connects))
-                {
-                    hasOverlap = true;
-                    return;
-                }
-                if (connects)
-                    hasConnection = true;
-            }
-#endif
-        }
-        void InsertFace(int faceId)
-        {
-            // find a group to insert the face into
-
-            bool inserted = false;
-            struct Candidate 
-            {
-                int groupId; bool hasConnection;
-            };
-            List<Candidate> candidates;
-            for (int i = 0; i < groups.Count(); i++)
-            {
-                bool hasOverlap = false;
-                bool hasConnection = false;
-                FaceGroupOverlapTest(groups[i], faces[faceId], hasOverlap, hasConnection);
-                if (!hasOverlap)
-                {
-                    candidates.Add(Candidate{ i, hasConnection });
-                }
-            }
-            for (auto c : candidates)
-            {
-                if (c.hasConnection)
-                {
-                    AddFaceToGroup(faceId, c.groupId);
-                    inserted = true;
-                }
-            }
-            if (!inserted && candidates.Count())
-            {
-                AddFaceToGroup(faceId, candidates.First().groupId);
-            }
-            else
-            {
-                // create a new group and insert the face into it
-                groups.Add(FaceGroup());
-                AddFaceToGroup(faceId, groups.Count() - 1);
-            }
-        }
-
-        void ClassifyFaces() // classify faces into non-overlapping groups
-        {
-            IntSet insertedFaces;
-            IntSet queuedFaces;
-            queuedFaces.SetMax(faces.Count());
-            insertedFaces.SetMax(faces.Count());
-            List<int> queue;
-            for (int f = 0; f < faces.Count(); f++)
-            {
-                if (!insertedFaces.Contains(f))
-                {
-                    queue.Clear();
-                    queue.Add(f);
-                    queuedFaces.Add(f);
-                    int qptr = 0;
-                    while (qptr < queue.Count())
-                    {
-                        int fid = queue[qptr++];
-                        if (insertedFaces.Contains(fid)) continue;
-                        InsertFace(fid);
-                        insertedFaces.Add(fid);
-                        for (auto qv : faces[fid].quantizedUVs)
-                        {
-                            auto & nlist = faceList[qv].GetValue();
-                            for (auto neighborId : nlist)
-                            {
-                                if (!queuedFaces.Contains(neighborId))
-                                {
-                                    queue.Add(neighborId);
-                                    queuedFaces.Add(neighborId);
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -473,16 +425,6 @@ namespace GameEngine
             return curMax;
         }
 
-        void SetZeroUV(FaceGroup & g)
-        {
-            for (auto f : g.faces)
-            {
-                meshOut->SetVertexUV(faces[f].Id * 3, 1, Vec2::Create(0.0f));
-                meshOut->SetVertexUV(faces[f].Id * 3 + 1, 1, Vec2::Create(0.0f));
-                meshOut->SetVertexUV(faces[f].Id * 3 + 2, 1, Vec2::Create(0.0f));
-            }
-        }
-
         void CopyVertex(int dst, int src)
         {
             auto mvf = mesh->GetVertexFormat();
@@ -524,7 +466,7 @@ namespace GameEngine
                             {
                                 // we need to add new vertex
                                 int vid = mesh->Indices[face.Id * 3 + i];
-                                meshOut->AllocVertexBuffer(meshOut->GetVertexCount() + 1);
+                                meshOut->GrowVertexBuffer(meshOut->GetVertexCount() + 1);
                                 CopyVertex(meshOut->GetVertexCount() - 1, vid);
                                 meshOut->SetVertexUV(meshOut->GetVertexCount() - 1, 1, uv);
                                 meshOut->Indices[face.Id * 3 + i] = meshOut->GetVertexCount() - 1;
@@ -542,7 +484,6 @@ namespace GameEngine
             mesh = pMeshIn;
             meshOut = pMeshOut;
             BuildFaces();
-            ClassifyFaces();
             BuildCharts();
             // determine the scale of each chart
             // so that each group can have the same resolution

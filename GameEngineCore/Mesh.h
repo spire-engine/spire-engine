@@ -213,11 +213,21 @@ namespace GameEngine
 			vertexData.SetSize(vertexFormat.GetVertexSize() * numVerts);
 			vertCount = numVerts;
 		}
+        void GrowVertexBuffer(int numVerts)
+        {
+            if (vertexData.Capacity() < numVerts * vertexFormat.GetVertexSize())
+            {
+                vertexData.Reserve((numVerts + numVerts / 2) * vertexFormat.GetVertexSize());
+                vertexData.SetSize(vertexFormat.GetVertexSize() * numVerts);
+            }
+            vertCount = numVerts;
+        }
 		void SaveToStream(CoreLib::IO::Stream * stream);
 		void SaveToFile(const CoreLib::String & fileName);
 		void LoadFromStream(CoreLib::IO::Stream * stream);
 		void LoadFromFile(const CoreLib::String & fileName);
 		void FromSkeleton(Skeleton * skeleton, float width);
+        void UpdateBounds();
 		Mesh DeduplicateVertices();
 	public:
 		static Mesh CreateBox(VectorMath::Vec3 vmin, VectorMath::Vec3 vmax);
