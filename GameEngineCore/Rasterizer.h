@@ -21,10 +21,19 @@ namespace GameEngine
     {
         CoreLib::IntSet bitmap;
         int width, height;
-        Canvas(int w, int h)
-            : width(w), height(h)
+        void Init(int w, int h)
         {
+            width = w;
+            height = h;
             bitmap.SetMax(w * h);
+        }
+        void Set(int x, int y)
+        {
+            bitmap.Add(y * width + x);
+        }
+        bool Get(int x, int y)
+        {
+            return bitmap.Contains(y * width + x);
         }
     };
     class Rasterizer

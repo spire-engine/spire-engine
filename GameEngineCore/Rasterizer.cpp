@@ -69,6 +69,85 @@ namespace GameEngine
             isOwnerEdge[1] = tri.Y1 < tri.Y2 || tri.Y1 == tri.Y2 && tri.Y0 >= tri.Y1;
             isOwnerEdge[2] = tri.Y2 < tri.Y0 || tri.Y0 == tri.Y2 && tri.Y1 >= tri.Y0;
         }
+        /*
+        template< typename TShader, int32 Dilate >
+void RasterizeTriangle( TShader& Shader, const FVector2D Points[3], int32 ScissorWidth, int32 ScissorHeight )
+{
+	const FVector2D HalfPixel( 0.5f, 0.5f );
+	FVector2D p0 = Points[0] - HalfPixel;
+	FVector2D p1 = Points[1] - HalfPixel;
+	FVector2D p2 = Points[2] - HalfPixel;
+
+	// Correct winding
+	float Facing = ( p0.X - p1.X ) * ( p2.Y - p0.Y ) - ( p0.Y - p1.Y ) * ( p2.X - p0.X );
+	if( Facing < 0.0f )
+	{
+		Swap( p0, p2 );
+	}
+
+	// 28.4 fixed point
+	const int32 X0 = (int32)( 16.0f * p0.X + 0.5f );
+	const int32 X1 = (int32)( 16.0f * p1.X + 0.5f );
+	const int32 X2 = (int32)( 16.0f * p2.X + 0.5f );
+	
+	const int32 Y0 = (int32)( 16.0f * p0.Y + 0.5f );
+	const int32 Y1 = (int32)( 16.0f * p1.Y + 0.5f );
+	const int32 Y2 = (int32)( 16.0f * p2.Y + 0.5f );
+
+	// Bounding rect
+	int32 MinX = ( FMath::Min3( X0, X1, X2 ) - Dilate + 15 ) / 16;
+	int32 MaxX = ( FMath::Max3( X0, X1, X2 ) + Dilate + 15 ) / 16;
+	int32 MinY = ( FMath::Min3( Y0, Y1, Y2 ) - Dilate + 15 ) / 16;
+	int32 MaxY = ( FMath::Max3( Y0, Y1, Y2 ) + Dilate + 15 ) / 16;
+
+	// Clip to image
+	MinX = FMath::Clamp( MinX, 0, ScissorWidth );
+	MaxX = FMath::Clamp( MaxX, 0, ScissorWidth );
+	MinY = FMath::Clamp( MinY, 0, ScissorHeight );
+	MaxY = FMath::Clamp( MaxY, 0, ScissorHeight );
+
+	// Deltas
+	const int32 DX01 = X0 - X1;
+	const int32 DX12 = X1 - X2;
+	const int32 DX20 = X2 - X0;
+
+	const int32 DY01 = Y0 - Y1;
+	const int32 DY12 = Y1 - Y2;
+	const int32 DY20 = Y2 - Y0;
+
+	// Half-edge constants
+	int32 C0 = DY01 * X0 - DX01 * Y0;
+	int32 C1 = DY12 * X1 - DX12 * Y1;
+	int32 C2 = DY20 * X2 - DX20 * Y2;
+
+	// Correct for fill convention
+	C0 += ( DY01 < 0 || ( DY01 == 0 && DX01 > 0 ) ) ? 0 : -1;
+	C1 += ( DY12 < 0 || ( DY12 == 0 && DX12 > 0 ) ) ? 0 : -1;
+	C2 += ( DY20 < 0 || ( DY20 == 0 && DX20 > 0 ) ) ? 0 : -1;
+
+	// Dilate edges
+	C0 += ( abs(DX01) + abs(DY01) ) * Dilate;
+	C1 += ( abs(DX12) + abs(DY12) ) * Dilate;
+	C2 += ( abs(DX20) + abs(DY20) ) * Dilate;
+
+	for( int32 y = MinY; y < MaxY; y++ )
+	{
+		for( int32 x = MinX; x < MaxX; x++ )
+		{
+			// same as Edge1 >= 0 && Edge2 >= 0 && Edge3 >= 0
+			int32 IsInside;
+			IsInside  = C0 + (DX01 * y - DY01 * x) * 16;
+			IsInside |= C1 + (DX12 * y - DY12 * x) * 16;
+			IsInside |= C2 + (DX20 * y - DY20 * x) * 16;
+
+			if( IsInside >= 0 )
+			{
+				Shader.Process( x, y );
+			}
+		}
+	}
+}
+        */
         inline int TestQuadFragment(__m128i x, __m128i y)
         {
             int sign0, sign1, sign2;
@@ -348,10 +427,8 @@ namespace GameEngine
     }
 
     // sets up the triangle based on three post-projection clip space coordinates.
-    // it computes the edges equation and perform back-face culling. 
     bool Rasterizer::SetupTriangle(ProjectedTriangle & tri, Vec2 s0, Vec2 s1, Vec2 s2, int width, int height)
     {
-        //s0 += Vec3(1.0f, 1.0f, 0.0f); s1 += Vec3(1.0f, 1.0f, 0.0f); s2 += Vec3(1.0f, 1.0f, 0.0f);
         tri.X0 = (int)((s0.x)*width * 16);
         tri.Y0 = (int)((s0.y)*height * 16);
         tri.X1 = (int)((s1.x)*width * 16);
