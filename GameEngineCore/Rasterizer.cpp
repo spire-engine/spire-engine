@@ -20,7 +20,7 @@ namespace GameEngine
 
     struct TriangleSIMD
     {
-        __m128i a0, a1, a2, b0, b1, b2, x0, y0, x1, y1, x2, y2;
+        __m128i a0, a1, a2, b0, b1, b2, x0, y0, x1, y1, x2, y2, c0, c1, c2;
         int isOwnerEdge[3];
 
         inline void LoadForCoordinates(ProjectedTriangle & tri)
@@ -37,6 +37,9 @@ namespace GameEngine
             y1 = _mm_set1_epi32(tri.Y1);
             x2 = _mm_set1_epi32(tri.X2);
             y2 = _mm_set1_epi32(tri.Y2);
+            c0 = _mm_set1_epi32(tri.C0);
+            c1 = _mm_set1_epi32(tri.C1);
+            c2 = _mm_set1_epi32(tri.C2);
         }
 
         inline bool TouchesBlock(__m128i x, __m128i y)
@@ -64,6 +67,9 @@ namespace GameEngine
             y1 = _mm_set1_epi32(tri.Y1);
             x2 = _mm_set1_epi32(tri.X2);
             y2 = _mm_set1_epi32(tri.Y2);
+            c0 = _mm_set1_epi32(tri.C0);
+            c1 = _mm_set1_epi32(tri.C1);
+            c2 = _mm_set1_epi32(tri.C2);
 
             isOwnerEdge[0] = tri.Y0 < tri.Y1 || tri.Y0 == tri.Y1 && tri.Y2 >= tri.Y0;
             isOwnerEdge[1] = tri.Y1 < tri.Y2 || tri.Y1 == tri.Y2 && tri.Y0 >= tri.Y1;
@@ -153,32 +159,32 @@ void RasterizeTriangle( TShader& Shader, const FVector2D Points[3], int32 Scisso
             int sign0, sign1, sign2;
             if (isOwnerEdge[0])
             {
-                auto e0 = a0 * (x - x0) + b0 * (y - y0);
+                auto e0 = a0 * (x - x0) + b0 * (y - y0) + c0;
                 sign0 = ~_mm_movemask_epi8(e0);
             }
             else
             {
-                auto e0 = a0 * (x0 - x) + b0 * (y0 - y);
+                auto e0 = a0 * (x0 - x) + b0 * (y0 - y) - c0;
                 sign0 = _mm_movemask_epi8(e0);
             }
             if (isOwnerEdge[1])
             {
-                auto e1 = a1 * (x - x1) + b1 * (y - y1);
+                auto e1 = a1 * (x - x1) + b1 * (y - y1) + c1;
                 sign1 = ~_mm_movemask_epi8(e1);
             }
             else
             {
-                auto e1 = a1 * (x1 - x) + b1 * (y1 - y);
+                auto e1 = a1 * (x1 - x) + b1 * (y1 - y) - c1;
                 sign1 = _mm_movemask_epi8(e1);
             }
             if (isOwnerEdge[2])
             {
-                auto e2 = a2 * (x - x2) + b2 * (y - y2);
+                auto e2 = a2 * (x - x2) + b2 * (y - y2) + c2;
                 sign2 = ~_mm_movemask_epi8(e2);
             }
             else
             {
-                auto e2 = a2 * (x2 - x) + b2 * (y2 - y);
+                auto e2 = a2 * (x2 - x) + b2 * (y2 - y) - c2;
                 sign2 = _mm_movemask_epi8(e2);
             }
             return sign0 & sign1 & sign2 & 0x8888;
@@ -427,7 +433,7 @@ void RasterizeTriangle( TShader& Shader, const FVector2D Points[3], int32 Scisso
     }
 
     // sets up the triangle based on three post-projection clip space coordinates.
-    bool Rasterizer::SetupTriangle(ProjectedTriangle & tri, Vec2 s0, Vec2 s1, Vec2 s2, int width, int height)
+    bool Rasterizer::SetupTriangle(ProjectedTriangle & tri, Vec2 s0, Vec2 s1, Vec2 s2, int width, int height, int dilate)
     {
         tri.X0 = (int)((s0.x)*width * 16);
         tri.Y0 = (int)((s0.y)*height * 16);
@@ -441,6 +447,10 @@ void RasterizeTriangle( TShader& Shader, const FVector2D Points[3], int32 Scisso
         tri.B1 = tri.X2 - tri.X1;
         tri.A2 = tri.Y2 - tri.Y0;
         tri.B2 = tri.X0 - tri.X2;
+        tri.C0 = (abs(tri.A0) + abs(tri.B0)) * dilate;
+        tri.C1 = (abs(tri.A1) + abs(tri.B1)) * dilate;
+        tri.C2 = (abs(tri.A2) + abs(tri.B2)) * dilate;
+
         int divisor = tri.B2*tri.A0 - tri.A2*tri.B0;
         if (divisor > 0)
         {
@@ -493,14 +503,18 @@ void RasterizeTriangle( TShader& Shader, const FVector2D Points[3], int32 Scisso
         int count = 0;
         RasterizeImpl(ptri, canvas.width, canvas.height, [&](int x, int y)
         {
-            if (canvas.bitmap.Contains(y * canvas.width + x))
+            if (x < canvas.width && y < canvas.height && canvas.bitmap.Contains(y * canvas.width + x))
                 count++; 
         });
         return count;
     }
     void Rasterizer::Rasterize(Canvas & canvas, ProjectedTriangle & ptri)
     {
-        RasterizeImpl(ptri, canvas.width, canvas.height, [&](int x, int y) {canvas.bitmap.Add(y*canvas.width+x); });
+        RasterizeImpl(ptri, canvas.width, canvas.height, [&](int x, int y) 
+        {
+            if (x < canvas.width && y < canvas.height)
+                canvas.bitmap.Add(y * canvas.width + x); 
+        });
     }
 }
 

@@ -3,60 +3,30 @@
 #include "Mesh.h"
 #include "Rasterizer.h"
 #include "CoreLib/Imaging/Bitmap.h"
+#include "CoreLib/Threading.h"
 using namespace VectorMath;
 
 namespace GameEngine
 {
-    const int QuantizeResolution = 8192;
-    const int RasterizeResolution = 2048;
-    const int PackResolution = 1024;
     const float UNINITIALIZED_UV = -1024.0f;
     struct Face
     {
         int Id;
         int chartId;
         float uvSurfaceArea;
-        Vec3 edges[3];  //edge equations (A,B,C)
-        Vec2i quantizedUVs[3];
         Vec2 verts[3];
-        ProjectedTriangle ptri;
         void Init(Mesh* mesh, int index)
         {
             Id = index;
             int mod3[] = { 0, 1, 2, 0 };
-            for (int i = 0; i<3;i++)
-            {
-                verts[i] = mesh->GetVertexUV(mesh->Indices[index * 3 + i], 0);
-            };
             for (int i = 0; i < 3; i++)
             {
-                quantizedUVs[i] = Vec2i::Create((int)(verts[i].x * QuantizeResolution), (int)(verts[i].y * QuantizeResolution));
-                Vec2 e = verts[mod3[i + 1]] - verts[i];
-                Vec2 n = Vec2::Create(-e.y, e.x);
-                float len = n.Length();
-                if (len > 1e-5f)
-                {
-                    n *= (1.0f / len);
-                }
-                float c = -Vec2::Dot(n, verts[i]);
-                edges[i] = Vec3::Create(n.x, n.y, c);
+                verts[i] = mesh->GetVertexUV(mesh->Indices[index * 3 + i], 0);
             }
-
-            // test winding direction
-            float s = edges[0].x * verts[2].x + edges[0].y * verts[2].y + edges[0].z;
-            if (s > 0.0f)
-            {
-                // all vertices should be on the "negative" side of its opposing edge
-                // if not, negate all edge equations to make it so
-                for (int i = 0; i < 3; i++)
-                    edges[i] = -edges[i];
-            }
-
             // compute uv surface area
             auto e0 = verts[1] - verts[0];
             auto e1 = verts[2] - verts[0];
             uvSurfaceArea = 0.5f * (e0.x * e1.y - e0.y * e1.x);
-            Rasterizer::SetupTriangle(ptri, verts[0], verts[1], verts[2], RasterizeResolution, RasterizeResolution);
         }
         float GetSurfaceArea(Mesh * mesh)
         {
@@ -85,8 +55,7 @@ namespace GameEngine
     {
         List<int> faces;
         float surfaceArea = 0.0f;
-        float packScale = 1.0f;
-        Vec2 size, innerSize, packOrigin;
+        Vec2 size, packOrigin;
         Vec2 minUV, maxUV;
     };
 
@@ -213,9 +182,15 @@ namespace GameEngine
         Mesh * meshOut;
         List<Face> faces;
         List<Chart> charts;
-        Dictionary<Vec2i, List<int>> faceList;
         VertexOverlapList overlapList;
         DisjointSet faceSets;
+
+        struct ChartPlacement
+        {
+            Vec2 position;
+            Vec2 size;
+        };
+
         bool VertexOverlaps(int v0, int v1)
         {
             int i0 = mesh->Indices[v0];
@@ -289,8 +264,8 @@ namespace GameEngine
                         if (uv.y > chart.maxUV.y) chart.maxUV.y = uv.y;
                     }
                 }
-                chart.innerSize = chart.maxUV - chart.minUV;
-                Vec2 invSize = Vec2::Create(1.0f / chart.innerSize.x, 1.0f / chart.innerSize.y);
+                chart.size = chart.maxUV - chart.minUV;
+                Vec2 invSize = Vec2::Create(1.0f / chart.size.x, 1.0f / chart.size.y);
                 for (auto & f : chart.faces)
                 {
                     auto & face = faces[f];
@@ -303,26 +278,6 @@ namespace GameEngine
                 }
             }
         }
-        template<typename SetPixelFunc>
-        void RasterizeLine(VectorMath::Vec2 s0, VectorMath::Vec2 s1, const SetPixelFunc & setPixel)
-        {
-            int x0 = (int)(s0.x * RasterizeResolution);
-            int y0 = (int)(s0.y * RasterizeResolution);
-            int x1 = (int)(s1.x * RasterizeResolution);
-            int y1 = (int)(s1.y * RasterizeResolution);
-
-            int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-            int dy = abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-            int err = (dx > dy ? dx : -dy) / 2, e2;
-            for (;;)
-            {
-                if (setPixel(x0, y0)) return;
-                if (x0 == x1 && y0 == y1) break;
-                e2 = err;
-                if (e2 > -dx) { err -= dy; x0 += sx; }
-                if (e2 < dy) { err += dx; y0 += sy; }
-            }
-        }
 
         void BuildFaces()
         {
@@ -330,103 +285,7 @@ namespace GameEngine
             for (int i = 0; i < faces.Count(); i++)
             {
                 faces[i].Init(mesh, i);
-                for (int j = 0; j < 3; j++)
-                {
-                    auto quv = faces[i].quantizedUVs[j];
-                    if (auto list = faceList.TryGetValue(quv))
-                    {
-                        list->Add(i);
-                    }
-                    else
-                    {
-                        List<int> tlist;
-                        tlist.Add(i);
-                        faceList[quv] = tlist;
-                    }
-                }
             }
-        }
-        bool RectangleOverlap(Vec2 origin0, Vec2 size0, Vec2 origin1, Vec2 size1)
-        {
-            if (origin1.x + size1.x <= origin0.x + 1e-4f || origin0.x + size0.x <= origin1.x + 1e-4f)
-                return false;
-            if (origin1.y + size1.y <= origin0.y + 1e-4f || origin0.y + size0.y <= origin1.y + 1e-4f)
-                return false;
-            return true;
-        }
-        Vec2 PackCharts(float uvPadding)
-        {
-            List<Vec2> placementPoints;
-            placementPoints.Add(Vec2::Create(0.0f));
-            Vec2 curMax = Vec2::Create(0.0f, 0.0f);
-            charts.Sort([](Chart& c1, Chart & c2) {return c1.surfaceArea > c2.surfaceArea; });
-            float refSize = charts[0].innerSize.x;
-            for (int ptr = 0; ptr < charts.Count(); ptr++)
-            {
-                auto & chart = charts[ptr];
-                chart.size = chart.innerSize + Vec2::Create(refSize * uvPadding);
-                Vec2 size = chart.size;
-                float minArea = 1e20f;
-                int bestPlacementPoint = -1;
-                Vec2 bestExtent = curMax;
-                for (int i = 0; i < placementPoints.Count(); i++)
-                {
-                    // can we really place here?
-                    bool occupied = false;
-                    for (int tptr = 0; tptr < ptr; tptr++)
-                    {
-                        auto thatOrigin = charts[tptr].packOrigin;
-                        auto thatSize = charts[tptr].size;
-                        auto thisOrigin = placementPoints[i];
-                        if (RectangleOverlap(thatOrigin, thatSize, thisOrigin, size))
-                        {
-                            occupied = true;
-                            break;
-                        }
-                    }
-                    if (occupied)
-                        continue;
-                    // find the new extent as a result of placing the group at this placement point
-                    Vec2 vmax = placementPoints[i] + size;
-                    Vec2 newMax = Vec2::Create(Math::Max(curMax.x, vmax.x), Math::Max(curMax.y, vmax.y));
-                    float squareSize = Math::Max(newMax.x, newMax.y);
-                    float area = squareSize * squareSize;
-                    if (area < minArea)
-                    {
-                        minArea = area;
-                        bestPlacementPoint = i;
-                        bestExtent = Vec2::Create(squareSize, squareSize);
-                    }
-                }
-                Vec2 p = placementPoints[bestPlacementPoint];
-                chart.packOrigin = p;
-                Vec2 newPoint = p + Vec2::Create(size.x, 0.0f);
-                Vec2 newPoint1 = p + Vec2::Create(0.0f, size.y);
-                placementPoints[bestPlacementPoint] = newPoint;
-                placementPoints.Add(newPoint1);
-                curMax = bestExtent;
-            }
-            
-            // visualize boxes
-            /*CoreLib::Imaging::BitmapF bmp(RasterizeResolution, RasterizeResolution);
-            auto pixels = bmp.GetPixels();
-            auto invExt = Vec2::Create(1.0f / curMax.x, 1.0f / curMax.y);
-            for (int i = 0; i < RasterizeResolution * RasterizeResolution; i++) pixels[i].SetZero();
-            for (auto & chart : charts)
-            {
-                auto setPixel = [&](int x, int y) 
-                {
-                    if (x < RasterizeResolution && y < RasterizeResolution)
-                    {
-                        pixels[y * RasterizeResolution + x] = Vec4::Create(1.0f, 1.0f, 1.0f, 1.0f);
-                    }
-                    return false;
-                };
-                RasterizeLine(chart.packOrigin*invExt, (chart.packOrigin + chart.size)*invExt, setPixel);
-                RasterizeLine((chart.packOrigin + Vec2::Create(chart.size.x, 0.0f)) *invExt, (chart.packOrigin + Vec2::Create(0.0f, chart.size.y))*invExt, setPixel);
-            }
-            bmp.GetImageRef().SaveAsBmpFile("debug.bmp");*/
-            return curMax;
         }
 
         void RasterizeChart(Canvas& bmp, Chart & chart)
@@ -439,46 +298,209 @@ namespace GameEngine
                 invSize = Vec2::Create(safeInv(invSize.x), safeInv(invSize.y));
                 for (int i = 0; i < 3; i++)
                 {
-                    sv[i] = (faces[f].verts[i] - chart.minUV) * invSize;
-                    /*
-                    // Compute equations of the planes through the two edges
-
-                    float3 plane[2];
-
-                    plane[0] = cross(currentPos.xyw - prevPos.xyw, prevPos.xyw);
-
-                    plane[1] = cross(nextPos.xyw - currentPos.xyw, currentPos.xyw);
-
-
-
-                    // Move the planes by the appropriate semidiagonal
-
-                    plane[0].z -= dot(hPixel.xy, abs(plane[0].xy));
-
-                    plane[1].z -= dot(hPixel.xy, abs(plane[1].xy));
-
-
-                    */
+                    sv[i] = faces[f].verts[i];
                 }
-                SetupTriangle(tri, sv[0], sv[1], sv[2], bmp.width, bmp.height);
+                Rasterizer::SetupTriangle(tri, sv[0], sv[1], sv[2], bmp.width, bmp.height);
                 Rasterizer::Rasterize(bmp, tri);
             }
         }
 
-        bool PackCharts2(int textureSize, float scale, int paddingPixels)
+        static const int CoarseReductionFactor = 4;
+        struct HierarchicalBitmap
         {
+            Canvas FineBitmap;
+            Canvas CoarseBitmap;
+            void BuildCoarseBitmap()
+            {
+                CoarseBitmap.Init((FineBitmap.width + CoarseReductionFactor - 1) / CoarseReductionFactor,
+                    (FineBitmap.height + CoarseReductionFactor - 1) / CoarseReductionFactor);
+                for (int i = 0; i < CoarseBitmap.height; i++)
+                {
+                    int y0 = i * CoarseReductionFactor;
+                    int y1 = Math::Min(FineBitmap.height, y0 + CoarseReductionFactor);
+                    for (int j = 0; j < CoarseBitmap.width; j++)
+                    {
+                        int x0 = j * CoarseReductionFactor;
+                        int x1 = Math::Min(FineBitmap.width, x0 + CoarseReductionFactor);
+                        for (int y = y0; y < y1; y++)
+                            for (int x = x0; x < x1; x++)
+                                if (FineBitmap.Get(x, y))
+                                {
+                                    CoarseBitmap.Set(j, i);
+                                    goto nextJ;
+                                }
+                    nextJ:;
+                    }
+                }
+            }
+            void Set(int x, int y)
+            {
+                FineBitmap.Set(x, y);
+                CoarseBitmap.Set(x / CoarseReductionFactor, y / CoarseReductionFactor);
+            }
+        };
+
+        void WriteChartBitmask(HierarchicalBitmap & texture, HierarchicalBitmap & chartBitmap, int x, int y)
+        {
+            for (int i = 0; i < chartBitmap.FineBitmap.height; i++)
+                for (int j = 0; j < chartBitmap.FineBitmap.width; j++)
+                {
+                    if (chartBitmap.FineBitmap.Get(j, i))
+                    {
+                        texture.Set(j + x, i + y);
+                    }
+                }
+        }
+        void DilateBitmap(Canvas & rs, Canvas& inBmp, int pixels)
+        {
+            Canvas tmp;
+            rs.Init(inBmp.width + pixels * 2, inBmp.height + pixels * 2);
+            for (int i = 0; i < inBmp.height; i++)
+                for (int j = 0; j < inBmp.width; j++)
+                    if (inBmp.Get(j, i))
+                        rs.Set(j + pixels, i + pixels);
+            tmp.Init(rs.width, rs.height);
+            for (auto i = 0; i < tmp.height; i++)
+                for (auto j = 0; j < tmp.width; j++)
+                {
+                    for (auto k = -pixels; k <= pixels; k++)
+                        if (j + k >= 0 && j + k < tmp.width && rs.Get(j + k, i))
+                        {
+                            tmp.Set(j, i);
+                            break;
+                        }
+                }
+            for (auto i = 0; i < tmp.height; i++)
+                for (auto j = 0; j < tmp.width; j++)
+                {
+                    for (auto k = -pixels; k <= pixels; k++)
+                        if (i + k >= 0 && i + k < tmp.height && tmp.Get(j, i + k))
+                        {
+                            rs.Set(j, i);
+                            break;
+                        }
+                }
+        }
+
+        bool ChartHasOverlap(HierarchicalBitmap& texture, HierarchicalBitmap& chartBmp, int x, int y)
+        {
+            int cx = x / CoarseReductionFactor;
+            int cy = y / CoarseReductionFactor;
+            for (int i = 0; i < chartBmp.CoarseBitmap.height; i++)
+                for (int j = 0; j < chartBmp.CoarseBitmap.width; j++)
+                {
+                    if (chartBmp.CoarseBitmap.Get(j, i) && 
+                        texture.CoarseBitmap.Get(j + cx, i + cy))
+                    {
+                        int fiEnd = Math::Min(chartBmp.FineBitmap.height, (i + 1) * CoarseReductionFactor);
+                        int fjEnd = Math::Min(chartBmp.FineBitmap.width, (j + 1) * CoarseReductionFactor);
+
+                        for (int fi = i * CoarseReductionFactor; fi < fiEnd; fi++)
+                            for (int fj = j * CoarseReductionFactor; fj < fjEnd; fj++)
+                                if (chartBmp.FineBitmap.Get(fj, fi) && texture.FineBitmap.Get(fj + x, fi + y))
+                                    return true;
+                    }
+                }
+            return false;
+        }
+        bool TryPackCharts(int textureSize, float scale, int paddingPixels, List<ChartPlacement> & chartPositions)
+        {
+            chartPositions.SetSize(charts.Count());
             // first, rasterize all charts
-            List<Canvas> chartBitmaps;
+            List<HierarchicalBitmap> chartBitmaps;
             chartBitmaps.SetSize(charts.Count());
+
             for (int i = 0; i < charts.Count(); i++)
             {
                 auto & chart = charts[i];
-                int chartBitmapWidth = Math::Max(1, (int)(chart.innerSize.x * textureSize));
-                int chartBitmapHeight = Math::Max(1, (int)(chart.innerSize.y * textureSize));
+                int chartBitmapWidth = Math::Max(1, (int)(chart.size.x * textureSize * scale));
+                int chartBitmapHeight = Math::Max(1, (int)(chart.size.y * textureSize * scale));
                 Canvas bmp;
-                bmp.(chartBitmapWidth, chartBitmapHeight);
+                bmp.Init(chartBitmapWidth, chartBitmapHeight);
                 RasterizeChart(bmp, chart);
+                DilateBitmap(chartBitmaps[i].FineBitmap, bmp, paddingPixels);
+                chartBitmaps[i].BuildCoarseBitmap();
             }
+            
+            // try all placements
+            HierarchicalBitmap texture;
+            texture.FineBitmap.Init(textureSize, textureSize);
+            texture.CoarseBitmap.Init(textureSize / CoarseReductionFactor, textureSize / CoarseReductionFactor);
+
+            for (int i = 0; i < charts.Count(); i++)
+            {
+                bool placed = false;
+                for (int x = 0; x < textureSize - chartBitmaps[i].FineBitmap.width; x += 4)
+                {
+                    for (int y = 0; y < textureSize - chartBitmaps[i].FineBitmap.height; y += 4)
+                    {
+                        // try placing chart at (x,y)
+                        if (!ChartHasOverlap(texture, chartBitmaps[i], x, y))
+                        {
+                            WriteChartBitmask(texture, chartBitmaps[i], x, y);
+                            placed = true;
+                            chartPositions[i].position = Vec2::Create((float)(x + paddingPixels), (float)(y + paddingPixels));
+                            chartPositions[i].size = Vec2::Create((float)(chartBitmaps[i].FineBitmap.width - paddingPixels * 2), (float)(chartBitmaps[i].FineBitmap.height - paddingPixels * 2));
+                            break;
+                        }
+                    }
+                    if (placed)
+                        break;
+                }
+                if (!placed)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool PackCharts2(int textureSize, int paddingPixels, float & scale)
+        {
+            charts.Sort([](Chart& c1, Chart& c2) { return c1.surfaceArea > c2.surfaceArea; });
+
+            List<ChartPlacement> chartPositions;
+            // sort charts by size
+            scale = 1.0f;
+            float failScale = 1.0f, succScale = 0.0f;
+            while (scale > 1e-3f)
+            {
+                List<ChartPlacement> tmpChartPositions;
+                if (TryPackCharts(textureSize, scale, paddingPixels, tmpChartPositions))
+                {
+                    succScale = scale;
+                    chartPositions = tmpChartPositions;
+                    break;
+                }
+                failScale = scale;
+                scale = scale * 0.5f;
+            }
+            // find best scale
+            if (scale < 1e-3)
+                return false;
+            for (int iter = 0; iter < 5;  iter++)
+            {
+                List<ChartPlacement> tmpChartPositions;
+                float midScale = (succScale + failScale) * 0.5f;
+                bool succ = TryPackCharts(textureSize, midScale, paddingPixels, tmpChartPositions);
+                if (succ)
+                {
+                    succScale = midScale;
+                    chartPositions = tmpChartPositions;
+                }
+                else
+                    failScale = midScale;
+            }
+            if (chartPositions.Count())
+            {
+                for (int i = 0; i < chartPositions.Count(); i++)
+                {
+                    charts[i].packOrigin = chartPositions[i].position * (1.0f / textureSize);
+                    charts[i].size = chartPositions[i].size * (1.0f / textureSize);
+                }
+                return true;
+            }
+            return false;
         }
 
         void CopyVertex(int dst, int src)
@@ -500,13 +522,11 @@ namespace GameEngine
             meshOut->SetVertexUV(dst, 0, mesh->GetVertexUV(src, 0));
         }
 
-        void RenormalizeUVs(Vec2 extentSize)
+        void RenormalizeUVs()
         {
-            Vec2 invExtentSize = Vec2::Create(1.0f / extentSize.x, 1.0f / extentSize.y);
             for (auto & chart : charts)
             {
                 auto size = chart.size;
-                auto innerOffset = chart.packOrigin + (chart.size - chart.innerSize)*0.5f;
                 if (size.x * size.y > 0.0f)
                 {
                     for (auto f : chart.faces)
@@ -515,17 +535,18 @@ namespace GameEngine
                         for (int i = 0; i < 3; i++)
                         {
                             auto uv = face.verts[i];
-                            uv.x = (uv.x * chart.innerSize.x + innerOffset.x) * invExtentSize.x;
-                            uv.y = (uv.y * chart.innerSize.y + innerOffset.y) * invExtentSize.y;
+                            uv.x = (uv.x * chart.size.x + chart.packOrigin.x);
+                            uv.y = (uv.y * chart.size.y + chart.packOrigin.y);
                             auto existingUV = meshOut->GetVertexUV(meshOut->Indices[face.Id * 3 + i], 1);
                             if (existingUV.x != UNINITIALIZED_UV && (fabs(existingUV.x - uv.x) > 1e-4f || fabs(existingUV.y - uv.y)>1e-4f) )
                             {
                                 // we need to add new vertex
                                 int vid = mesh->Indices[face.Id * 3 + i];
+                                int nid = meshOut->GetVertexCount();
                                 meshOut->GrowVertexBuffer(meshOut->GetVertexCount() + 1);
-                                CopyVertex(meshOut->GetVertexCount() - 1, vid);
-                                meshOut->SetVertexUV(meshOut->GetVertexCount() - 1, 1, uv);
-                                meshOut->Indices[face.Id * 3 + i] = meshOut->GetVertexCount() - 1;
+                                CopyVertex(nid, vid);
+                                meshOut->SetVertexUV(nid, 1, uv);
+                                meshOut->Indices[face.Id * 3 + i] = nid;
                             }
                             else
                                 meshOut->SetVertexUV(mesh->Indices[face.Id * 3 + i], 1, uv);
@@ -535,21 +556,17 @@ namespace GameEngine
             }
         }
 
-        void GenerateUniqueUV(Mesh * pMeshIn, Mesh* pMeshOut, float uvPadding)
+        bool GenerateUniqueUV(Mesh * pMeshIn, Mesh* pMeshOut, int textureSize, int paddingPixels)
         {
             mesh = pMeshIn;
             meshOut = pMeshOut;
             BuildFaces();
             BuildCharts();
-            // determine the scale of each chart
-            // so that each group can have the same resolution
-            //float maxSurfaceArea = From(charts).Max([](const Chart& c) {return c.surfaceArea; }).surfaceArea;
-            for (auto & chart : charts)
-            {
-                chart.packScale = 1.0f; // chart.surfaceArea / maxSurfaceArea;
-                chart.innerSize *= chart.packScale;
-            }
-            Vec2 extentSize = PackCharts(uvPadding);
+
+            float scale = 0.0f;
+            bool succ = PackCharts2(textureSize, paddingPixels, scale);
+            if (!succ)
+                return false;
 
             auto mvf = mesh->GetVertexFormat();
             MeshVertexFormat newVertexFormat = MeshVertexFormat(mvf.GetColorChannelCount(), 2, mvf.HasTangent(), mvf.HasSkinning());
@@ -563,13 +580,14 @@ namespace GameEngine
                 CopyVertex(i, i);
                 meshOut->SetVertexUV(i, 1, Vec2::Create(UNINITIALIZED_UV, UNINITIALIZED_UV));
             }
-            RenormalizeUVs(extentSize);
+            RenormalizeUVs();
+            return true;
         }
     };
 
-    void GenerateLightmapUV(Mesh* meshOut, Mesh* meshIn, float padding)
+    bool GenerateLightmapUV(Mesh* meshOut, Mesh* meshIn, int textureSize, int paddingPixels)
     {
         LightmapUVGenerationContext ctx;
-        ctx.GenerateUniqueUV(meshIn, meshOut, padding);
+        return ctx.GenerateUniqueUV(meshIn, meshOut, textureSize, paddingPixels);
     }
 }

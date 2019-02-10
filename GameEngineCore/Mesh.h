@@ -218,8 +218,8 @@ namespace GameEngine
             if (vertexData.Capacity() < numVerts * vertexFormat.GetVertexSize())
             {
                 vertexData.Reserve((numVerts + numVerts / 2) * vertexFormat.GetVertexSize());
-                vertexData.SetSize(vertexFormat.GetVertexSize() * numVerts);
             }
+            vertexData.SetSize(vertexFormat.GetVertexSize() * numVerts);
             vertCount = numVerts;
         }
 		void SaveToStream(CoreLib::IO::Stream * stream);

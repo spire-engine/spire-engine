@@ -2,6 +2,8 @@
 #include "LightmapUVGeneration.h"
 #include "Mesh.h"
 #include "CoreLib/Imaging/Bitmap.h"
+#include "CoreLib/PerformanceCounter.h"
+#include "CoreLib/LibIO.h"
 
 using namespace CoreLib;
 using namespace GameEngine;
@@ -98,13 +100,19 @@ void VisualizeTrianglePair(Mesh & mesh, int f0, int f1, String fileName)
 
 int main(int argc, const char ** argv)
 {
-    if (argc < 1)
+    if (argc < 2)
+    {
         printf("usage: filename");
+        return 0;
+    }
     Mesh mIn;
     Mesh mOut;
     mIn.LoadFromFile(argv[1]);
-    VisualizeUV(mIn, 0, String(argv[1]) + ".in.bmp");
-
-    GenerateLightmapUV(&mOut, &mIn, 0.01f);
+    auto startTime = CoreLib::Diagnostics::PerformanceCounter::Start();
+    GenerateLightmapUV(&mOut, &mIn, 1024, 4);
+    auto consumedTime = CoreLib::Diagnostics::PerformanceCounter::EndSeconds(startTime);
+    mOut.SaveToFile(CoreLib::IO::Path::ReplaceExt(argv[1], ".out.mesh"));
     VisualizeUV(mOut, 1, String(argv[1]) + ".out.bmp");
+    printf("Time consumed: %.1fs\n", consumedTime);
+    return 0;
 }

@@ -36,6 +36,10 @@ namespace CoreLib
 				buffer = other.buffer;
 				return *this;
 			}
+            int* GetBuffer()
+            {
+                return buffer.Buffer();
+            }
 			int GetHashCode()
 			{
 				int rs = 0;

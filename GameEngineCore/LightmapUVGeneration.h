@@ -4,7 +4,7 @@
 namespace GameEngine
 {
     class Mesh;
-    void GenerateLightmapUV(Mesh* meshOut, Mesh* meshIn, float uvPadding);
+    bool GenerateLightmapUV(Mesh* meshOut, Mesh* meshIn, int textureSize, int paddingPixels);
 }
 
 #endif
