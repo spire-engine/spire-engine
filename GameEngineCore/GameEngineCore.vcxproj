@@ -194,6 +194,8 @@
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="MeshBuilder.cpp" />
     <ClCompile Include="Model.cpp" />
+    <ClCompile Include="ObjectSpaceGBufferRenderer.cpp" />
+    <ClCompile Include="ObjectSpaceMapSet.cpp" />
     <ClCompile Include="OS-Win32.cpp" />
     <ClCompile Include="OutlinePostRenderPass.cpp" />
     <ClCompile Include="Physics.cpp" />
@@ -277,6 +279,7 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="MeshBuilder.h" />
     <ClInclude Include="Model.h" />
+    <ClInclude Include="ObjectSpaceMapSet.h" />
     <ClInclude Include="OS.h" />
     <ClInclude Include="OutlinePassParameters.h" />
     <ClInclude Include="Physics.h" />

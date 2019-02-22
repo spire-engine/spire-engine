@@ -178,6 +178,12 @@
     <ClCompile Include="Rasterizer.cpp">
       <Filter>Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="ObjectSpaceMapSet.cpp">
+      <Filter>Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjectSpaceGBufferRenderer.cpp">
+      <Filter>Geometry</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -367,6 +373,9 @@
       <Filter>Geometry</Filter>
     </ClInclude>
     <ClInclude Include="DisjointSet.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectSpaceMapSet.h">
       <Filter>Geometry</Filter>
     </ClInclude>
   </ItemGroup>
