@@ -372,6 +372,7 @@ interface IMaterialPattern
 		VertexPositionInfo shadingPoint,
 		ViewParams viewParams);
     bool alphaTest();
+    float4 getDiffuse();
     [mutating]
     void init();
 };
@@ -424,6 +425,10 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
         ao = 1.0;
         isDoubleSided = false;
         alphaTestThreshold = 0.0;
+    }
+    float4 getDiffuse()
+    {
+        return float4(albedo, opacity);
     }
     bool alphaTest()
     {

@@ -61,6 +61,7 @@ namespace GameEngine
         ShaderTypeSymbol * typeSymbol = nullptr;
 		CoreLib::Array<CoreLib::RefPtr<DescriptorSet>, DynamicBufferLengthMultiplier> descriptors;
 		int currentDescriptor = 0;
+        DescriptorSetLayout * descLayout = nullptr;
 	public:
 		DeviceMemory * UniformMemory = nullptr;
 		int BufferOffset = 0, BufferLength = 0;
@@ -77,6 +78,7 @@ namespace GameEngine
 		{
 			return typeSymbol;
 		}
+        DescriptorSetLayout* GetDescriptorSetLayout() { return descLayout; }
 		void SetDescriptorSetLayout(HardwareRenderer * hw, DescriptorSetLayout * layout);
 		DescriptorSet * GetDescriptorSet(int i)
 		{

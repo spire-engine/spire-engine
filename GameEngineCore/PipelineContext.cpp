@@ -162,6 +162,7 @@ namespace GameEngine
 	void ModuleInstance::SetDescriptorSetLayout(HardwareRenderer * hw, DescriptorSetLayout * layout)
 	{
 		descriptors.Clear();
+        descLayout = layout;
         if (layout)
         {
             for (int i = 0; i < descriptors.GetCapacity(); i++)

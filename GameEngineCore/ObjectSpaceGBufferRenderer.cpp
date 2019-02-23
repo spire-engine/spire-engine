@@ -3,6 +3,8 @@
 #include "RenderProcedure.h"
 #include "Actor.h"
 #include "Material.h"
+#include "Engine.h"
+
 using namespace CoreLib;
 namespace GameEngine
 {
@@ -15,12 +17,18 @@ namespace GameEngine
         HardwareRenderer * hwRenderer;
         ShaderSet shaders;
         RendererService * rendererService;
+        ShaderEntryPoint* vsEntryPoint, *psEntryPoint;
+        PipelineContext pipeContext;
+        RenderStat renderStats;
+        RefPtr<CommandBuffer> cmdBuffer;
     public:
         ObjectSpaceGBufferRenderer(HardwareRenderer * hw, RendererService * service, CoreLib::String shaderFileName)
         {
-            ShaderCompilationResult crs;
-            shaders = CompileGraphicsShader(crs, hwRenderer, shaderFileName);
             rendererService = service;
+            vsEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "vsMain");
+            psEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "psMain");
+            pipeContext.Init(hwRenderer, &renderStats);
+            cmdBuffer = hwRenderer->CreateCommandBuffer();
         }
         void RenderObjectSpaceMap(ArrayView<Texture2D*> dest, ArrayView<StorageFormat> attachmentFormats, Actor * actor)
         {
@@ -38,7 +46,6 @@ namespace GameEngine
             RefPtr<FrameBuffer> frameBuffer = renderTargetLayout->CreateFrameBuffer(renderAttachments);
             
             DrawableSink sink;
-            RefPtr<PipelineBuilder> pipelineBuilder = hwRenderer->CreatePipelineBuilder();
             GetDrawablesParameter param;
             param.sink = &sink;
             param.rendererService = rendererService;
@@ -47,26 +54,40 @@ namespace GameEngine
             param.CameraPos = actor->GetPosition();
             param.UseSkeleton = false;
             actor->GetDrawables(param);
-            Array<Shader*, 2> shaderArray;
-            shaderArray.Add(shaders.vertexShader.Ptr());
-            shaderArray.Add(shaders.fragmentShader.Ptr());
-            DescriptorLayout descriptors[] =
-            {
-                DescriptorLayout(StageFlags::sfGraphics, 0, BindingType::UniformBuffer),
-                DescriptorLayout(StageFlags::sfGraphics, 1, BindingType::Sampler),
-            };
-            RefPtr<DescriptorSetLayout> descSetLayout = hwRenderer->CreateDescriptorSetLayout(MakeArrayView(descriptors, sizeof(descriptors)/sizeof(DescriptorLayout)));
             
-            for (auto & drawable : sink.GetDrawables(false))
+            FixedFunctionPipelineStates fixStates;
+            fixStates.CullMode = CullMode::Disabled;
+            pipeContext.BindEntryPoint(vsEntryPoint, psEntryPoint, renderTargetLayout.Ptr(), &fixStates);
+            cmdBuffer->BeginRecording(frameBuffer.Ptr());
+
+            auto processDrawable = [&](Drawable* drawable)
             {
-                pipelineBuilder->SetVertexLayout(drawable->GetMesh()->vertexFormat);
-                pipelineBuilder->SetShaders(shaderArray.GetArrayView());
-                pipelineBuilder->FixedFunctionStates.BlendMode = BlendMode::Replace;
-                pipelineBuilder->FixedFunctionStates.DepthCompareFunc = CompareFunc::Always;
-                pipelineBuilder->FixedFunctionStates.PrimitiveTopology = PrimitiveType::Triangles;
-                drawable->GetMaterial()->IsDoubleSided
-                pipelineBuilder->SetBindingLayout(MakeArrayView(descriptorSetLayout.Ptr()));
+                auto pipeline = pipeContext.GetPipeline(&drawable->GetVertexFormat());
+                cmdBuffer->BindPipeline(pipeline->pipeline.Ptr());
+                DescriptorSetBindingArray bindings;
+                pipeContext.PushModuleInstance(&drawable->GetMaterial()->MaterialModule);
+                pipeContext.PushModuleInstance(drawable->GetTransformModule());
+                pipeContext.GetBindings(bindings);
+                for (int i = 0; i < bindings.Count(); i++)
+                    cmdBuffer->BindDescriptorSet(i, bindings[i]);
+                cmdBuffer->BindVertexBuffer(drawable->GetMesh()->GetVertexBuffer(), drawable->GetMesh()->vertexBufferOffset);
+                cmdBuffer->BindIndexBuffer(drawable->GetMesh()->GetIndexBuffer(), drawable->GetMesh()->indexBufferOffset);
+                auto range = drawable->GetElementRange();
+                cmdBuffer->DrawIndexed(range.StartIndex, range.Count);
+                pipeContext.PopModuleInstance();
+                pipeContext.PopModuleInstance();
+            };
+            for (auto drawable : sink.GetDrawables(false))
+            {
+                processDrawable(drawable);
             }
+            for (auto drawable : sink.GetDrawables(true))
+            {
+                processDrawable(drawable);
+            }
+            cmdBuffer->EndRecording();
+            hwRenderer->ExecuteRenderPass(frameBuffer.Ptr(), MakeArrayView(cmdBuffer.Ptr()), nullptr);
+            hwRenderer->Wait();
         }
     };
 }
