@@ -402,6 +402,7 @@ extern "C" {
 		VK_STRUCTURE_TYPE_BEGIN_RANGE = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 		VK_STRUCTURE_TYPE_END_RANGE = VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO,
 		VK_STRUCTURE_TYPE_RANGE_SIZE = (VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO - VK_STRUCTURE_TYPE_APPLICATION_INFO + 1),
+        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT = 1000101001,
 		VK_STRUCTURE_TYPE_MAX_ENUM = 0x7FFFFFFF
 	} VkStructureType;
 
@@ -1980,6 +1981,31 @@ extern "C" {
 		float                                      depthBiasSlopeFactor;
 		float                                      lineWidth;
 	} VkPipelineRasterizationStateCreateInfo;
+
+    #define VK_EXT_conservative_rasterization 1
+    #define VK_EXT_CONSERVATIVE_RASTERIZATION_SPEC_VERSION 1
+    #define VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME "VK_EXT_conservative_rasterization"
+        
+        
+    typedef enum VkConservativeRasterizationModeEXT {
+        VK_CONSERVATIVE_RASTERIZATION_MODE_DISABLED_EXT = 0,
+        VK_CONSERVATIVE_RASTERIZATION_MODE_OVERESTIMATE_EXT = 1,
+        VK_CONSERVATIVE_RASTERIZATION_MODE_UNDERESTIMATE_EXT = 2,
+        VK_CONSERVATIVE_RASTERIZATION_MODE_BEGIN_RANGE_EXT = VK_CONSERVATIVE_RASTERIZATION_MODE_DISABLED_EXT,
+        VK_CONSERVATIVE_RASTERIZATION_MODE_END_RANGE_EXT = VK_CONSERVATIVE_RASTERIZATION_MODE_UNDERESTIMATE_EXT,
+        VK_CONSERVATIVE_RASTERIZATION_MODE_RANGE_SIZE_EXT = (VK_CONSERVATIVE_RASTERIZATION_MODE_UNDERESTIMATE_EXT - VK_CONSERVATIVE_RASTERIZATION_MODE_DISABLED_EXT + 1),
+        VK_CONSERVATIVE_RASTERIZATION_MODE_MAX_ENUM_EXT = 0x7FFFFFFF
+    } VkConservativeRasterizationModeEXT;
+    
+    typedef VkFlags VkPipelineRasterizationConservativeStateCreateFlagsEXT;
+
+    typedef struct VkPipelineRasterizationConservativeStateCreateInfoEXT {
+        VkStructureType                                           sType;
+        const void*                                               pNext;
+        VkPipelineRasterizationConservativeStateCreateFlagsEXT    flags;
+        VkConservativeRasterizationModeEXT                        conservativeRasterizationMode;
+        float                                                     extraPrimitiveOverestimationSize;
+    } VkPipelineRasterizationConservativeStateCreateInfoEXT;
 
 	typedef struct VkPipelineMultisampleStateCreateInfo {
 		VkStructureType                          sType;
