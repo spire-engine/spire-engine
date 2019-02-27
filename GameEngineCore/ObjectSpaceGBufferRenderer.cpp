@@ -26,9 +26,10 @@ namespace GameEngine
     public:
         virtual void Init(HardwareRenderer * hw, RendererService * service, CoreLib::String shaderFileName) override
         {
+            hwRenderer = hw;
             rendererService = service;
-            vsEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "vsMain");
-            psEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "psMain");
+            vsEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "vs_Main");
+            psEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "ps_Main");
             pipeContext.Init(hwRenderer, &renderStats);
             cmdBuffer = hwRenderer->CreateCommandBuffer();
         }

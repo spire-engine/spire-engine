@@ -1,3 +1,6 @@
+#ifndef GAME_ENGINE_STATIC_SCENE_H
+#define GAME_ENGINE_STATIC_SCENE_H
+
 #include "CoreLib/Basic.h"
 #include "Ray.h"
 #include "VectorMath.h"
@@ -10,8 +13,8 @@ namespace GameEngine
     struct StaticSceneTracingResult
     {
         VectorMath::Vec2 UV;
-        Actor* ActorID;
-        float T;
+        Actor* Actor = nullptr;
+        float T = FLT_MAX;
         bool IsHit = false;
     };
 
@@ -23,3 +26,5 @@ namespace GameEngine
 
     StaticScene* BuildStaticScene(Level* level);
 }
+
+#endif

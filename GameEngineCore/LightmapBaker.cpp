@@ -1,9 +1,11 @@
 #include "ObjectSpaceGBufferRenderer.h"
+#include "StaticSceneRenderer.h"
 #include "ObjectSpaceMapSet.h"
 #include "Level.h"
 #include "StaticMeshActor.h"
 #include "VectorMath.h"
 #include "Engine.h"
+#include "CameraActor.h"
 
 namespace GameEngine
 {
@@ -29,6 +31,7 @@ namespace GameEngine
         EnumerableDictionary<String, RawMapSet> maps;
     private:
         Level* level = nullptr;
+        RefPtr<StaticScene> staticScene;
         void AllocLightmaps()
         {
             // in the future we may support a wider range of actors.
@@ -38,7 +41,7 @@ namespace GameEngine
                 if (auto smActor = actor.Value.As<StaticMeshActor>())
                 {
                     auto size = (smActor->Bounds.Max - smActor->Bounds.Min).Length();
-                    int resolution = Math::Clamp(1 << Math::Log2Ceil((int)size * ResolutionScale), MinResolution, MaxResolution);
+                    int resolution = Math::Clamp(1 << Math::Log2Ceil((int)(size * ResolutionScale)), MinResolution, MaxResolution);
                     maps[smActor->Name] = RawMapSet();
                     maps[smActor->Name]().Init(resolution, resolution);
                 }
@@ -80,15 +83,12 @@ namespace GameEngine
                 }
                 buffer.SetSize(map->normalMap.Width * map->normalMap.Height * 4);
                 texNormal->GetData(0, buffer.Buffer(), map->normalMap.Width*map->normalMap.Height * sizeof(float) * 4);
-                uint32_t* dst = (uint32_t*)map->normalMap.GetBuffer();
+                uint32_t* dstNormal = (uint32_t*)map->normalMap.GetBuffer();
                 for (int i = 0; i < map->normalMap.Width*map->normalMap.Height; i++)
                 {
-                    dst[i] = PackRGB10(buffer[i * 4], buffer[i * 4 + 1], buffer[i * 4 + 2]);
+                    dstNormal[i] = PackRGB10(buffer[i * 4], buffer[i * 4 + 1], buffer[i * 4 + 2]);
                 }
             }
-        }
-        void BuildStaticScene()
-        {
         }
     public:
         void BakeLightmaps(EnumerableDictionary<String, RawObjectSpaceMap>& lightmaps, Level* pLevel)
@@ -96,7 +96,21 @@ namespace GameEngine
             level = pLevel;
             AllocLightmaps();
             BakeLightmapGBuffers();
-            BuildStaticScene();
+            staticScene = BuildStaticScene(level);
+
+            RefPtr<StaticSceneRenderer> staticRenderer = CreateStaticSceneRenderer();
+            staticRenderer->SetCamera(pLevel->CurrentCamera->GetCameraTransform(), pLevel->CurrentCamera->FOV, 1280, 720);
+            EnumerableDictionary<String, RawObjectSpaceMap> diffuseMaps;
+            for (auto & map : maps)
+                diffuseMaps[map.Key] = map.Value.diffuseMap;
+            auto & image = staticRenderer->Render(staticScene.Ptr(), diffuseMaps);
+            image.GetImageRef().SaveAsBmpFile("StaticSceneRender.bmp");
         }
     };
+
+    void BakeLightmaps(EnumerableDictionary<String, RawObjectSpaceMap>& lightmaps, Level* pLevel)
+    {
+        LightmapBaker baker;
+        baker.BakeLightmaps(lightmaps, pLevel);
+    }
 }

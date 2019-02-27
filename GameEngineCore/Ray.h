@@ -2,6 +2,7 @@
 #define GAME_ENGINE_RAY_H
 
 #include <float.h>
+#include "CoreLib/VectorMath.h"
 
 namespace GameEngine
 {

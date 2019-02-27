@@ -218,6 +218,7 @@
     <ClCompile Include="StandardRenderProcedure.cpp" />
     <ClCompile Include="StaticMeshActor.cpp" />
     <ClCompile Include="StaticScene.cpp" />
+    <ClCompile Include="StaticSceneRenderer.cpp" />
     <ClCompile Include="SystemWindow-Win32.cpp" />
     <ClCompile Include="TerrainActor.cpp" />
     <ClCompile Include="TextureCompressor.cpp" />
@@ -276,6 +277,7 @@
     <ClInclude Include="Level.h" />
     <ClInclude Include="LightActor.h" />
     <ClInclude Include="LightingData.h" />
+    <ClInclude Include="LightmapBaker.h" />
     <ClInclude Include="LightmapUVGeneration.h" />
     <ClInclude Include="LightProbeRenderer.h" />
     <ClInclude Include="Material.h" />
@@ -307,6 +309,7 @@
     <ClInclude Include="StandardViewUniforms.h" />
     <ClInclude Include="StaticMeshActor.h" />
     <ClInclude Include="StaticScene.h" />
+    <ClInclude Include="StaticSceneRenderer.h" />
     <ClInclude Include="SystemWindow-Win32.h" />
     <ClInclude Include="TerrainActor.h" />
     <ClInclude Include="TextureCompressor.h" />

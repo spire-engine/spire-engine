@@ -37,7 +37,7 @@ namespace GameEngine
     class BvhNode_Build
     {
     public:
-        BBox Bounds;
+        CoreLib::Graphics::BBox Bounds;
         int Axis;
         T** Elements;
         int ElementCount;
@@ -134,14 +134,6 @@ namespace GameEngine
         VectorMath::Vec3 Center;
     };
 
-    inline void Assert(bool pred)
-    {
-#ifdef _DEBUG
-        if (!pred)
-            throw 0;
-#endif
-    }
-
     inline float SurfaceArea(CoreLib::Graphics::BBox & box)
     {
         return ((box.xMax - box.xMin)*(box.yMax - box.yMin) + (box.xMax - box.xMin)*(box.zMax - box.zMax) + (box.yMax - box.yMin)*(box.zMax - box.zMin))*2.0f;
@@ -218,7 +210,6 @@ namespace GameEngine
                         int b = (int)(nBuckets *
                             ((elements[i].Center[dim] - centroidBounds.Min[dim]) / (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
                         if (b == nBuckets) b = nBuckets - 1;
-                        Assert(b >= 0 && b < nBuckets);
                         buckets_proc[procId][b].count++;
                         buckets_proc[procId][b].bounds.Union(elements[i].Bounds);
                     }
@@ -239,7 +230,6 @@ namespace GameEngine
                     int b = (int)(nBuckets *
                         ((elements[i].Center[dim] - centroidBounds.Min[dim]) / (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
                     if (b == nBuckets) b = nBuckets - 1;
-                    Assert(b >= 0 && b < nBuckets);
                     buckets[b].count++;
                     buckets[b].bounds.Union(elements[i].Bounds);
                 }
@@ -253,7 +243,7 @@ namespace GameEngine
                 bounds1[i].Union(buckets[i + 1].bounds);
                 bounds1[i].Union(bounds1[i + 1]);
             }
-            CoreLib::Graphics::BBox b0, b1;
+            CoreLib::Graphics::BBox b0;
             b0.Init();
             int count0 = 0;
             float minCost = FLT_MAX;
@@ -281,7 +271,6 @@ namespace GameEngine
                     int b = (int)(nBuckets * ((p.Center[dim] - centroidBounds.Min[dim]) /
                         (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
                     if (b == nBuckets) b = nBuckets - 1;
-                    Assert(b >= 0 && b < nBuckets);
                     return b <= minCostSplit;
                 });
                 node->Axis = dim;
@@ -289,8 +278,8 @@ namespace GameEngine
                 int nodeCount1, nodeCount2;
                 if (depth > 8)
                 {
-                    node->Children[0] = ConstructBvhNodeNonRec<T, CostEvaluator>(tree, elements, (int)(pmid - elements), listSize1, nodeCount1, eval, depth + 1);
-                    node->Children[1] = ConstructBvhNodeNonRec<T, CostEvaluator>(tree, pmid, (int)(elements + elementCount - pmid), listSize2, nodeCount2, eval, depth + 1);
+                    node->Children[0] = ConstructBvhNodeNonRec<T, CostEvaluator>(elements, (int)(pmid - elements), listSize1, nodeCount1, eval);
+                    node->Children[1] = ConstructBvhNodeNonRec<T, CostEvaluator>(pmid, (int)(elements + elementCount - pmid), listSize2, nodeCount2, eval);
                 }
                 else
                 {
@@ -321,9 +310,8 @@ namespace GameEngine
     }
 
     template<typename T, typename CostEvaluator>
-    BvhNode_Build<T> * ConstructBvhNodeNonRec(Bvh_Build<T> & tree, BuildData<T>* elements, int elementCount, int & elementListSize, int & nodeCount, CostEvaluator & eval, int depth)
+    BvhNode_Build<T> * ConstructBvhNodeNonRec(BuildData<T>* elements, int elementCount, int & elementListSize, int & nodeCount, CostEvaluator & eval)
     {
-        CoreLib::Int64 Profile_BadSplits = 0;
         struct BvhJob
         {
             BvhNode_Build<T> ** result;
@@ -366,22 +354,22 @@ namespace GameEngine
             BvhNode_Build<T> * node = new BvhNode_Build<T>();
             nodeCount++;
             (*job.result) = node;
-            BuildData<T>* elements = job.elements;
-            int elementCount = job.elementCount;
-            if (elementCount == 0)
+            BuildData<T>* jElements = job.elements;
+            int jElementCount = job.elementCount;
+            if (jElementCount == 0)
             {
                 printf("elementCount = 0 !");
                 throw 0;
             }
-            if (elementCount == 1 || stackPtr == stackSize)
+            if (jElementCount == 1 || stackPtr == stackSize)
             {
-                node->Bounds = elements->Bounds;
-                node->AllocElements((int)elementCount);
-                for (int i = 0; i < (int)elementCount; i++)
+                node->Bounds = jElements->Bounds;
+                node->AllocElements((int)jElementCount);
+                for (int i = 0; i < (int)jElementCount; i++)
                 {
-                    node->Elements[i] = elements[i].Element;
+                    node->Elements[i] = jElements[i].Element;
                 }
-                elementListSize += elementCount;
+                elementListSize += jElementCount;
                 if (!stackPtr)
                     break;
                 else
@@ -390,14 +378,14 @@ namespace GameEngine
             }
             else
             {
-                BBox centroidBounds;
-                BBox bbox;
+                CoreLib::Graphics::BBox centroidBounds;
+                CoreLib::Graphics::BBox bbox;
                 centroidBounds.Init();
                 bbox.Init();
-                for (int i = 0; i < elementCount; i++)
+                for (int i = 0; i < jElementCount; i++)
                 {
-                    centroidBounds.Union(elements[i].Center);
-                    bbox.Union(elements[i].Bounds);
+                    centroidBounds.Union(jElements[i].Center);
+                    bbox.Union(jElements[i].Bounds);
                 }
                 node->Bounds = bbox;
                 int dim = centroidBounds.MaxDimension();
@@ -405,12 +393,12 @@ namespace GameEngine
                 if (centroidBounds.Min[dim] == centroidBounds.Max[dim])
                 {
                     node->Bounds = bbox;
-                    node->AllocElements((int)elementCount);
-                    for (int i = 0; i < (int)elementCount; i++)
+                    node->AllocElements((int)jElementCount);
+                    for (int i = 0; i < (int)jElementCount; i++)
                     {
-                        node->Elements[i] = elements[i].Element;
+                        node->Elements[i] = jElements[i].Element;
                     }
-                    elementListSize += elementCount;
+                    elementListSize += jElementCount;
                     if (!stackPtr)
                         break;
                     else
@@ -419,19 +407,18 @@ namespace GameEngine
                 }
 
                 BucketInfo buckets[nBuckets];
-                for (int i = 0; i < elementCount; i++)
+                for (int i = 0; i < jElementCount; i++)
                 {
                     int b = (int)(nBuckets *
-                        ((elements[i].Center[dim] - centroidBounds.Min[dim]) / (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
+                        ((jElements[i].Center[dim] - centroidBounds.Min[dim]) / (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
                     if (b == nBuckets) b = nBuckets - 1;
-                    Assert(b >= 0 && b < nBuckets);
                     buckets[b].count++;
-                    buckets[b].bounds.Union(elements[i].Bounds);
+                    buckets[b].bounds.Union(jElements[i].Bounds);
                 }
 
                 float minCost = FLT_MAX;
                 int minCostSplit = 0;
-                BBox bounds1[nBuckets - 1];
+                CoreLib::Graphics::BBox bounds1[nBuckets - 1];
                 bounds1[nBuckets - 2] = buckets[nBuckets - 1].bounds;
                 for (int i = nBuckets - 3; i >= 0; i--)
                 {
@@ -439,14 +426,14 @@ namespace GameEngine
                     bounds1[i].Union(buckets[i + 1].bounds);
                     bounds1[i].Union(bounds1[i + 1]);
                 }
-                BBox b0, b1;
+                CoreLib::Graphics::BBox b0;
                 b0.Init();
                 int count0 = 0;
                 for (int i = 0; i < nBuckets - 1; i++)
                 {
                     b0.Union(buckets[i].bounds);
                     count0 += buckets[i].count;
-                    int count1 = (int)elementCount - count0;
+                    int count1 = (int)jElementCount - count0;
                     float cost = eval.EvalCost(count0, SurfaceArea(b0), count1, SurfaceArea(bounds1[i]), SurfaceArea(bbox));
                     if (cost < minCost)
                     {
@@ -454,32 +441,31 @@ namespace GameEngine
                         minCostSplit = i;
                     }
                 }
-                if (elementCount > CostEvaluator::ElementsPerNode ||
-                    minCost < elementCount)
+                if (jElementCount > CostEvaluator::ElementsPerNode ||
+                    minCost < jElementCount)
                 {
-                    BuildData<T> *pmid = std::partition(elements,
-                        elements + elementCount,
+                    BuildData<T> *pmid = std::partition(jElements,
+                        jElements + jElementCount,
                         [&](const BuildData<T> &p)
                     {
                         int b = (int)(nBuckets * ((p.Center[dim] - centroidBounds.Min[dim]) /
                             (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
                         if (b == nBuckets) b = nBuckets - 1;
-                        Assert(b >= 0 && b < nBuckets);
                         return b <= minCostSplit;
                     });
                     node->Axis = dim;
-                    job = BvhJob(node->Children, elements, (int)(pmid - elements));
-                    pushJob(node->Children + 1, pmid, (int)(elements + elementCount - pmid));
+                    job = BvhJob(node->Children, jElements, (int)(pmid - jElements));
+                    pushJob(node->Children + 1, pmid, (int)(jElements + jElementCount - pmid));
                 }
                 else
                 {
-                    node->AllocElements((int)elementCount);
+                    node->AllocElements((int)jElementCount);
                     node->Bounds = bbox;
-                    for (int i = 0; i < (int)elementCount; i++)
+                    for (int i = 0; i < (int)jElementCount; i++)
                     {
-                        node->Elements[i] = elements[i].Element;
+                        node->Elements[i] = jElements[i].Element;
                     }
-                    elementListSize += elementCount;
+                    elementListSize += jElementCount;
                     if (!stackPtr)
                         break;
                     else
@@ -515,11 +501,9 @@ namespace GameEngine
                 if (node->ElementCount > 0)
                 {
                     THit inter;
-                    inter.Init();
-
                     for (int i = node->ElementId; i < node->ElementId + node->ElementCount; i++)
                     {
-                        if (tracer.Trace(inter, tree.Elements[i], traceRay, rayDiff, tmax))
+                        if (tracer.Trace(inter, tree.Elements[i], traceRay, tmax))
                         {
                             if (pred)
                                 return true;
@@ -527,7 +511,6 @@ namespace GameEngine
                             {
                                 rs = inter;
                                 traceRay.tMax = tmax;
-                                t = tmax;
                                 hit = true;
                             }
                         }

@@ -6,6 +6,7 @@
 #include "FreeRoamCameraController.h"
 #include "PropertyEditControl.h"
 #include "CameraActor.h"
+#include "LightmapBaker.h"
 
 using namespace CoreLib;
 using namespace GraphicsUI;
@@ -174,6 +175,12 @@ namespace GameEngine
 
 			}
 		}
+
+        void BakeLightmaps()
+        {
+            EnumerableDictionary<String, RawObjectSpaceMap> lightmaps;
+            GameEngine::BakeLightmaps(lightmaps, level);
+        }
 		void InitUI()
 		{
 			Color uiBackColor = Color(45, 45, 45, 255);
@@ -233,6 +240,8 @@ namespace GameEngine
 			mnDelete->OnClick.Bind(this, &LevelEditorImpl::mnDelete_Clicked);
 
 			auto mnLighting = new MenuItem(mainMenu, "&Lighting");
+            auto mnPrebakeLighting = new MenuItem(mnLighting, "&Bake Lightmaps");
+            mnPrebakeLighting->OnClick.Bind(this, &LevelEditorImpl::mnBakeLightmaps_Clicked);
 			auto mnUpdateLightProbes = new MenuItem(mnLighting, "&Update Light Probes", "F12");
 			mnUpdateLightProbes->OnClick.Bind(this, &LevelEditorImpl::mnUpdateLightProbes_Clicked);
 
@@ -553,6 +562,10 @@ namespace GameEngine
 		{
 			Engine::Instance()->UpdateLightProbes();
 		}
+        void mnBakeLightmaps_Clicked(UI_Base*)
+        {
+            BakeLightmaps();
+        }
 		void UIEntry_MouseMove(UI_Base *, UIMouseEventArgs & e)
 		{
 			auto curMouseScreenSpacePos = Vec2i::Create(e.X, e.Y);

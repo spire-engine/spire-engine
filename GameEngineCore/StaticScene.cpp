@@ -21,7 +21,6 @@ namespace GameEngine
         static const int ElementsPerNode = 8;
         inline float EvalCost(int n1, float a1, int n2, float a2, float area)
         {
-            float factor = 1.0f;
             return 0.125f + ((float)n1*a1 + (float)n2*a2) / area;
         }
     };
@@ -32,8 +31,28 @@ namespace GameEngine
     public:
         inline bool Trace(StaticSceneTracingResult & inter, const StaticFace & face, const Ray & ray, float & t) const
         {
+            Vec3 e1 = face.verts[1] - face.verts[0];
+            Vec3 e2 = face.verts[2] - face.verts[0];
+            Vec3 s1 = Vec3::Cross(ray.Dir, e2);
+            float  invd = 1.0f / (Vec3::Dot(s1, e1));
+            Vec3 d = ray.Origin - face.verts[0];
+            float  b1 = Vec3::Dot(d, s1) * invd;
+            Vec3 s2 = Vec3::Cross(d, e1);
+            float  b2 = Vec3::Dot(ray.Dir, s2) * invd;
+            float temp = Vec3::Dot(e2, s2) * invd;
 
-            return true;
+            if (b1 < 0.f || b1 > 1.f || b2 < 0.f || b1 + b2 > 1.f || temp < 0.f || temp > ray.tMax)
+            {
+                return false;
+            }
+            else
+            {
+                t = inter.T = temp;
+                inter.IsHit = true;
+                inter.Actor = face.actor;
+                inter.UV = face.uvs[0] * b1 + face.uvs[1] * b2 + face.uvs[2] * (1.0f - b1 - b2);
+                return true;
+            }
         }
     };
 
@@ -60,7 +79,7 @@ namespace GameEngine
         }
     };
 
-    void AddMeshInstance(List<StaticFace>& faces, Mesh * mesh, Matrix4 localTranform, Actor * actor)
+    void AddMeshInstance(List<StaticFace>& faces, Mesh * mesh, Matrix4 localTransform, Actor * actor)
     {
         int uvChannelId = mesh->GetVertexFormat().GetUVChannelCount() - 1;
         for (int i = 0; i < mesh->Indices.Count() / 3; i++)
@@ -71,7 +90,7 @@ namespace GameEngine
             {
                 int vid = mesh->Indices[i * 3 + j];
                 f.uvs[j] = mesh->GetVertexUV(vid, uvChannelId);
-                f.verts[j] = mesh->GetVertexPosition(vid);
+                f.verts[j] = localTransform.Transform(Vec4::Create(mesh->GetVertexPosition(vid), 1.0f)).xyz();
             }
             faces.Add(f);
         }

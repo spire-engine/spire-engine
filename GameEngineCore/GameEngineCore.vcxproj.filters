@@ -190,6 +190,9 @@
     <ClCompile Include="StaticScene.cpp">
       <Filter>Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="StaticSceneRenderer.cpp">
+      <Filter>Geometry</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -394,6 +397,12 @@
       <Filter>Geometry</Filter>
     </ClInclude>
     <ClInclude Include="Bvh.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="StaticSceneRenderer.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="LightmapBaker.h">
       <Filter>Geometry</Filter>
     </ClInclude>
   </ItemGroup>

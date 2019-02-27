@@ -174,7 +174,6 @@ namespace CoreLib
 
 		inline bool RayBBoxIntersection(const BBox & bbox, const Vec3 & origin, const Vec3 & dir, float & tmin, float & tmax)
 		{
-			float tymin, tymax, tzmin, tzmax;
 			Vec3 rdir = dir;
 			rdir.x = 1.0f / dir.x;
 			rdir.y = 1.0f / dir.y;
