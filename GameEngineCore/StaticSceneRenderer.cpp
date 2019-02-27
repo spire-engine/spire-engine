@@ -64,15 +64,15 @@ namespace GameEngine
                         auto map = maps.TryGetValue(inter.Actor->Name.GetValue());
                         if (map)
                         {
-                            frameBuffer.GetPixels()[i*frameBuffer.GetHeight() + j] = map->Sample(inter.UV);
+                            frameBuffer.GetPixels()[i*frameBuffer.GetWidth() + j] = map->Sample(inter.UV);
                         }
                         else
                         {
-                            frameBuffer.GetPixels()[i*frameBuffer.GetHeight() + j] = Vec4::Create(1.0f, 0.0f, 0.0f, 1.0f);
+                            frameBuffer.GetPixels()[i*frameBuffer.GetWidth() + j] = Vec4::Create(1.0f, 0.0f, 0.0f, 1.0f);
                         }
                     }
                     else
-                        frameBuffer.GetPixels()[i*frameBuffer.GetHeight() + j].SetZero();
+                        frameBuffer.GetPixels()[i*frameBuffer.GetWidth() + j].SetZero();
                 }
             return frameBuffer;
         }
