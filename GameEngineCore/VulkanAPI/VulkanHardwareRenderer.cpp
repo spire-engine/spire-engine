@@ -419,7 +419,7 @@ namespace VK
 			};
 			CoreLib::List<const char*> enabledDeviceExtensions;
 			AddExtension(enabledDeviceExtensions, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-			AddExtension(enabledDeviceExtensions, VK_NV_GLSL_SHADER_EXTENSION_NAME);
+            AddExtension(enabledDeviceExtensions, VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
 			DEBUG_ONLY(AddExtension(enabledDeviceExtensions, VK_EXT_DEBUG_MARKER_EXTENSION_NAME));
 
 			// Device Features
@@ -3324,6 +3324,12 @@ namespace VK
 			.setDepthBiasSlopeFactor(pipelineBuilder->FixedFunctionStates.PolygonOffsetFactor)
 			.setLineWidth(1.0f);
 
+        if (pipelineBuilder->FixedFunctionStates.ConsevativeRasterization)
+        {
+            VkPipelineRasterizationConservativeStateCreateInfoEXT conservativeRasterStateCI{};
+            conservativeRasterStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT;
+            conservativeRasterStateCI.conservativeRasterizationMode = VK_CONSERVATIVE_RASTERIZATION_MODE_OVERESTIMATE_EXT;
+        }
 		// Create Multisampling Description
 		//TODO: Implement multisampling
 		vk::PipelineMultisampleStateCreateInfo multisampleCreateInfo = vk::PipelineMultisampleStateCreateInfo()

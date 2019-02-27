@@ -743,6 +743,7 @@ namespace GameEngine
 	public:
 		bool PrimitiveRestartEnabled = false;
 		bool EnablePolygonOffset = false;
+        bool ConsevativeRasterization = false;
 		float PolygonOffsetFactor = 0.4f;
 		float PolygonOffsetUnits = 1.0f;
 		PrimitiveType PrimitiveTopology = GameEngine::PrimitiveType::Triangles;
