@@ -188,6 +188,7 @@
     <ClCompile Include="LevelEditor.cpp" />
     <ClCompile Include="LightActor.cpp" />
     <ClCompile Include="LightingData.cpp" />
+    <ClCompile Include="LightmapBaker.cpp" />
     <ClCompile Include="LightmapUVGeneration.cpp" />
     <ClCompile Include="LightProbeRenderer.cpp" />
     <ClCompile Include="Material.cpp" />
@@ -216,6 +217,7 @@
     <ClCompile Include="SSAO.cpp" />
     <ClCompile Include="StandardRenderProcedure.cpp" />
     <ClCompile Include="StaticMeshActor.cpp" />
+    <ClCompile Include="StaticScene.cpp" />
     <ClCompile Include="SystemWindow-Win32.cpp" />
     <ClCompile Include="TerrainActor.cpp" />
     <ClCompile Include="TextureCompressor.cpp" />
@@ -247,6 +249,7 @@
     <ClInclude Include="AsyncCommandBuffer.h" />
     <ClInclude Include="Atmosphere.h" />
     <ClInclude Include="AtmosphereActor.h" />
+    <ClInclude Include="Bvh.h" />
     <ClInclude Include="CameraActor.h" />
     <ClInclude Include="CatmullSpline.h" />
     <ClInclude Include="DisjointSet.h" />
@@ -279,6 +282,7 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="MeshBuilder.h" />
     <ClInclude Include="Model.h" />
+    <ClInclude Include="ObjectSpaceGBufferRenderer.h" />
     <ClInclude Include="ObjectSpaceMapSet.h" />
     <ClInclude Include="OS.h" />
     <ClInclude Include="OutlinePassParameters.h" />
@@ -289,6 +293,7 @@
     <ClInclude Include="Property.h" />
     <ClInclude Include="PropertyEditControl.h" />
     <ClInclude Include="Rasterizer.h" />
+    <ClInclude Include="Ray.h" />
     <ClInclude Include="RenderContext.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RendererService.h" />
@@ -301,6 +306,7 @@
     <ClInclude Include="SSAO.h" />
     <ClInclude Include="StandardViewUniforms.h" />
     <ClInclude Include="StaticMeshActor.h" />
+    <ClInclude Include="StaticScene.h" />
     <ClInclude Include="SystemWindow-Win32.h" />
     <ClInclude Include="TerrainActor.h" />
     <ClInclude Include="TextureCompressor.h" />
@@ -326,6 +332,7 @@
     <None Include="..\EngineContent\Shaders\CopyPixel.slang" />
     <None Include="..\EngineContent\Shaders\CustomDepthPass.slang" />
     <None Include="..\EngineContent\Shaders\DefaultMaterial.slang" />
+    <None Include="..\EngineContent\Shaders\LightmapGBufferGen.slang" />
     <None Include="..\EngineContent\Shaders\ForwardBasePass.slang" />
     <None Include="..\EngineContent\Shaders\Gizmo.slang" />
     <None Include="..\EngineContent\Shaders\LightProbePrefilter.slang" />

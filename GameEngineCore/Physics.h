@@ -4,14 +4,11 @@
 #include "CoreLib/Basic.h"
 #include "CoreLib/VectorMath.h"
 #include "CoreLib/Graphics/BBox.h"
+#include "Ray.h"
 
 namespace GameEngine
 {
-	struct Ray
-	{
-		VectorMath::Vec3 Origin;
-		VectorMath::Vec3 Dir;
-	};
+	
 	struct PhysicsModelFace
 	{
 		VectorMath::Vec3 Vertices[3];

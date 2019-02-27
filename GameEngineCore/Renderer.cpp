@@ -178,6 +178,10 @@ namespace GameEngine
 		{
 			return hardwareRenderer;
 		}
+        virtual RendererService* GetRendererService() override
+        {
+            return renderService.Ptr();
+        }
 
 		RefPtr<ViewResource> cubemapRenderView;
 		RefPtr<IRenderProcedure> cubemapRenderProc;

@@ -69,6 +69,13 @@ VSOutput vs_main(SPECIALIZATION_TYPE_2 vertexIn)
     return rs;
 }
 
+struct PsOut
+{
+	float4 diffuse : SV_Target0;
+	float4 position : SV_Target1;
+	float4 normal : SV_Target2;
+};
+
 float4 ps_main(VSOutput vsOut)
 {
     VertexPositionInfo vin;
@@ -82,5 +89,10 @@ float4 ps_main(VSOutput vsOut)
     vattribs.colorSet = vsOut.vertColorSet;
     vattribs.boneWeightSet.setPackedRepresentation(vsOut.vertBoneWeightSet);
     SPECIALIZATION_TYPE_0.MaterialPattern pattern = gMaterial.evalPattern(vin, vattribs, gView);
-    return pattern.getDiffuse();
+
+	PsOut rs;
+	rs.diffuse = pattern.getDiffuse();
+	rs.position = vsOut.worldPos;
+	rs.normal = vsOut.normal;
+    return rs;
 }

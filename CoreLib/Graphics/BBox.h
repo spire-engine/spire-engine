@@ -122,6 +122,56 @@ namespace CoreLib
 			}
 		};
 
+        inline bool RayBBoxIntersection_RcpDir(const BBox & bbox, const Vec3 & origin, const Vec3 & rdir, float & tmin, float & tmax)
+        {
+            float tymin, tymax, tzmin, tzmax;
+
+            if (rdir.x >= 0)
+            {
+                tmin = (bbox.Min.x - origin.x) * rdir.x;
+                tmax = (bbox.Max.x - origin.x) * rdir.x;
+            }
+            else
+            {
+                tmin = (bbox.Max.x - origin.x) * rdir.x;
+                tmax = (bbox.Min.x - origin.x) * rdir.x;
+            }
+            if (rdir.y >= 0)
+            {
+                tymin = (bbox.Min.y - origin.y) * rdir.y;
+                tymax = (bbox.Max.y - origin.y) * rdir.y;
+            }
+            else
+            {
+                tymin = (bbox.Max.y - origin.y) * rdir.y;
+                tymax = (bbox.Min.y - origin.y) * rdir.y;
+            }
+            if (tmin - tymax > Epsilon || tymin - tmax > Epsilon)
+                return false;
+            if (tymin > tmin)
+                tmin = tymin;
+            if (tymax < tmax)
+                tmax = tymax;
+            if (rdir.z >= 0)
+            {
+                tzmin = (bbox.Min.z - origin.z) * rdir.z;
+                tzmax = (bbox.Max.z - origin.z) * rdir.z;
+            }
+            else
+            {
+                tzmin = (bbox.Max.z - origin.z) * rdir.z;
+                tzmax = (bbox.Min.z - origin.z) * rdir.z;
+            }
+            if (tmin - tzmax > Epsilon || tzmin - tmax > Epsilon)
+                return false;
+            if (tzmin > tmin)
+                tmin = tzmin;
+            if (tzmax < tmax)
+                tmax = tzmax;
+            return tmin <= tmax;
+        }
+
+
 		inline bool RayBBoxIntersection(const BBox & bbox, const Vec3 & origin, const Vec3 & dir, float & tmin, float & tmax)
 		{
 			float tymin, tymax, tzmin, tzmax;
@@ -129,50 +179,7 @@ namespace CoreLib
 			rdir.x = 1.0f / dir.x;
 			rdir.y = 1.0f / dir.y;
 			rdir.z = 1.0f / dir.z;
-
-			if (rdir.x >= 0)
-			{
-				tmin = (bbox.Min.x - origin.x) * rdir.x;
-				tmax = (bbox.Max.x - origin.x) * rdir.x;
-			}
-			else
-			{
-				tmin = (bbox.Max.x - origin.x) * rdir.x;
-				tmax = (bbox.Min.x - origin.x) * rdir.x;
-			}
-			if (rdir.y >= 0)
-			{
-				tymin = (bbox.Min.y - origin.y) * rdir.y;
-				tymax = (bbox.Max.y - origin.y) * rdir.y;
-			}
-			else
-			{
-				tymin = (bbox.Max.y - origin.y) * rdir.y;
-				tymax = (bbox.Min.y - origin.y) * rdir.y;
-			}
-			if (tmin - tymax > Epsilon || tymin - tmax > Epsilon)
-				return false;
-			if (tymin > tmin)
-				tmin = tymin;
-			if (tymax < tmax)
-				tmax = tymax;
-			if (rdir.z >= 0)
-			{
-				tzmin = (bbox.Min.z - origin.z) * rdir.z;
-				tzmax = (bbox.Max.z - origin.z) * rdir.z;
-			}
-			else
-			{
-				tzmin = (bbox.Max.z - origin.z) * rdir.z;
-				tzmax = (bbox.Min.z - origin.z) * rdir.z;
-			}
-			if (tmin - tzmax > Epsilon || tzmin - tmax > Epsilon)
-				return false;
-			if (tzmin > tmin)
-				tmin = tzmin;
-			if (tzmax < tmax)
-				tmax = tzmax;
-			return tmin <= tmax;
+            return RayBBoxIntersection_RcpDir(bbox, origin, rdir, tmin, tmax);
 		}
 
 		inline void TransformBBox(BBox & bboxOut, const Matrix4 & mat, const BBox & bboxIn)

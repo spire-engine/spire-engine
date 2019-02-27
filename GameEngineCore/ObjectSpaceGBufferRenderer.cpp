@@ -1,3 +1,4 @@
+#include "ObjectSpaceGBufferRenderer.h"
 #include "RenderContext.h"
 #include "ViewResource.h"
 #include "RenderProcedure.h"
@@ -6,12 +7,13 @@
 #include "Engine.h"
 
 using namespace CoreLib;
+
 namespace GameEngine
 {
     class IRenderProcedure;
     class Renderer;
 
-    class ObjectSpaceGBufferRenderer : public CoreLib::RefObject
+    class ObjectSpaceGBufferRendererImpl : public ObjectSpaceGBufferRenderer
     {
     private:
         HardwareRenderer * hwRenderer;
@@ -22,7 +24,7 @@ namespace GameEngine
         RenderStat renderStats;
         RefPtr<CommandBuffer> cmdBuffer;
     public:
-        ObjectSpaceGBufferRenderer(HardwareRenderer * hw, RendererService * service, CoreLib::String shaderFileName)
+        virtual void Init(HardwareRenderer * hw, RendererService * service, CoreLib::String shaderFileName) override
         {
             rendererService = service;
             vsEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "vsMain");
@@ -30,7 +32,7 @@ namespace GameEngine
             pipeContext.Init(hwRenderer, &renderStats);
             cmdBuffer = hwRenderer->CreateCommandBuffer();
         }
-        void RenderObjectSpaceMap(ArrayView<Texture2D*> dest, ArrayView<StorageFormat> attachmentFormats, Actor * actor)
+        virtual void RenderObjectSpaceMap(ArrayView<Texture2D*> dest, ArrayView<StorageFormat> attachmentFormats, Actor * actor) override
         {
             List<AttachmentLayout> attachments;
             RenderAttachments renderAttachments;
@@ -59,7 +61,7 @@ namespace GameEngine
             fixStates.CullMode = CullMode::Disabled;
             pipeContext.BindEntryPoint(vsEntryPoint, psEntryPoint, renderTargetLayout.Ptr(), &fixStates);
             cmdBuffer->BeginRecording(frameBuffer.Ptr());
-
+            cmdBuffer->ClearAttachments(frameBuffer.Ptr());
             auto processDrawable = [&](Drawable* drawable)
             {
                 auto pipeline = pipeContext.GetPipeline(&drawable->GetVertexFormat());
@@ -90,4 +92,9 @@ namespace GameEngine
             hwRenderer->Wait();
         }
     };
+
+    ObjectSpaceGBufferRenderer* CreateObjectSpaceGBufferRenderer()
+    {
+        return new ObjectSpaceGBufferRendererImpl();
+    }
 }

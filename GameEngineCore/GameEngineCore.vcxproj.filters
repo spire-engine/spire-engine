@@ -184,6 +184,12 @@
     <ClCompile Include="ObjectSpaceGBufferRenderer.cpp">
       <Filter>Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="LightmapBaker.cpp">
+      <Filter>Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="StaticScene.cpp">
+      <Filter>Geometry</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -378,6 +384,18 @@
     <ClInclude Include="ObjectSpaceMapSet.h">
       <Filter>Geometry</Filter>
     </ClInclude>
+    <ClInclude Include="ObjectSpaceGBufferRenderer.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="StaticScene.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="Ray.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="Bvh.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Actors">
@@ -464,6 +482,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="..\EngineContent\Shaders\CustomDepthPass.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\LightmapGBufferGen.slang">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

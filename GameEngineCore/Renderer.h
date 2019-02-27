@@ -16,6 +16,7 @@ namespace GameEngine
 	class ModuleInstance;
 	class Level;
 	class RenderStat;
+    class RendererService;
 	class Renderer : public CoreLib::Object
 	{
 	public:
@@ -32,6 +33,7 @@ namespace GameEngine
 		virtual RendererSharedResource * GetSharedResource() = 0;
 		virtual Texture2D * GetRenderedImage() = 0;
 		virtual HardwareRenderer * GetHardwareRenderer() = 0;
+        virtual RendererService* GetRendererService() = 0;
 	};
 
 	Renderer* CreateRenderer(RenderAPI api);
