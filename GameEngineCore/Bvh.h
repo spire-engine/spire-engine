@@ -496,7 +496,7 @@ namespace GameEngine
         while (true)
         {
             float t1, t2;
-            if (RayBBoxIntersection(node->Bounds, ray.Origin, rcpDir, t1, t2) && t1 < traceRay.tMax)
+            if (RayBBoxIntersection_RcpDir(node->Bounds, ray.Origin, rcpDir, t1, t2) && t1 < traceRay.tMax)
             {
                 if (node->ElementCount > 0)
                 {

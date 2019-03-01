@@ -12,7 +12,7 @@ namespace GameEngine
     {
     public:
         virtual void Init(HardwareRenderer * hw, RendererService * service, CoreLib::String shaderFileName) = 0;
-        virtual void RenderObjectSpaceMap(CoreLib::ArrayView<Texture2D*> dest, CoreLib::ArrayView<StorageFormat> attachmentFormats, Actor * actor) = 0;
+        virtual void RenderObjectSpaceMap(CoreLib::ArrayView<Texture2D*> dest, CoreLib::ArrayView<StorageFormat> attachmentFormats, Actor * actor, int width, int height) = 0;
     };
 
     ObjectSpaceGBufferRenderer* CreateObjectSpaceGBufferRenderer();

@@ -56,21 +56,22 @@ namespace GameEngine
             {
                 auto map = maps.TryGetValue(actor.Key);
                 if (!map) continue;
-                Texture2D* texDiffuse = hwRenderer->CreateTexture2D(TextureUsage::ColorAttachment, map->diffuseMap.Width, map->diffuseMap.Height, 0, StorageFormat::RGBA_8);
-                Texture2D* texPosition = hwRenderer->CreateTexture2D(TextureUsage::ColorAttachment, map->positionMap.Width, map->positionMap.Height, 0, StorageFormat::RGBA_F32);
-                Texture2D* texNormal = hwRenderer->CreateTexture2D(TextureUsage::ColorAttachment, map->normalMap.Width, map->normalMap.Height, 0, StorageFormat::RGBA_F32);
+                RefPtr<Texture2D> texDiffuse = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, map->diffuseMap.Width, map->diffuseMap.Height, 1, StorageFormat::RGBA_8);
+                RefPtr<Texture2D> texPosition = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, map->positionMap.Width, map->positionMap.Height, 1, StorageFormat::RGBA_F32);
+                RefPtr<Texture2D> texNormal = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, map->normalMap.Width, map->normalMap.Height, 1, StorageFormat::RGBA_F32);
                 Array<Texture2D*, 3> dest;
                 Array<StorageFormat, 3> formats;
                 dest.SetSize(3);
-                dest[0] = texDiffuse;
-                dest[1] = texPosition;
-                dest[2] = texNormal;
+                dest[0] = texDiffuse.Ptr();
+                dest[1] = texPosition.Ptr();
+                dest[2] = texNormal.Ptr();
                 formats.SetSize(3);
                 formats[0] = StorageFormat::RGBA_8;
                 formats[1] = StorageFormat::RGBA_F32;
                 formats[2] = StorageFormat::RGBA_F32;
-                renderer->RenderObjectSpaceMap(dest.GetArrayView(), formats.GetArrayView(), actor.Value.Ptr());
+                renderer->RenderObjectSpaceMap(dest.GetArrayView(), formats.GetArrayView(), actor.Value.Ptr(), map->diffuseMap.Width, map->diffuseMap.Height);
                 texDiffuse->GetData(0, map->diffuseMap.GetBuffer(), map->diffuseMap.Width*map->diffuseMap.Height * sizeof(uint32_t));
+                map->diffuseMap.SaveToFile("test.bmp");
                 List<float> buffer;
                 buffer.SetSize(map->positionMap.Width * map->positionMap.Height * 4);
                 texPosition->GetData(0, buffer.Buffer(), map->positionMap.Width*map->positionMap.Height * sizeof(float) * 4);
@@ -99,7 +100,7 @@ namespace GameEngine
             staticScene = BuildStaticScene(level);
 
             RefPtr<StaticSceneRenderer> staticRenderer = CreateStaticSceneRenderer();
-            staticRenderer->SetCamera(pLevel->CurrentCamera->GetCameraTransform(), pLevel->CurrentCamera->FOV, 1280, 720);
+            staticRenderer->SetCamera(pLevel->CurrentCamera->GetCameraTransform(), pLevel->CurrentCamera->FOV, 1024, 1024);
             EnumerableDictionary<String, RawObjectSpaceMap> diffuseMaps;
             for (auto & map : maps)
                 diffuseMaps[map.Key] = map.Value.diffuseMap;

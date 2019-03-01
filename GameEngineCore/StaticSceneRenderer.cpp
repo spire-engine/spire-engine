@@ -17,11 +17,11 @@ namespace GameEngine
         float screenZ;
         float fov;
 
-        CoreLib::Imaging::BitmapF frameBuffer;
-        void GetCameraRay(Ray & r, float x, float y)
+        CoreLib::RefPtr<CoreLib::Imaging::BitmapF> frameBuffer;
+        void GetCameraRay(Ray & r, int w, int h, float x, float y)
         {
-            float centerX = frameBuffer.GetWidth() * 0.5f;
-            float centerY = frameBuffer.GetHeight() * 0.5f;
+            float centerX = w * 0.5f;
+            float centerY = h * 0.5f;
             
             Vec3 tmpVec;
             r.tMax = FLT_MAX;
@@ -42,9 +42,9 @@ namespace GameEngine
     public:
         virtual void SetCamera(VectorMath::Matrix4 camTransform, float screenFov, int screenWidth, int screenHeight) override
         {
-            cameraTransform = camTransform;
+            camTransform.Inverse(cameraTransform);
             fov = screenFov;
-            frameBuffer = CoreLib::Imaging::BitmapF(screenWidth, screenHeight);
+            frameBuffer = new CoreLib::Imaging::BitmapF(screenWidth, screenHeight);
             screenZ = -(screenHeight >> 1) / tanf(screenFov*(0.5f*PI / 180.0f));
             camRight.SetZero();
             camUp.SetZero();
@@ -53,28 +53,31 @@ namespace GameEngine
         }
         virtual CoreLib::Imaging::BitmapF& Render(StaticScene* scene, CoreLib::EnumerableDictionary<CoreLib::String, RawObjectSpaceMap> & maps) override
         {
-            for (int i = 0; i < frameBuffer.GetHeight(); i++)
-                for (int j = 0; j < frameBuffer.GetWidth(); j++)
+            auto pixels = frameBuffer->GetPixels();
+            int h = frameBuffer->GetHeight();
+            int w = frameBuffer->GetWidth();
+            for (int i = 0; i < h; i++)
+                for (int j = 0; j < w; j++)
                 {
                     Ray ray;
-                    GetCameraRay(ray, (float)j, (float)i);
+                    GetCameraRay(ray, w, h, (float)j, (float)i);
                     auto inter = scene->TraceRay(ray);
                     if (inter.IsHit)
                     {
                         auto map = maps.TryGetValue(inter.Actor->Name.GetValue());
                         if (map)
                         {
-                            frameBuffer.GetPixels()[i*frameBuffer.GetWidth() + j] = map->Sample(inter.UV);
+                            pixels[i * w + j] = map->Sample(inter.UV);
                         }
                         else
                         {
-                            frameBuffer.GetPixels()[i*frameBuffer.GetWidth() + j] = Vec4::Create(1.0f, 0.0f, 0.0f, 1.0f);
+                            pixels[i * w + j] = Vec4::Create(1.0f, 0.0f, 0.0f, 1.0f);
                         }
                     }
                     else
-                        frameBuffer.GetPixels()[i*frameBuffer.GetWidth() + j].SetZero();
+                        pixels[i * w + j] = Vec4::Create(0.0f, 0.0f, 0.4f, 1.0f);
                 }
-            return frameBuffer;
+            return *frameBuffer;
         }
     };
 

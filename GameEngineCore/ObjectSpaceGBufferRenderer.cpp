@@ -23,11 +23,15 @@ namespace GameEngine
         ShaderEntryPoint* vsEntryPoint, *psEntryPoint;
         PipelineContext pipeContext;
         RenderStat renderStats;
-        RefPtr<CommandBuffer> cmdBuffer;
+        RefPtr<CommandBuffer> cmdBuffer, layoutTransferCmdBuffer1, layoutTransferCmdBuffer2;
         ModuleInstance viewParams;
         DeviceMemory uniformMemory;
         StandardViewUniforms viewUniform;
     public:
+        ~ObjectSpaceGBufferRendererImpl()
+        {
+            viewParams = ModuleInstance();
+        }
         virtual void Init(HardwareRenderer * hw, RendererService * service, CoreLib::String shaderFileName) override
         {
             hwRenderer = hw;
@@ -36,6 +40,8 @@ namespace GameEngine
             psEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "ps_main");
             pipeContext.Init(hwRenderer, &renderStats);
             cmdBuffer = hwRenderer->CreateCommandBuffer();
+            layoutTransferCmdBuffer1 = hwRenderer->CreateCommandBuffer();
+            layoutTransferCmdBuffer2 = hwRenderer->CreateCommandBuffer();
 
             viewUniform.CameraPos.SetZero();
             VectorMath::Matrix4::CreateIdentityMatrix(viewUniform.InvViewProjTransform);
@@ -51,12 +57,12 @@ namespace GameEngine
             {
                 auto descSet = viewParams.GetDescriptorSet(i);
                 descSet->BeginUpdate();
-                descSet->Update(0, sharedRes->textureSampler.Ptr());
+                descSet->Update(1, sharedRes->textureSampler.Ptr());
                 descSet->EndUpdate();
             }
             viewParams.SetUniformData(&viewUniform, sizeof(viewUniform));
         }
-        virtual void RenderObjectSpaceMap(ArrayView<Texture2D*> dest, ArrayView<StorageFormat> attachmentFormats, Actor * actor) override
+        virtual void RenderObjectSpaceMap(ArrayView<Texture2D*> dest, ArrayView<StorageFormat> attachmentFormats, Actor * actor, int width, int height) override
         {
             List<AttachmentLayout> attachments;
             RenderAttachments renderAttachments;
@@ -68,6 +74,8 @@ namespace GameEngine
                 attachments.Add(layout);
                 renderAttachments.SetAttachment(i, dest[i]);
             }
+
+            auto destTextures = From(dest).Select([](auto x) {return (Texture*)x; }).ToList();
             RefPtr<RenderTargetLayout> renderTargetLayout = hwRenderer->CreateRenderTargetLayout(attachments.GetArrayView());
             RefPtr<FrameBuffer> frameBuffer = renderTargetLayout->CreateFrameBuffer(renderAttachments);
             
@@ -83,9 +91,20 @@ namespace GameEngine
             
             FixedFunctionPipelineStates fixStates;
             fixStates.CullMode = CullMode::Disabled;
+            fixStates.DepthCompareFunc = CompareFunc::Disabled;
+            fixStates.BlendMode = BlendMode::Replace;
+            fixStates.ConsevativeRasterization = true;
             pipeContext.BindEntryPoint(vsEntryPoint, psEntryPoint, renderTargetLayout.Ptr(), &fixStates);
             pipeContext.PushModuleInstance(&viewParams);
+            
+            layoutTransferCmdBuffer1->BeginRecording();
+            layoutTransferCmdBuffer1->TransferLayout(destTextures.GetArrayView(),
+                TextureLayoutTransfer::UndefinedToRenderAttachment);
+            layoutTransferCmdBuffer1->EndRecording();
+            hwRenderer->ExecuteNonRenderCommandBuffers(layoutTransferCmdBuffer1.Ptr());
+            
             cmdBuffer->BeginRecording(frameBuffer.Ptr());
+            cmdBuffer->SetViewport(0, 0, width, height);
             cmdBuffer->ClearAttachments(frameBuffer.Ptr());
             auto processDrawable = [&](Drawable* drawable)
             {
@@ -115,6 +134,11 @@ namespace GameEngine
             }
             cmdBuffer->EndRecording();
             hwRenderer->ExecuteRenderPass(frameBuffer.Ptr(), MakeArrayView(cmdBuffer.Ptr()), nullptr);
+            layoutTransferCmdBuffer2->BeginRecording();
+            layoutTransferCmdBuffer2->TransferLayout(destTextures.GetArrayView(),
+                TextureLayoutTransfer::RenderAttachmentToSample);
+            layoutTransferCmdBuffer2->EndRecording();
+            hwRenderer->ExecuteNonRenderCommandBuffers(layoutTransferCmdBuffer2.Ptr());
             hwRenderer->Wait();
         }
     };

@@ -50,7 +50,7 @@ namespace GameEngine
                 t = inter.T = temp;
                 inter.IsHit = true;
                 inter.Actor = face.actor;
-                inter.UV = face.uvs[0] * b1 + face.uvs[1] * b2 + face.uvs[2] * (1.0f - b1 - b2);
+                inter.UV = face.uvs[0] * (1.0f - b1 - b2) + face.uvs[1] * b1 + face.uvs[2] * b2;
                 return true;
             }
         }

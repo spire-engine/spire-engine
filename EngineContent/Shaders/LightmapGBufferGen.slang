@@ -70,7 +70,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
     
     float3 displacement = gMaterial.getDisplacement(worldPos, vattribs, gView);
     rs.worldPos = worldPos.vertPos + displacement;
-    rs.projPos = float4(vertexIn.getUVSet().getUV(1), 0.0, 1.0);
+    rs.projPos = float4(vertexIn.getUVSet().getUV(1) * 2.0 - 1.0, 0.0, 1.0);
     return rs;
 }
 

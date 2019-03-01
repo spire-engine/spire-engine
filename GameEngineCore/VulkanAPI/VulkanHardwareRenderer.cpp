@@ -1,4 +1,4 @@
-#include "vkel.h"
+#include "volk.h"
 #include "vulkan.hpp"
 #include "../GameEngineCore/HardwareRenderer.h"
 #include "CoreLib/WinForm/Debug.h"
@@ -294,6 +294,7 @@ namespace VK
 			// Enabled Extensions
 			CoreLib::List<const char*> enabledInstanceExtensions;
 			enabledInstanceExtensions.Add(VK_KHR_SURFACE_EXTENSION_NAME);
+            enabledInstanceExtensions.Add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 #if _WIN32
 			enabledInstanceExtensions.Add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #endif
@@ -311,7 +312,7 @@ namespace VK
 			State().instance = vk::createInstance(instInfo);
 
 			// Load instance level function pointers
-			vkelInstanceInit((VkInstance)(State().instance));
+			volkLoadInstance((VkInstance)(State().instance));
 
 			// Create callbacks
 			DEBUG_ONLY(CreateDebugCallback());
@@ -418,7 +419,7 @@ namespace VK
 				printf("Extension %s not supported\n", extensionName);
 			};
 			CoreLib::List<const char*> enabledDeviceExtensions;
-			AddExtension(enabledDeviceExtensions, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+			AddExtension(enabledDeviceExtensions, VK_KHR_SWAPCHAIN_EXTENSION_NAME); 
             AddExtension(enabledDeviceExtensions, VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
 			DEBUG_ONLY(AddExtension(enabledDeviceExtensions, VK_EXT_DEBUG_MARKER_EXTENSION_NAME));
 
@@ -437,7 +438,7 @@ namespace VK
 			State().device = State().physicalDevice.createDevice(deviceInfo);
 
 			// Load device level function pointers
-			vkelDeviceInit((VkDevice)(State().device));
+			volkLoadDevice((VkDevice)(State().device));
 
 			State().presentQueue = State().device.getQueue(renderQueueFamilyIndex, 0);
 			State().renderQueue = State().device.getQueue(renderQueueFamilyIndex, 0);
@@ -496,7 +497,7 @@ namespace VK
 				return;
 
 			State().initialized = true;
-			vkelInit();
+            volkInitialize();
 			CreateInstance();
 			SelectPhysicalDevice();
 			InitDevice();
@@ -554,7 +555,6 @@ namespace VK
 
 			UninitDevice();
 			DestroyInstance();
-			vkelUninit();
 			State().initialized = false;
 		};
 
@@ -3324,11 +3324,12 @@ namespace VK
 			.setDepthBiasSlopeFactor(pipelineBuilder->FixedFunctionStates.PolygonOffsetFactor)
 			.setLineWidth(1.0f);
 
+        VkPipelineRasterizationConservativeStateCreateInfoEXT conservativeRasterStateCI{};
         if (pipelineBuilder->FixedFunctionStates.ConsevativeRasterization)
         {
-            VkPipelineRasterizationConservativeStateCreateInfoEXT conservativeRasterStateCI{};
             conservativeRasterStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT;
             conservativeRasterStateCI.conservativeRasterizationMode = VK_CONSERVATIVE_RASTERIZATION_MODE_OVERESTIMATE_EXT;
+            rasterizationCreateInfo.pNext = &conservativeRasterStateCI;
         }
 		// Create Multisampling Description
 		//TODO: Implement multisampling
@@ -4320,14 +4321,9 @@ namespace VK
 
             swapchain = RendererState::Device().createSwapchainKHR(swapchainCreateInfo);
             DestroySwapchain(oldSwapchain);
-            images.SetSize(200);
-            unsigned int swapchainImageCount = 0;
-            vk::Result result = RendererState::Device().getSwapchainImagesKHR(swapchain, &swapchainImageCount, nullptr);
-            if (result == vk::Result::eSuccess && swapchainImageCount)
-                images.SetSize(swapchainImageCount);
-            else
-                throw HardwareRendererException("Failed to create swapchain");
-            RendererState::Device().getSwapchainImagesKHR(swapchain, &swapchainImageCount, images.Buffer());
+            auto vkImages = RendererState::Device().getSwapchainImagesKHR(swapchain);
+            images.SetSize((int)vkImages.size());
+            memcpy(images.Buffer(), &vkImages[0], vkImages.size() * sizeof(vk::Image));
 			CreateCommandBuffers();
         }
 

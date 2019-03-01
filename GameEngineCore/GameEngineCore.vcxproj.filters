@@ -3,9 +3,6 @@
   <ItemGroup>
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Engine.cpp" />
-    <ClCompile Include="VulkanAPI\vkel.c">
-      <Filter>Renderer\RenderAPI\Vulkan API</Filter>
-    </ClCompile>
     <ClCompile Include="Level.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="DynamicVariable.cpp" />
@@ -193,6 +190,9 @@
     <ClCompile Include="StaticSceneRenderer.cpp">
       <Filter>Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="VulkanAPI\volk.c">
+      <Filter>Renderer\RenderAPI\Vulkan API</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -200,9 +200,6 @@
     <ClInclude Include="Material.h" />
     <ClInclude Include="DynamicVariable.h" />
     <ClInclude Include="Engine.h" />
-    <ClInclude Include="VulkanAPI\vkel.h">
-      <Filter>Renderer\RenderAPI\Vulkan API</Filter>
-    </ClInclude>
     <ClInclude Include="InputDispatcher.h" />
     <ClInclude Include="TextureCompressor.h" />
     <ClInclude Include="TextureTool\LibSquish.h" />
@@ -404,6 +401,12 @@
     </ClInclude>
     <ClInclude Include="LightmapBaker.h">
       <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanAPI\volk.h">
+      <Filter>Renderer\RenderAPI\Vulkan API</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanAPI\vulkan.h">
+      <Filter>Renderer\RenderAPI\Vulkan API</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -356,9 +356,10 @@ namespace GameEngine
 			uiSystemInterface->ExecuteDrawCommands(sysWindow.Value, fence);
 			syncFences[version].Add(fence);
 			aggregateTime += renderingTimeDelta;
+            if (sysWindow.Key->GetClientHeight() < 2)
+                continue;
 			renderer->GetHardwareRenderer()->Present(sysWindow.Value->surface.Ptr(), sysWindow.Value->uiOverlayTexture.Ptr());
 		}
-
 		if (aggregateTime > 1.0f)
 		{
 			drawCallStatForm->SetNumShaders(stats.NumShaders);

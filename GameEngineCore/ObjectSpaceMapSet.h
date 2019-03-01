@@ -23,7 +23,7 @@ namespace GameEngine
         void SetPixel(int x, int y, VectorMath::Vec4 value);
         void * GetBuffer() { return data.Buffer(); }
         void Init(DataType type, int w, int h);
-
+        void SaveToFile(CoreLib::String fileName);
     };
     uint32_t PackRGBA8(float x, float y, float z, float w);
     uint32_t PackRGB10(float x, float y, float z);

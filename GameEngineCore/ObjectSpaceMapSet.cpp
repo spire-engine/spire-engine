@@ -1,6 +1,7 @@
 #include "ObjectSpaceMapSet.h"
 #include "CoreLib/Basic.h"
 #include "VectorMath.h"
+#include "CoreLib/Imaging/Bitmap.h"
 
 using namespace CoreLib;
 
@@ -60,7 +61,14 @@ namespace GameEngine
         Width = w;
         Height = h;
     }
-
+    void RawObjectSpaceMap::SaveToFile(String fileName)
+    {
+        CoreLib::Imaging::BitmapF bmp = CoreLib::Imaging::BitmapF(Width, Height);
+        auto pixels = bmp.GetPixels();
+        for (int i = 0; i < Width * Height; i++)
+            pixels[i] = GetPixel(i % Width, i / Width);
+        bmp.GetImageRef().SaveAsBmpFile(fileName);
+    }
     uint32_t PackRGB10(float x, float y, float z)
     {
         auto r1 = CoreLib::Math::Clamp((uint32_t)((x + 1.0f) * 0.5f * 1023), 0u, 1023u);

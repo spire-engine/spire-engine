@@ -229,7 +229,7 @@
     <ClCompile Include="VideoEncoder.cpp" />
     <ClCompile Include="View.cpp" />
     <ClCompile Include="ViewResource.cpp" />
-    <ClCompile Include="VulkanAPI\vkel.c" />
+    <ClCompile Include="VulkanAPI\volk.c" />
     <ClCompile Include="VulkanAPI\VulkanHardwareRenderer.cpp" />
     <ClCompile Include="WorldRenderPass.cpp" />
   </ItemGroup>
@@ -325,7 +325,8 @@
     <ClInclude Include="VideoEncoder.h" />
     <ClInclude Include="View.h" />
     <ClInclude Include="ViewResource.h" />
-    <ClInclude Include="VulkanAPI\vkel.h" />
+    <ClInclude Include="VulkanAPI\volk.h" />
+    <ClInclude Include="VulkanAPI\vulkan.h" />
     <ClInclude Include="VulkanAPI\vulkan.hpp" />
     <ClInclude Include="WorldRenderPass.h" />
   </ItemGroup>
