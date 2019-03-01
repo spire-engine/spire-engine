@@ -12,7 +12,7 @@ namespace GameEngine
     {
     public:
         virtual void SetCamera(VectorMath::Matrix4 camTransform, float screenFov, int screenWidth, int screenHeight) = 0;
-        virtual CoreLib::Imaging::BitmapF& Render(StaticScene* scene, CoreLib::EnumerableDictionary<CoreLib::String, RawObjectSpaceMap> & maps) = 0;
+        virtual CoreLib::Imaging::BitmapF& Render(StaticScene* scene, CoreLib::List<RawObjectSpaceMap> & maps) = 0;
     };
 
     StaticSceneRenderer* CreateStaticSceneRenderer();

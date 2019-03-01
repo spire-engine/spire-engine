@@ -12,7 +12,7 @@ namespace GameEngine
     {
         Vec3 verts[3];
         Vec2 uvs[3];
-        Actor* actor;
+        int mapId;
     };
     
     class MeshBvhEvaluator
@@ -49,7 +49,7 @@ namespace GameEngine
             {
                 t = inter.T = temp;
                 inter.IsHit = true;
-                inter.Actor = face.actor;
+                inter.MapId = face.mapId;
                 inter.UV = face.uvs[0] * (1.0f - b1 - b2) + face.uvs[1] * b1 + face.uvs[2] * b2;
                 return true;
             }
@@ -79,13 +79,13 @@ namespace GameEngine
         }
     };
 
-    void AddMeshInstance(List<StaticFace>& faces, Mesh * mesh, Matrix4 localTransform, Actor * actor)
+    void AddMeshInstance(List<StaticFace>& faces, Mesh * mesh, Matrix4 localTransform, int id)
     {
         int uvChannelId = mesh->GetVertexFormat().GetUVChannelCount() - 1;
         for (int i = 0; i < mesh->Indices.Count() / 3; i++)
         {
             StaticFace f;
-            f.actor = actor;
+            f.mapId = id;
             for (int j = 0; j < 3; j++)
             {
                 int vid = mesh->Indices[i * 3 + j];
@@ -100,11 +100,14 @@ namespace GameEngine
     {
         StaticSceneImpl* scene = new StaticSceneImpl();
         List<StaticFace> faces;
+        int id = 0;
         for (auto actor : level->Actors)
         {
             if (auto smActor = actor.Value.As<StaticMeshActor>())
             {
-                AddMeshInstance(faces, smActor->Mesh, smActor->LocalTransform.GetValue(), smActor.Ptr());
+                scene->MapIds[actor.Value.Ptr()] = id;
+                AddMeshInstance(faces, smActor->Mesh, smActor->LocalTransform.GetValue(), id);
+                id++;
             }
         }
         Bvh_Build<StaticFace> bvhBuild;

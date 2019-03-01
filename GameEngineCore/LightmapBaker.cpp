@@ -101,9 +101,10 @@ namespace GameEngine
 
             RefPtr<StaticSceneRenderer> staticRenderer = CreateStaticSceneRenderer();
             staticRenderer->SetCamera(pLevel->CurrentCamera->GetCameraTransform(), pLevel->CurrentCamera->FOV, 1024, 1024);
-            EnumerableDictionary<String, RawObjectSpaceMap> diffuseMaps;
-            for (auto & map : maps)
-                diffuseMaps[map.Key] = map.Value.diffuseMap;
+            List<RawObjectSpaceMap> diffuseMaps;
+            diffuseMaps.SetSize(staticScene->MapIds.Count());
+            for (auto mid : staticScene->MapIds)
+                diffuseMaps[mid.Value] = maps[mid.Key->Name.GetValue()]().diffuseMap;
             auto & image = staticRenderer->Render(staticScene.Ptr(), diffuseMaps);
             image.GetImageRef().SaveAsBmpFile("StaticSceneRender.bmp");
         }

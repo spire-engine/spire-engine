@@ -51,7 +51,7 @@ namespace GameEngine
             camRight.x = 1.0f;
             camUp.y = 1.0f;
         }
-        virtual CoreLib::Imaging::BitmapF& Render(StaticScene* scene, CoreLib::EnumerableDictionary<CoreLib::String, RawObjectSpaceMap> & maps) override
+        virtual CoreLib::Imaging::BitmapF& Render(StaticScene* scene, CoreLib::List<RawObjectSpaceMap> & maps) override
         {
             auto pixels = frameBuffer->GetPixels();
             int h = frameBuffer->GetHeight();
@@ -64,15 +64,8 @@ namespace GameEngine
                     auto inter = scene->TraceRay(ray);
                     if (inter.IsHit)
                     {
-                        auto map = maps.TryGetValue(inter.Actor->Name.GetValue());
-                        if (map)
-                        {
-                            pixels[i * w + j] = map->Sample(inter.UV);
-                        }
-                        else
-                        {
-                            pixels[i * w + j] = Vec4::Create(1.0f, 0.0f, 0.0f, 1.0f);
-                        }
+                        auto & map = maps[inter.MapId];
+                        pixels[i * w + j] = map.Sample(inter.UV);
                     }
                     else
                         pixels[i * w + j] = Vec4::Create(0.0f, 0.0f, 0.4f, 1.0f);

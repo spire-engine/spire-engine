@@ -13,7 +13,7 @@ namespace GameEngine
     struct StaticSceneTracingResult
     {
         VectorMath::Vec2 UV;
-        Actor* Actor = nullptr;
+        int MapId;
         float T = FLT_MAX;
         bool IsHit = false;
     };
@@ -21,6 +21,7 @@ namespace GameEngine
     class StaticScene : public CoreLib::RefObject
     {
     public:
+        CoreLib::EnumerableDictionary<Actor*, int> MapIds;
         virtual StaticSceneTracingResult TraceRay(const Ray & ray) = 0;
     };
 
