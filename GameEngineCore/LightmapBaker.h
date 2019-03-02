@@ -2,13 +2,21 @@
 #define GAME_ENGINE_LIGHTMAP_BAKER_H
 
 #include "CoreLib/Basic.h"
-#include "ObjectSpaceMapSet.h"
+#include "LightmapSet.h"
 
 namespace GameEngine
 {
     class Level;
-
-    void BakeLightmaps(CoreLib::EnumerableDictionary<CoreLib::String, RawObjectSpaceMap>& lightmaps, Level* pLevel);
+    struct LightmapBakingSettings
+    {
+        float ResolutionScale = 16.0f;
+        int MinResolution = 8;
+        int MaxResolution = 1024;
+        int SampleCount = 16;
+        float Epsilon = 1e-5f;
+        float ShadowBias = 1e-2f;
+    };
+    void BakeLightmaps(LightmapSet& lightmaps, const LightmapBakingSettings & settings, Level* pLevel);
 }
 
 #endif

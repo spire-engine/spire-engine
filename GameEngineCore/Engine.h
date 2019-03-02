@@ -15,6 +15,7 @@
 #include "UISystemBase.h"
 #include "VideoEncoder.h"
 #include "ShaderCompiler.h"
+#include "DebugGraphics.h"
 
 namespace GameEngine
 {
@@ -86,6 +87,7 @@ namespace GameEngine
         CoreLib::RefPtr<IVideoEncoder> videoEncoder;
         CoreLib::RefPtr<CoreLib::IO::Stream> videoEncodingStream;
         CoreLib::RefPtr<IShaderCompiler> shaderCompiler;
+        CoreLib::RefPtr<DebugGraphics> debugGraphics;
 		EngineMode engineMode = EngineMode::Normal;
 		CoreLib::Array<RenderStat, 16> renderStats;
 		GraphicsUI::CommandForm * uiCommandForm = nullptr;
@@ -129,6 +131,7 @@ namespace GameEngine
         {
             return uiSystemInterface.Ptr();
         }
+        
 		Level * GetLevel()
 		{
 			return level.Ptr();
@@ -205,6 +208,10 @@ namespace GameEngine
 		static void Init(const EngineInitArguments & args);
         static void Run();
 		static void Destroy();
+        static DebugGraphics* GetDebugGraphics()
+        {
+            return Instance()->debugGraphics.Ptr();
+        }
         static IShaderCompiler* GetShaderCompiler()
         {
             return Instance()->shaderCompiler.Ptr();

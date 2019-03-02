@@ -3,6 +3,8 @@
 #include "Level.h"
 #include "CoreLib/Graphics/BBox.h"
 #include "StaticMeshActor.h"
+#include "PointLightActor.h"
+#include "DirectionalLightActor.h"
 
 namespace GameEngine
 {
@@ -96,9 +98,51 @@ namespace GameEngine
         }
     }
 
+    static void GatherLights(StaticSceneImpl* scene, Level* level)
+    {
+        for (auto & actor : level->Actors)
+        {
+            auto actorType = actor.Value->GetEngineType();
+            if (actorType == EngineActorType::Light)
+            {
+                auto light = dynamic_cast<LightActor*>(actor.Value.Ptr());
+                if (light->lightType == LightType::Directional)
+                {
+                    auto dirLight = (DirectionalLightActor*)(light);
+                    StaticLight lightData;
+                    lightData.Type = StaticLightType::Directional;
+                    lightData.Intensity = dirLight->Color.GetValue();
+                    lightData.Direction = dirLight->GetDirection();
+                    auto localTransform = dirLight->GetLocalTransform();
+                    lightData.Position = Vec3::Create(localTransform.values[12], localTransform.values[13], localTransform.values[14]);
+                    lightData.Radius = 0.0f;
+                    lightData.SpotFadingStartAngle = lightData.SpotFadingEndAngle = 0.0f;
+                    lightData.Decay = 0.0f;
+                    scene->lights.Add(lightData);
+                }
+                else if (light->lightType == LightType::Point)
+                {
+                    auto pointLight = (PointLightActor*)(light);
+                    StaticLight lightData;
+                    lightData.Type = pointLight->IsSpotLight ? StaticLightType::Spot : StaticLightType::Spot;
+                    lightData.Intensity = pointLight->Color.GetValue();
+                    lightData.Direction = pointLight->GetDirection();
+                    auto localTransform = pointLight->GetLocalTransform();
+                    lightData.Position = Vec3::Create(localTransform.values[12], localTransform.values[13], localTransform.values[14]);
+                    lightData.Radius = pointLight->Radius.GetValue();
+                    lightData.SpotFadingStartAngle = pointLight->SpotLightStartAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
+                    lightData.SpotFadingEndAngle = pointLight->SpotLightEndAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
+                    lightData.Decay = 10.0f / (pointLight->DecayDistance90Percent.GetValue() * pointLight->DecayDistance90Percent.GetValue());
+                    scene->lights.Add(lightData);
+                }
+            }
+        }
+    }
+
     StaticScene* BuildStaticScene(Level* level)
     {
         StaticSceneImpl* scene = new StaticSceneImpl();
+        GatherLights(scene, level);
         List<StaticFace> faces;
         int id = 0;
         for (auto actor : level->Actors)

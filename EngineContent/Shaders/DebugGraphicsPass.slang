@@ -70,34 +70,11 @@ VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
     
     float3 displacement = gMaterial.getDisplacement(worldPos, vattribs, gView);
     rs.worldPos = worldPos.vertPos + displacement;
-    rs.projPos = float4(vertexIn.getUVSet().getUV(1) * 2.0 - 1.0, 0.0, 1.0);
+    rs.projPos = mul(gView.viewProjectionTransform, float4(rs.worldPos, 1.0));
     return rs;
 }
 
-struct PsOut
+float4 ps_main(VSOutput vsOut)
 {
-	float4 diffuse : SV_Target0;
-	float4 position : SV_Target1;
-	float4 normal : SV_Target2;
-};
-
-PsOut ps_main(VSOutput vsOut)
-{
-    VertexPositionInfo vin;
-    vin.vertPos = vsOut.worldPos;
-    vin.tangentFrame.vertNormal = normalize(vsOut.normal);
-    vin.tangentFrame.vertTangent = normalize(vsOut.tangent);
-    vin.tangentFrame.vertBinormal = cross(vin.tangentFrame.vertTangent, vin.tangentFrame.vertNormal);
-    vin.tangentFrame.binormalSign = vsOut.binormalSign;
-    VertexAttribs<SPECIALIZATION_TYPE_3.UVSet, SPECIALIZATION_TYPE_3.ColorSet, SPECIALIZATION_TYPE_3.BoneWeightSet> vattribs;
-    vattribs.uvSet = vsOut.vertUVSet;
-    vattribs.colorSet = vsOut.vertColorSet;
-    vattribs.boneWeightSet.setPackedRepresentation(vsOut.vertBoneWeightSet);
-    SPECIALIZATION_TYPE_1.MaterialPattern pattern = gMaterial.evalPattern(vin, vattribs, gView);
-
-	PsOut rs;
-	rs.diffuse = pattern.getDiffuse();
-	rs.position = float4(vsOut.worldPos, 0.0);
-	rs.normal = float4(vin.tangentFrame.vertNormal, 0.0);
-    return rs;
+    return vsOut.vertColorSet.getColor(0);
 }

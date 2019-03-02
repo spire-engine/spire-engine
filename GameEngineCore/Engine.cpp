@@ -174,6 +174,8 @@ namespace GameEngine
             mainWindow->CenterScreen();
             OsApplication::SetMainLoopEventHandler([this]() {MainLoop(); });
 
+            debugGraphics = CreateDebugGraphics();
+
             // initialize input dispatcher
             inputDispatcher = new InputDispatcher(CreateHardwareInputInterface(mainWindow->GetNativeHandle()));
             auto bindingFile = Path::Combine(gameDir, "bindings.config");
@@ -246,6 +248,7 @@ namespace GameEngine
 		fencePool = List<List<RefPtr<Fence>>>();
         mainWindow = nullptr;
 		uiSystemInterface = nullptr;
+        debugGraphics = nullptr;
 		renderer = nullptr;
         shaderCompiler = nullptr;
 	}

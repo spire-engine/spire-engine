@@ -178,8 +178,9 @@ namespace GameEngine
 
         void BakeLightmaps()
         {
-            EnumerableDictionary<String, RawObjectSpaceMap> lightmaps;
-            GameEngine::BakeLightmaps(lightmaps, level);
+            LightmapSet lightmaps;
+            LightmapBakingSettings settings;
+            GameEngine::BakeLightmaps(lightmaps, settings, level);
         }
 		void InitUI()
 		{

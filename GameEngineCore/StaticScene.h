@@ -18,10 +18,23 @@ namespace GameEngine
         bool IsHit = false;
     };
 
+    enum class StaticLightType
+    {
+        Directional, Point, Spot
+    };
+
+    struct StaticLight
+    {
+        StaticLightType Type;
+        VectorMath::Vec3 Position, Direction, Intensity;
+        float SpotFadingStartAngle, SpotFadingEndAngle, Decay, Radius;
+    };
+
     class StaticScene : public CoreLib::RefObject
     {
     public:
         CoreLib::EnumerableDictionary<Actor*, int> MapIds;
+        CoreLib::List<StaticLight> lights;
         virtual StaticSceneTracingResult TraceRay(const Ray & ray) = 0;
     };
 

@@ -51,21 +51,25 @@ namespace GameEngine
             camRight.x = 1.0f;
             camUp.y = 1.0f;
         }
-        virtual CoreLib::Imaging::BitmapF& Render(StaticScene* scene, CoreLib::List<RawObjectSpaceMap> & maps) override
+        virtual CoreLib::Imaging::BitmapF& Render(StaticScene* scene, CoreLib::List<RawObjectSpaceMap> & diffuseMaps, LightmapSet & lightMaps) override
         {
             auto pixels = frameBuffer->GetPixels();
             int h = frameBuffer->GetHeight();
             int w = frameBuffer->GetWidth();
+            #pragma omp parallel for
             for (int i = 0; i < h; i++)
                 for (int j = 0; j < w; j++)
                 {
                     Ray ray;
+                    if (i == 512 && j == 520)
+                        printf("break");
                     GetCameraRay(ray, w, h, (float)j, (float)i);
                     auto inter = scene->TraceRay(ray);
                     if (inter.IsHit)
                     {
-                        auto & map = maps[inter.MapId];
-                        pixels[i * w + j] = map.Sample(inter.UV);
+                        auto & diffuseMap = diffuseMaps[inter.MapId];
+                        auto & lightMap = lightMaps.Lightmaps[inter.MapId];
+                        pixels[i * w + j] = diffuseMap.Sample(inter.UV) * lightMap.Sample(inter.UV);
                     }
                     else
                         pixels[i * w + j] = Vec4::Create(0.0f, 0.0f, 0.4f, 1.0f);

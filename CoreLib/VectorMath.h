@@ -254,6 +254,14 @@ namespace VectorMath
 			rs.z = z * scale;
 			return rs;
 		}
+        inline Vec3 operator * (const Vec3 & vin) const
+        {
+            Vec3 rs;
+            rs.x = x * vin.x;
+            rs.y = y * vin.y;
+            rs.z = z * vin.z;
+            return rs;
+        }
 		inline Vec3 & operator += (const Vec3 & vin)
 		{
 			x += vin.x; y += vin.y; z += vin.z;
@@ -448,6 +456,15 @@ namespace VectorMath
 			rs.w = w - vin.w;
 			return rs;
 		}
+        inline Vec4 operator * (const Vec4 & vin) const
+        {
+            Vec4 rs;
+            rs.x = x * vin.x;
+            rs.y = y * vin.y;
+            rs.z = z * vin.z;
+            rs.w = w * vin.w;
+            return rs;
+        }
 		inline Vec4 operator - ()
 		{
 			Vec4 rs;

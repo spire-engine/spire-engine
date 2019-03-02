@@ -93,6 +93,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;GAMEENGINECORE_EXPORTS;%(PreprocessorDefinitions);NO_COMMAND_BUFFER;</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>../CoreLib/;../;../CoreLib/LibGL/</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -107,6 +108,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USRDLL;GAMEENGINECORE_EXPORTS;%(PreprocessorDefinitions);</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>../CoreLib/;../;../CoreLib/LibGL/</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -126,6 +128,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;GAMEENGINECORE_EXPORTS;%(PreprocessorDefinitions);NO_COMMAND_BUFFER;</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>../CoreLib/;../;../CoreLib/LibGL/</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -144,6 +147,7 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;GAMEENGINECORE_EXPORTS;%(PreprocessorDefinitions);</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>../CoreLib/;../;../CoreLib/LibGL/</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -166,6 +170,8 @@
     <ClCompile Include="CameraActor.cpp" />
     <ClCompile Include="CatmullSpline.cpp" />
     <ClCompile Include="CustomDepthRenderPass.cpp" />
+    <ClCompile Include="DebugGraphics.cpp" />
+    <ClCompile Include="DebugGraphicsRenderPass.cpp" />
     <ClCompile Include="DeviceMemory.cpp" />
     <ClCompile Include="DirectionalLightActor.cpp" />
     <ClCompile Include="Drawable.cpp" />
@@ -253,6 +259,7 @@
     <ClInclude Include="Bvh.h" />
     <ClInclude Include="CameraActor.h" />
     <ClInclude Include="CatmullSpline.h" />
+    <ClInclude Include="DebugGraphics.h" />
     <ClInclude Include="DisjointSet.h" />
     <ClInclude Include="EnvMapActor.h" />
     <ClInclude Include="FrameIdDisplayActor.h" />
@@ -278,6 +285,7 @@
     <ClInclude Include="LightActor.h" />
     <ClInclude Include="LightingData.h" />
     <ClInclude Include="LightmapBaker.h" />
+    <ClInclude Include="LightmapSet.h" />
     <ClInclude Include="LightmapUVGeneration.h" />
     <ClInclude Include="LightProbeRenderer.h" />
     <ClInclude Include="Material.h" />
@@ -335,6 +343,7 @@
     <None Include="..\EngineContent\Shaders\BoneHighlight.slang" />
     <None Include="..\EngineContent\Shaders\CopyPixel.slang" />
     <None Include="..\EngineContent\Shaders\CustomDepthPass.slang" />
+    <None Include="..\EngineContent\Shaders\DebugGraphicsPass.slang" />
     <None Include="..\EngineContent\Shaders\DefaultMaterial.slang" />
     <None Include="..\EngineContent\Shaders\LightmapGBufferGen.slang" />
     <None Include="..\EngineContent\Shaders\ForwardBasePass.slang" />

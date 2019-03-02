@@ -44,6 +44,7 @@ namespace GameEngine
 		RefPtr<WorldRenderPass> shadowRenderPass;
 		RefPtr<WorldRenderPass> forwardRenderPass;
         RefPtr<WorldRenderPass> customDepthRenderPass;
+        RefPtr<WorldRenderPass> debugGraphicsRenderPass;
 
 		RefPtr<PostRenderPass> atmospherePass;
 		RefPtr<PostRenderPass> toneMappingFromAtmospherePass;
@@ -57,7 +58,7 @@ namespace GameEngine
 
 		StandardViewUniforms viewUniform;
 
-		RefPtr<WorldPassRenderTask> forwardBaseInstance, transparentPassInstance, customDepthPassInstance;
+		RefPtr<WorldPassRenderTask> forwardBaseInstance, transparentPassInstance, customDepthPassInstance, debugGraphicsPassInstance;
 
 		DeviceMemory renderPassUniformMemory;
 		SharedModuleInstances sharedModules;
@@ -127,6 +128,9 @@ namespace GameEngine
 			
 			forwardRenderPass = CreateForwardBaseRenderPass();
 			forwardRenderPass->Init(renderer);
+
+            debugGraphicsRenderPass = CreateDebugGraphicsRenderPass();
+            debugGraphicsRenderPass->Init(renderer);
 
             customDepthRenderPass = CreateCustomDepthRenderPass();
             customDepthRenderPass->Init(renderer);
@@ -228,6 +232,9 @@ namespace GameEngine
 			forwardBaseOutput->GetSize(w, h);
 			forwardBaseInstance = forwardRenderPass->CreateInstance(forwardBaseOutput, true);
 
+            debugGraphicsRenderPass->ResetInstancePool();
+            debugGraphicsPassInstance = debugGraphicsRenderPass->CreateInstance(forwardBaseOutput, false);
+
             customDepthRenderPass->ResetInstancePool();
             customDepthPassInstance = customDepthRenderPass->CreateInstance(customDepthOutput, true);
 
@@ -315,9 +322,11 @@ namespace GameEngine
 			sharedRes->pipelineManager.PushModuleInstance(&viewParams);
 			sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
 			forwardBaseInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
+            debugGraphicsPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, Engine::GetDebugGraphics()->GetDrawables());
 			sharedRes->pipelineManager.PopModuleInstance();
 			sharedRes->pipelineManager.PopModuleInstance();
 			task.AddTask(forwardBaseInstance);
+            task.AddTask(debugGraphicsPassInstance);
 			task.AddImageTransferTask(CoreLib::ArrayView<Texture*>(), textures.GetArrayView());
 
 			if (useAtmosphere)

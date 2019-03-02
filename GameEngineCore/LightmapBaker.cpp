@@ -1,3 +1,4 @@
+#include "LightmapBaker.h"
 #include "ObjectSpaceGBufferRenderer.h"
 #include "StaticSceneRenderer.h"
 #include "ObjectSpaceMapSet.h"
@@ -14,22 +15,20 @@ namespace GameEngine
     class LightmapBaker
     {
     public:
-        float ResolutionScale = 16.0f;
-        int MinResolution = 8;
-        int MaxResolution = 1024;
+        LightmapBakingSettings settings;
+    private:
         struct RawMapSet
         {
-            RawObjectSpaceMap lightmap, diffuseMap, normalMap, positionMap;
+            RawObjectSpaceMap lightMap, diffuseMap, normalMap, positionMap;
             void Init(int w, int h)
             {
-                lightmap.Init(RawObjectSpaceMap::DataType::RGB32F, w, h);
+                lightMap.Init(RawObjectSpaceMap::DataType::RGB32F, w, h);
                 diffuseMap.Init(RawObjectSpaceMap::DataType::RGBA8, w, h);
                 normalMap.Init(RawObjectSpaceMap::DataType::RGB10_X2_SIGNED, w, h);
                 positionMap.Init(RawObjectSpaceMap::DataType::RGB32F, w, h);
             }
         };
-        EnumerableDictionary<String, RawMapSet> maps;
-    private:
+        EnumerableDictionary<Actor*, RawMapSet> maps;
         Level* level = nullptr;
         RefPtr<StaticScene> staticScene;
         void AllocLightmaps()
@@ -41,9 +40,9 @@ namespace GameEngine
                 if (auto smActor = actor.Value.As<StaticMeshActor>())
                 {
                     auto size = (smActor->Bounds.Max - smActor->Bounds.Min).Length();
-                    int resolution = Math::Clamp(1 << Math::Log2Ceil((int)(size * ResolutionScale)), MinResolution, MaxResolution);
-                    maps[smActor->Name] = RawMapSet();
-                    maps[smActor->Name]().Init(resolution, resolution);
+                    int resolution = Math::Clamp(1 << Math::Log2Ceil((int)(size * settings.ResolutionScale)), settings.MinResolution, settings.MaxResolution);
+                    maps[smActor.Ptr()] = RawMapSet();
+                    maps[smActor.Ptr()]().Init(resolution, resolution);
                 }
             }
         }
@@ -54,7 +53,7 @@ namespace GameEngine
             renderer->Init(Engine::Instance()->GetRenderer()->GetHardwareRenderer(), Engine::Instance()->GetRenderer()->GetRendererService(), "LightmapGBufferGen.slang");
             for (auto actor : level->Actors)
             {
-                auto map = maps.TryGetValue(actor.Key);
+                auto map = maps.TryGetValue(actor.Value.Ptr());
                 if (!map) continue;
                 RefPtr<Texture2D> texDiffuse = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, map->diffuseMap.Width, map->diffuseMap.Height, 1, StorageFormat::RGBA_8);
                 RefPtr<Texture2D> texPosition = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, map->positionMap.Width, map->positionMap.Height, 1, StorageFormat::RGBA_F32);
@@ -71,7 +70,6 @@ namespace GameEngine
                 formats[2] = StorageFormat::RGBA_F32;
                 renderer->RenderObjectSpaceMap(dest.GetArrayView(), formats.GetArrayView(), actor.Value.Ptr(), map->diffuseMap.Width, map->diffuseMap.Height);
                 texDiffuse->GetData(0, map->diffuseMap.GetBuffer(), map->diffuseMap.Width*map->diffuseMap.Height * sizeof(uint32_t));
-                map->diffuseMap.SaveToFile("test.bmp");
                 List<float> buffer;
                 buffer.SetSize(map->positionMap.Width * map->positionMap.Height * 4);
                 texPosition->GetData(0, buffer.Buffer(), map->positionMap.Width*map->positionMap.Height * sizeof(float) * 4);
@@ -91,28 +89,133 @@ namespace GameEngine
                 }
             }
         }
+
+        void RenderDebugView(String fileName, LightmapSet & lightmaps)
+        {
+            List<RawObjectSpaceMap> diffuseMaps;
+            diffuseMaps.SetSize(staticScene->MapIds.Count());
+            for (auto mid : staticScene->MapIds)
+            {
+                diffuseMaps[mid.Value] = maps[mid.Key]().diffuseMap;
+            }
+            RefPtr<StaticSceneRenderer> staticRenderer = CreateStaticSceneRenderer();
+            staticRenderer->SetCamera(level->CurrentCamera->GetCameraTransform(), level->CurrentCamera->FOV, 1024, 1024);
+            auto & image = staticRenderer->Render(staticScene.Ptr(), diffuseMaps, lightmaps);
+            image.GetImageRef().SaveAsBmpFile(fileName);
+        }
+
+        float Lerp(float a, float b, float t)
+        {
+            return a * (1.0f - t) + b * t;
+        }
+
+        VectorMath::Vec3 TraceShadowRay(Ray & shadowRay)
+        {
+            auto inter = staticScene->TraceRay(shadowRay);
+            if (inter.IsHit)
+                return VectorMath::Vec3::Create(0.0f, 0.0f, 0.0f);
+
+            return VectorMath::Vec3::Create(1.0f, 1.0f, 1.0f);
+        }
+
+        VectorMath::Vec3 ComputeDirectLighting(VectorMath::Vec3 pos, VectorMath::Vec3 normal)
+        {
+            VectorMath::Vec3 result;
+            result.SetZero();
+            for (auto & light : staticScene->lights)
+            {
+                switch (light.Type)
+                {
+                case StaticLightType::Directional:
+                {
+                    auto l = light.Direction;
+                    auto nDotL = VectorMath::Vec3::Dot(normal, l);
+                    Ray shadowRay;
+                    shadowRay.tMax = FLT_MAX;
+                    shadowRay.Origin = pos + normal * settings.ShadowBias + l * settings.ShadowBias;
+                    shadowRay.Dir = l;
+                    auto shadowFactor = TraceShadowRay(shadowRay);
+                    result += light.Intensity * shadowFactor * Math::Max(0.0f, nDotL);
+                    break;
+                }
+                case StaticLightType::Point:
+                case StaticLightType::Spot:
+                {
+                    auto l = light.Position - pos;
+                    auto dist = l.Length();
+                    if (dist < light.Radius)
+                    {
+                        auto invDist = 1.0f / dist;
+                        l *= invDist;
+                        auto nDotL = VectorMath::Vec3::Dot(normal, l);
+                        float actualDecay = 1.0f / Math::Max(1.0f, dist * light.Decay);
+                        if (light.Type == StaticLightType::Spot)
+                        {
+                            float ang = acos(VectorMath::Vec3::Dot(l, light.Direction));
+                            actualDecay *= Lerp(1.0, 0.0, Math::Clamp((ang - light.SpotFadingStartAngle) / (light.SpotFadingEndAngle - light.SpotFadingStartAngle), 0.0f, 1.0f));
+                        }
+                        Ray shadowRay;
+                        shadowRay.tMax = dist;
+                        shadowRay.Origin = pos + normal * settings.ShadowBias + l * settings.ShadowBias;
+                        shadowRay.Dir = l;
+                        auto shadowFactor = TraceShadowRay(shadowRay);
+                        result += light.Intensity * actualDecay * shadowFactor * Math::Max(0.0f, nDotL);
+                    }
+                    break;
+                }
+                }
+            }
+            return result;
+        }
+
+        void ComputeLightmaps(LightmapSet& lightmaps)
+        {
+            for (auto & map : maps)
+            {
+                int imageSize = map.Value.diffuseMap.Width * map.Value.diffuseMap.Height;
+                #pragma omp parallel for
+                for (int pixelIdx = 0; pixelIdx < imageSize; pixelIdx++)
+                {
+                    int x = pixelIdx % map.Value.diffuseMap.Width;
+                    int y = pixelIdx / map.Value.diffuseMap.Width;
+                    VectorMath::Vec4 lighting;
+                    lighting.SetZero();
+                    if (x == 140 && y == 587)
+                        printf("break");
+                    auto diffuse = map.Value.diffuseMap.GetPixel(x, y);
+                    // compute lighting only for lightmap pixels that represent valid surface regions
+                    if (diffuse.x > 1e-6f || diffuse.y > 1e-6f || diffuse.z > 1e-6f)
+                    {
+                        auto pos = map.Value.positionMap.GetPixel(x, y).xyz();
+                        auto normal = map.Value.normalMap.GetPixel(x, y).xyz().Normalize();
+                        lighting = VectorMath::Vec4::Create(ComputeDirectLighting(pos, normal), 1.0f);
+                    }
+                    map.Value.lightMap.SetPixel(x, y, lighting);
+                }
+            }
+            // move lightmaps to return value
+            lightmaps.Lightmaps.SetSize(maps.Count());
+            for (auto mid : staticScene->MapIds)
+            {
+                lightmaps.Lightmaps[mid.Value] = _Move(maps[mid.Key]().lightMap);
+            }
+        }
     public:
-        void BakeLightmaps(EnumerableDictionary<String, RawObjectSpaceMap>& lightmaps, Level* pLevel)
+        void BakeLightmaps(LightmapSet& lightmaps, Level* pLevel)
         {
             level = pLevel;
             AllocLightmaps();
             BakeLightmapGBuffers();
             staticScene = BuildStaticScene(level);
-
-            RefPtr<StaticSceneRenderer> staticRenderer = CreateStaticSceneRenderer();
-            staticRenderer->SetCamera(pLevel->CurrentCamera->GetCameraTransform(), pLevel->CurrentCamera->FOV, 1024, 1024);
-            List<RawObjectSpaceMap> diffuseMaps;
-            diffuseMaps.SetSize(staticScene->MapIds.Count());
-            for (auto mid : staticScene->MapIds)
-                diffuseMaps[mid.Value] = maps[mid.Key->Name.GetValue()]().diffuseMap;
-            auto & image = staticRenderer->Render(staticScene.Ptr(), diffuseMaps);
-            image.GetImageRef().SaveAsBmpFile("StaticSceneRender.bmp");
+            ComputeLightmaps(lightmaps);
+            RenderDebugView("LightmapView.bmp", lightmaps);
         }
     };
 
-    void BakeLightmaps(EnumerableDictionary<String, RawObjectSpaceMap>& lightmaps, Level* pLevel)
+    void BakeLightmaps(LightmapSet& lightmaps, const LightmapBakingSettings & settings, Level* pLevel)
     {
         LightmapBaker baker;
+        baker.settings = settings;
         baker.BakeLightmaps(lightmaps, pLevel);
     }
 }

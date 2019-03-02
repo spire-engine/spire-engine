@@ -11,6 +11,7 @@ namespace GameEngine
 	class ViewResource;
 
 	DECLARE_WORLD_RENDER_PASS(ForwardBase);
+    DECLARE_WORLD_RENDER_PASS(DebugGraphics);
 	DECLARE_WORLD_RENDER_PASS(GBuffer);
 	DECLARE_WORLD_RENDER_PASS(Shadow);
     DECLARE_WORLD_RENDER_PASS(CustomDepth);

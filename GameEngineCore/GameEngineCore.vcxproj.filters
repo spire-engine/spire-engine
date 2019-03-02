@@ -193,6 +193,12 @@
     <ClCompile Include="VulkanAPI\volk.c">
       <Filter>Renderer\RenderAPI\Vulkan API</Filter>
     </ClCompile>
+    <ClCompile Include="DebugGraphicsRenderPass.cpp">
+      <Filter>Renderer\WorldPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="DebugGraphics.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -408,6 +414,12 @@
     <ClInclude Include="VulkanAPI\vulkan.h">
       <Filter>Renderer\RenderAPI\Vulkan API</Filter>
     </ClInclude>
+    <ClInclude Include="LightmapSet.h">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="DebugGraphics.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Actors">
@@ -497,6 +509,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="..\EngineContent\Shaders\LightmapGBufferGen.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\DebugGraphicsPass.slang">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
