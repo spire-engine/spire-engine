@@ -7,6 +7,7 @@
 namespace GameEngine
 {
     class Drawable;
+    class RendererService;
 
     class DebugGraphics : public CoreLib::RefObject
     {
@@ -14,7 +15,7 @@ namespace GameEngine
         virtual void Clear() = 0;
         virtual void AddLine(VectorMath::Vec4 color, VectorMath::Vec3 v0, VectorMath::Vec3 v1) = 0;
         virtual void AddTriangle(VectorMath::Vec4 color, VectorMath::Vec3 v0, VectorMath::Vec3 v1, VectorMath::Vec3 v2) = 0;
-        virtual CoreLib::ArrayView<Drawable*> GetDrawables() = 0;
+        virtual CoreLib::ArrayView<Drawable*> GetDrawables(RendererService* rendererService) = 0;
     };
 
     DebugGraphics* CreateDebugGraphics();

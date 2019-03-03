@@ -63,10 +63,13 @@ namespace GameEngine
 
 			virtual CoreLib::RefPtr<Drawable> CreateStaticDrawable(Mesh * mesh, int elementId, Material * material, bool cacheMesh) override
 			{
+                if (!material)
+                    material = Engine::Instance()->GetLevel()->LoadErrorMaterial();
 				if (!material->MaterialModule)
 					renderer->sceneRes->RegisterMaterial(material);
 				RefPtr<Drawable> rs = CreateDrawableShared(mesh, material, cacheMesh);
 				rs->type = DrawableType::Static;
+                rs->primType = mesh->GetPrimitiveType();
 				rs->elementRange = mesh->ElementRanges[elementId];
 				CreateTransformModuleInstance(*rs->transformModule, "StaticMeshTransform", (int)(sizeof(Vec4) * 4));
 				rs->vertFormat = mesh->GetVertexFormat();
@@ -78,6 +81,7 @@ namespace GameEngine
 					renderer->sceneRes->RegisterMaterial(material);
 				RefPtr<Drawable> rs = CreateDrawableShared(mesh, material, cacheMesh);
 				rs->type = DrawableType::Skeletal;
+                rs->primType = mesh->GetPrimitiveType();
 				rs->elementRange = mesh->ElementRanges[elementId];
 				rs->skeleton = skeleton;
 				int poseMatrixSize = skeleton->Bones.Count() * (sizeof(Vec4) * 4);

@@ -117,6 +117,7 @@ namespace GameEngine
 		int modulePtr = 0;
 		ShaderKey lastKey; 
 		unsigned int lastVtxId = 0;
+        PrimitiveType lastPrimType = PrimitiveType::Triangles;
         bool shaderKeyChanged = true; 
         ShaderEntryPoint* vertexShaderEntryPoint, *fragmentShaderEntryPoint;
 		ModuleInstance* modules[32];
@@ -128,8 +129,8 @@ namespace GameEngine
 		HardwareRenderer * hwRenderer;
 		RenderStat * renderStats = nullptr;
 		CoreLib::Dictionary<int, VertexFormat> vertexFormats;
-		PipelineClass * GetPipelineInternal(MeshVertexFormat * vertFormat, int vtxId);
-		PipelineClass* CreatePipeline(MeshVertexFormat * vertFormat);
+		PipelineClass * GetPipelineInternal(MeshVertexFormat * vertFormat, int vtxId, PrimitiveType primType);
+		PipelineClass* CreatePipeline(MeshVertexFormat * vertFormat, PrimitiveType primType);
 	public:
 		PipelineContext() = default;
 		void Init(HardwareRenderer * hw, RenderStat * pRenderStats)
@@ -184,12 +185,12 @@ namespace GameEngine
 				    bindings.Add(dset);
             }
 		}
-		inline PipelineClass* GetPipeline(MeshVertexFormat * vertFormat)
+		inline PipelineClass* GetPipeline(MeshVertexFormat * vertFormat, PrimitiveType primType)
 		{
 			unsigned int vtxId = (unsigned int)vertFormat->GetTypeId();
-			if (!shaderKeyChanged && vtxId == lastVtxId)
+			if (!shaderKeyChanged && vtxId == lastVtxId && primType == lastPrimType)
 				return lastPipeline;
-			return GetPipelineInternal(vertFormat, vtxId);
+			return GetPipelineInternal(vertFormat, vtxId, primType);
 		}
 	};
 }

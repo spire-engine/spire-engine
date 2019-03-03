@@ -322,10 +322,16 @@ namespace GameEngine
 			sharedRes->pipelineManager.PushModuleInstance(&viewParams);
 			sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
 			forwardBaseInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
-            debugGraphicsPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, Engine::GetDebugGraphics()->GetDrawables());
 			sharedRes->pipelineManager.PopModuleInstance();
 			sharedRes->pipelineManager.PopModuleInstance();
 			task.AddTask(forwardBaseInstance);
+
+            debugGraphicsRenderPass->Bind();
+            sharedRes->pipelineManager.PushModuleInstance(&viewParams);
+            debugGraphicsPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer,
+                Engine::GetDebugGraphics()->GetDrawables(Engine::Instance()->GetRenderer()->GetRendererService()));
+            sharedRes->pipelineManager.PopModuleInstance();
+
             task.AddTask(debugGraphicsPassInstance);
 			task.AddImageTransferTask(CoreLib::ArrayView<Texture*>(), textures.GetArrayView());
 

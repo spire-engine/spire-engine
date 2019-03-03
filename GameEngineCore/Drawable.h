@@ -49,6 +49,7 @@ namespace GameEngine
 	private:
 		DrawableType type = DrawableType::Static;
 		MeshVertexFormat vertFormat;
+        PrimitiveType primType = PrimitiveType::Triangles;
 		CoreLib::RefPtr<DrawableMesh> mesh = nullptr;
 		MeshElementRange elementRange;
 		Material * material = nullptr;
@@ -81,6 +82,10 @@ namespace GameEngine
 		{
 			return vertFormat;
 		}
+        PrimitiveType GetPrimitiveType()
+        {
+            return primType;
+        }
 		MeshElementRange GetElementRange()
 		{
 			return elementRange;

@@ -40,41 +40,18 @@ ParameterBlock<SPECIALIZATION_TYPE_2> gWorldTransform;
 struct VSOutput
 {
 	float4 projPos : SV_POSITION;
-    centroid float3 worldPos;
-    centroid float3 normal, tangent;
-    float binormalSign;
-    SPECIALIZATION_TYPE_3.ColorSet vertColorSet;
-    SPECIALIZATION_TYPE_3.UVSet vertUVSet;
-    SPECIALIZATION_TYPE_3.BoneWeightSet.PackedType vertBoneWeightSet;
+    float4 color;
 };
 
 VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
 {
 	VSOutput rs;
-    rs.vertColorSet = vertexIn.getColorSet();
-    rs.vertUVSet = vertexIn.getUVSet();
-    rs.vertBoneWeightSet = vertexIn.getBoneWeightSet().getPackedRepresentation();
-
-    VertexAttribs<SPECIALIZATION_TYPE_3.UVSet, SPECIALIZATION_TYPE_3.ColorSet, SPECIALIZATION_TYPE_3.BoneWeightSet> vattribs;
-    vattribs.uvSet = rs.vertUVSet;
-    vattribs.colorSet = rs.vertColorSet;
-    vattribs.boneWeightSet.setPackedRepresentation(rs.vertBoneWeightSet);
-
-    VertexPositionInfo vin;
-    vin.vertPos = vertexIn.getPos();
-    vin.tangentFrame = vertexIn.getTangentFrame();
-    VertexPositionInfo worldPos = gWorldTransform.getWorldSpacePos(vin, vattribs);
-    rs.normal = worldPos.tangentFrame.vertNormal;
-    rs.tangent = worldPos.tangentFrame.vertTangent;
-    rs.binormalSign = worldPos.tangentFrame.binormalSign;
-    
-    float3 displacement = gMaterial.getDisplacement(worldPos, vattribs, gView);
-    rs.worldPos = worldPos.vertPos + displacement;
-    rs.projPos = mul(gView.viewProjectionTransform, float4(rs.worldPos, 1.0));
+    rs.color = vertexIn.getColorSet().getColor(0);
+    rs.projPos = mul(gView.viewProjectionTransform, float4(vertexIn.getPos(), 1.0));
     return rs;
 }
 
 float4 ps_main(VSOutput vsOut)
 {
-    return vsOut.vertColorSet.getColor(0);
+    return vsOut.color;
 }

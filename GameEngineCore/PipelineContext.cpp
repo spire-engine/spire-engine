@@ -54,16 +54,17 @@ namespace GameEngine
 		return rs;
 	}
 
-	PipelineClass * PipelineContext::GetPipelineInternal(MeshVertexFormat * vertFormat, int vtxId)
+	PipelineClass * PipelineContext::GetPipelineInternal(MeshVertexFormat * vertFormat, int vtxId, PrimitiveType primType)
 	{
 		shaderKeyChanged = false;
 		lastVtxId = vtxId;
-
+        lastPrimType = primType;
 		shaderKeyBuilder.Clear();
 		shaderKeyBuilder.Append(fragmentShaderEntryPoint->Id);
 		shaderKeyBuilder.FlipLeadingByte(vtxId);
 		for (int i = 0; i < modulePtr; i++)
 			shaderKeyBuilder.Append(modules[i]->ModuleId);
+        shaderKeyBuilder.Append((unsigned int)primType);
 		/*
 		if (shaderKeyBuilder.Key == lastKey)
 		{
@@ -76,15 +77,16 @@ namespace GameEngine
 			return pipeline->Ptr();
 		}
 		//lastKey = shaderKeyBuilder.Key;
-		lastPipeline = CreatePipeline(vertFormat);
+		lastPipeline = CreatePipeline(vertFormat, primType);
 		return lastPipeline;
 	}
 
-	PipelineClass * PipelineContext::CreatePipeline(MeshVertexFormat * vertFormat)
+	PipelineClass * PipelineContext::CreatePipeline(MeshVertexFormat * vertFormat, PrimitiveType primType)
 	{
 		RefPtr<PipelineBuilder> pipelineBuilder = hwRenderer->CreatePipelineBuilder();
 
 		pipelineBuilder->FixedFunctionStates = fixedFunctionStates;
+        pipelineBuilder->FixedFunctionStates.PrimitiveTopology = primType;
 
 		// Set vertex layout
 		pipelineBuilder->SetVertexLayout(LoadVertexFormat(*vertFormat));

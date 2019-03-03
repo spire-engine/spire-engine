@@ -87,11 +87,6 @@ namespace GameEngine
 		Interleaved, Split
 	};
 
-	enum class PrimitiveMode
-	{
-		Points = 0, Triangles = 0x004
-	};
-
 	enum class PrimitiveType
 	{
 		Points = 0, Lines = 1, LineStrips = 3, Triangles = 4, TriangleStrips = 5, TriangleFans = 6, Quads = 7, Patches = 14

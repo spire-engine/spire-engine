@@ -28,11 +28,42 @@ namespace GameEngine
 		return true;
 	}
 
+    static PrimitiveType ReadPrimitiveType(int ptype)
+    {
+        switch (ptype)
+        {
+        case 0:
+            return PrimitiveType::Triangles;
+        case 1:
+            return PrimitiveType::Lines;
+        case 2:
+            return PrimitiveType::Points;
+        default:
+            return PrimitiveType::Triangles;
+        }
+    }
+
+    static int WritePrimitiveType(PrimitiveType ptype)
+    {
+        switch (ptype)
+        {
+        case PrimitiveType::Triangles:
+            return 0;
+        case PrimitiveType::Lines:
+            return 1;
+        case PrimitiveType::Points:
+            return 2;
+        default:
+            throw ArgumentException("unsupported mesh primitive type");
+        }
+    }
+
 	void Mesh::LoadFromStream(Stream * stream)
 	{
 		auto reader = BinaryReader(stream);
 		MeshHeader header;
 		reader.Read(header);
+        primitiveType = ReadPrimitiveType(header.PrimitiveType);
 		if (!CheckMeshIdentifier(header.MeshFileIdentifier))
 		{
 			stream->Seek(SeekOrigin::Start, 0);
@@ -76,6 +107,7 @@ namespace GameEngine
 		auto writer = BinaryWriter(stream);
 		MeshHeader header;
 		header.ElementCount = ElementRanges.Count();
+        header.PrimitiveType = WritePrimitiveType(primitiveType);
 		writer.Write(header);
 		writer.Write(GetVertexTypeId());
 		writer.Write(vertCount);

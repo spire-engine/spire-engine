@@ -570,7 +570,7 @@ interface IMaterial
 
 interface IVertexColorSet
 {
-	float3 getColor(int index);
+	float4 getColor(int index);
 };
 
 interface IVertexUVSet
@@ -580,7 +580,7 @@ interface IVertexUVSet
 
 interface IVertexAttribs
 {
-	float3 getColor(int index);
+	float4 getColor(int index);
 	float2 getUV(int index);
 	uint getBoneId(int index);
 	float getBoneWeight(int index);
@@ -592,7 +592,7 @@ struct VertexAttribs<TVertexUVSet : IVertexUVSet, TColorSet : IVertexColorSet, T
 	TVertexUVSet uvSet;
 	TColorSet colorSet;
 	TBoneWeightSet boneWeightSet;
-	float3 getColor(int index) {return colorSet.getColor(index);}
+	float4 getColor(int index) {return colorSet.getColor(index);}
 	float2 getUV(int index) { return uvSet.getUV(index); }
 	uint getBoneId(int index)
 	{
@@ -610,21 +610,21 @@ struct VertexAttribs<TVertexUVSet : IVertexUVSet, TColorSet : IVertexColorSet, T
 
 struct VertexColorSet0 : IVertexColorSet
 {
-	float3 getColor(int index) { return 0.0; }
+	float4 getColor(int index) { return 0.0; }
 };
 
 struct VertexColorSet1 : IVertexColorSet
 {
-    float3 value : COLOR0;
-	float3 getColor(int index) { return value; }
+    float4 value : COLOR0;
+	float4 getColor(int index) { return value; }
 };
 
 struct VertexColorSet2 : IVertexColorSet
 {
-    float3 value0 : COLOR0;
-    float3 value1 : COLOR1;
+    float4 value0 : COLOR0;
+    float4 value1 : COLOR1;
 
-	float3 getColor(int index)
+	float4 getColor(int index)
 	{
 		switch (index)
 		{
@@ -640,10 +640,10 @@ struct VertexColorSet2 : IVertexColorSet
 
 struct VertexColorSet3 : IVertexColorSet
 {
-    float3 value0 : COLOR0;
-    float3 value1 : COLOR1;
-	float3 value2 : COLOR2;
-	float3 getColor(int index)
+    float4 value0 : COLOR0;
+    float4 value1 : COLOR1;
+	float4 value2 : COLOR2;
+	float4 getColor(int index)
 	{
 		switch (index)
 		{
@@ -661,12 +661,12 @@ struct VertexColorSet3 : IVertexColorSet
 
 struct VertexColorSet4 : IVertexColorSet
 {
-    float3 value0 : COLOR0;
-    float3 value1 : COLOR1;
-	float3 value2 : COLOR2;
-	float3 value3 : COLOR3;
+    float4 value0 : COLOR0;
+    float4 value1 : COLOR1;
+	float4 value2 : COLOR2;
+	float4 value3 : COLOR3;
 
-	float3 getColor(int index)
+	float4 getColor(int index)
 	{
 		switch (index)
 		{

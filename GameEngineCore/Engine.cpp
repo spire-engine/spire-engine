@@ -429,6 +429,26 @@ namespace GameEngine
 			parser.ReadToken();
 			mainWindow->GetUIEntry()->ShowWindow(drawCallStatForm);
 		}
+        else if (parser.LookAhead("debugline"))
+        {
+            parser.ReadToken();
+            debugGraphics->AddLine(VectorMath::Vec4::Create(1.0f, 0.0f, 0.0f, 1.0f),
+                Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()),
+                Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()));
+        }
+        else if (parser.LookAhead("debugtriangle"))
+        {
+            parser.ReadToken();
+            debugGraphics->AddTriangle(VectorMath::Vec4::Create(0.0f, 1.0f, 0.0f, 1.0f),
+                Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()),
+                Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()),
+                Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()));
+        }
+        else if (parser.LookAhead("debugclear"))
+        {
+            parser.ReadToken();
+            debugGraphics->Clear();
+        }
 		else if (parser.LookAhead("saveframe"))
 		{
 			try

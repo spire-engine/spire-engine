@@ -20,7 +20,7 @@ namespace GameEngine
 	{
 		if (!Engine::Instance()->GetGraphicsSettings().UsePipelineCache || pipelineCache[passId] == nullptr)
 		{
-			auto rs = pipelineManager.GetPipeline(&vertFormat);
+			auto rs = pipelineManager.GetPipeline(&vertFormat, primType);
 			pipelineCache[passId] = rs;
 		}
 		return pipelineCache[passId];

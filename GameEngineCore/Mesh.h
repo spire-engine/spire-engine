@@ -5,6 +5,7 @@
 #include "CoreLib/VectorMath.h"
 #include "CoreLib/Graphics/BBox.h"
 #include "CoreLib/LibIO.h"
+#include "HardwareRenderer.h"
 #include <assert.h>
 
 namespace GameEngine
@@ -85,7 +86,8 @@ namespace GameEngine
 		char MeshFileIdentifier[6] = {'M', 'E', 'S', 'H', '|', 'Y'};
 		int MeshFileVersion = CurrentMeshFileVersion;
 		int ElementCount = 0;
-		int Reserved[8] = { 0,0,0,0,0,0,0,0 };
+        int PrimitiveType = 0; // 0 = Triangles
+		int Reserved[7] = { 0,0,0,0,0,0,0 };
 	};
 
 	struct MeshElementRange
@@ -98,6 +100,7 @@ namespace GameEngine
 	private:
 		static int uid;
 		MeshVertexFormat vertexFormat;
+        PrimitiveType primitiveType = PrimitiveType::Triangles;
 		CoreLib::Basic::List<unsigned char> vertexData;
 		int vertCount = 0;
 		CoreLib::String fileName;
@@ -117,6 +120,14 @@ namespace GameEngine
 		{
 			return *(VectorMath::Vec3*)((unsigned char *)vertexData.Buffer() + vertId * vertexFormat.GetVertexSize());
 		}
+        void SetPrimitiveType(PrimitiveType type)
+        {
+            primitiveType = type;
+        }
+        PrimitiveType GetPrimitiveType()
+        {
+            return primitiveType;
+        }
 		void SetVertexUV(int vertId, int channelId, const VectorMath::Vec2 & uv)
 		{
 			auto destUV = (unsigned short*)((unsigned char *)vertexData.Buffer() + vertId * vertexFormat.GetVertexSize() + vertexFormat.GetUVOffset(channelId));

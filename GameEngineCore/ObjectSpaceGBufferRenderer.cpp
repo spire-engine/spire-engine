@@ -114,7 +114,7 @@ namespace GameEngine
                 DescriptorSetBindingArray bindings;
                 pipeContext.PushModuleInstance(&drawable->GetMaterial()->MaterialModule);
                 pipeContext.PushModuleInstance(drawable->GetTransformModule());
-                auto pipeline = pipeContext.GetPipeline(&drawable->GetVertexFormat());
+                auto pipeline = pipeContext.GetPipeline(&drawable->GetVertexFormat(), drawable->GetPrimitiveType());
                 cmdBuffer->BindPipeline(pipeline->pipeline.Ptr());
                 pipeContext.GetBindings(bindings);
                 for (int i = 0; i < bindings.Count(); i++)

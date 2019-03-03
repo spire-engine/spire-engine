@@ -1,6 +1,8 @@
+import ShaderLib;
+
 struct SolidColorMaterial : IMaterial
 {
-    vec3 solidColor;
+    float3 solidColor;
     typedef PbrMaterialPattern<NoSelfShadow> MaterialPattern;
     float3 getDisplacement<TVertAttribs : IVertexAttribs>(VertexPositionInfo shadingPoint, TVertAttribs vertAttribs, ViewParams viewParams)
     {
@@ -20,4 +22,4 @@ struct SolidColorMaterial : IMaterial
         rs.isDoubleSided = false;
         return rs;
     }
-}
+};
