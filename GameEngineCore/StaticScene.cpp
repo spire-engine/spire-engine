@@ -14,6 +14,7 @@ namespace GameEngine
     {
         Vec3 verts[3];
         Vec2 uvs[3];
+        Vec3 normal;
         int mapId;
     };
     
@@ -52,6 +53,7 @@ namespace GameEngine
                 t = inter.T = temp;
                 inter.IsHit = true;
                 inter.MapId = face.mapId;
+                inter.Normal = face.normal;
                 inter.UV = face.uvs[0] * (1.0f - b1 - b2) + face.uvs[1] * b1 + face.uvs[2] * b2;
                 return true;
             }
@@ -93,6 +95,7 @@ namespace GameEngine
                 int vid = mesh->Indices[i * 3 + j];
                 f.uvs[j] = mesh->GetVertexUV(vid, uvChannelId);
                 f.verts[j] = localTransform.Transform(Vec4::Create(mesh->GetVertexPosition(vid), 1.0f)).xyz();
+                f.normal = Vec3::Cross(f.verts[1] - f.verts[0], f.verts[2] - f.verts[0]).Normalize();
             }
             faces.Add(f);
         }

@@ -9,7 +9,7 @@ namespace GameEngine
     class Level;
     struct LightmapBakingSettings
     {
-        float ResolutionScale = 16.0f;
+        float ResolutionScale = 1.0f;
         int MinResolution = 8;
         int MaxResolution = 1024;
         int SampleCount = 16;

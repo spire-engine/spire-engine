@@ -16,6 +16,8 @@ namespace GameEngine
             return 4;
         case RawObjectSpaceMap::DataType::RGB32F:
             return 12;
+        case RawObjectSpaceMap::DataType::RGBA32F:
+            return 16;
         }
         return 0;
     }
@@ -29,6 +31,8 @@ namespace GameEngine
             return UnpackRGBA8(((uint32_t*)data.Buffer())[y*Height + x]);
         case RawObjectSpaceMap::DataType::RGB32F:
             return VectorMath::Vec4::Create(((VectorMath::Vec3*)data.Buffer())[y*Height + x], 1.0f);
+        case RawObjectSpaceMap::DataType::RGBA32F:
+            return ((VectorMath::Vec4*)data.Buffer())[y*Height + x];
         }
         return VectorMath::Vec4::Create(0.0f);
     }
@@ -50,6 +54,9 @@ namespace GameEngine
             break;
         case RawObjectSpaceMap::DataType::RGB32F:
             ((VectorMath::Vec3*)data.Buffer())[y*Height + x] = value.xyz();
+            break;
+        case RawObjectSpaceMap::DataType::RGBA32F:
+            ((VectorMath::Vec4*)data.Buffer())[y*Height + x] = value;
             break;
         }
     }

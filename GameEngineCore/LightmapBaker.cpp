@@ -25,7 +25,7 @@ namespace GameEngine
                 lightMap.Init(RawObjectSpaceMap::DataType::RGB32F, w, h);
                 diffuseMap.Init(RawObjectSpaceMap::DataType::RGBA8, w, h);
                 normalMap.Init(RawObjectSpaceMap::DataType::RGB10_X2_SIGNED, w, h);
-                positionMap.Init(RawObjectSpaceMap::DataType::RGB32F, w, h);
+                positionMap.Init(RawObjectSpaceMap::DataType::RGBA32F, w, h);
             }
         };
         EnumerableDictionary<Actor*, RawMapSet> maps;
@@ -46,8 +46,37 @@ namespace GameEngine
                 }
             }
         }
+        template<typename TResult, typename TSource, typename TSelectFunc>
+        void ReadAndDownSample(Texture2D* texture, TResult* dstBuffer, TSource srcZero, int w, int h, int superSample, const TSelectFunc & select)
+        {
+            auto dstZero = select(srcZero);
+            List<TSource> buffer;
+            buffer.SetSize(w * h);
+            texture->GetData(0, buffer.Buffer(), w * h * sizeof(TSource));
+            for (int y = 0; y < h / superSample; y++)
+                for (int x = 0; x < w / superSample; x++)
+                {
+                    int destId = y * (h / superSample) + x;
+                    dstBuffer[destId] = dstZero;
+                    for (int xx = 0; xx < superSample; xx++)
+                    {
+                        for (int yy = 0; yy < superSample; yy++)
+                        {
+                            auto src = buffer[(y + yy) * w + x + xx];
+                            if (src != srcZero)
+                            {
+                                dstBuffer[destId] = select(src);
+                                goto procEnd;
+                            }
+                        }
+                    }
+                procEnd:;
+                }
+
+        }
         void BakeLightmapGBuffers()
         {
+            const int SuperSampleFactor = 1;
             HardwareRenderer* hwRenderer = Engine::Instance()->GetRenderer()->GetHardwareRenderer();
             RefPtr<ObjectSpaceGBufferRenderer> renderer = CreateObjectSpaceGBufferRenderer();
             renderer->Init(Engine::Instance()->GetRenderer()->GetHardwareRenderer(), Engine::Instance()->GetRenderer()->GetRendererService(), "LightmapGBufferGen.slang");
@@ -55,38 +84,32 @@ namespace GameEngine
             {
                 auto map = maps.TryGetValue(actor.Value.Ptr());
                 if (!map) continue;
-                RefPtr<Texture2D> texDiffuse = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, map->diffuseMap.Width, map->diffuseMap.Height, 1, StorageFormat::RGBA_8);
-                RefPtr<Texture2D> texPosition = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, map->positionMap.Width, map->positionMap.Height, 1, StorageFormat::RGBA_F32);
-                RefPtr<Texture2D> texNormal = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, map->normalMap.Width, map->normalMap.Height, 1, StorageFormat::RGBA_F32);
-                Array<Texture2D*, 3> dest;
-                Array<StorageFormat, 3> formats;
-                dest.SetSize(3);
+                int width = map->diffuseMap.Width * SuperSampleFactor;
+                int height = map->diffuseMap.Height * SuperSampleFactor;
+                RefPtr<Texture2D> texDiffuse = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, width, height, 1, StorageFormat::RGBA_8);
+                RefPtr<Texture2D> texPosition = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, width, height, 1, StorageFormat::RGBA_F32);
+                RefPtr<Texture2D> texNormal = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, width, height, 1, StorageFormat::RGBA_F32);
+                RefPtr<Texture2D> texDepth = hwRenderer->CreateTexture2D(TextureUsage::SampledDepthAttachment, width, height, 1, StorageFormat::Depth32);
+                Array<Texture2D*, 4> dest;
+                Array<StorageFormat, 4> formats;
+                dest.SetSize(4);
                 dest[0] = texDiffuse.Ptr();
                 dest[1] = texPosition.Ptr();
                 dest[2] = texNormal.Ptr();
-                formats.SetSize(3);
+                dest[3] = texDepth.Ptr();
+                formats.SetSize(4);
                 formats[0] = StorageFormat::RGBA_8;
                 formats[1] = StorageFormat::RGBA_F32;
                 formats[2] = StorageFormat::RGBA_F32;
+                formats[3] = StorageFormat::Depth32;
                 renderer->RenderObjectSpaceMap(dest.GetArrayView(), formats.GetArrayView(), actor.Value.Ptr(), map->diffuseMap.Width, map->diffuseMap.Height);
-                texDiffuse->GetData(0, map->diffuseMap.GetBuffer(), map->diffuseMap.Width*map->diffuseMap.Height * sizeof(uint32_t));
-                List<float> buffer;
-                buffer.SetSize(map->positionMap.Width * map->positionMap.Height * 4);
-                texPosition->GetData(0, buffer.Buffer(), map->positionMap.Width*map->positionMap.Height * sizeof(float) * 4);
-                float* dst = (float*)map->positionMap.GetBuffer();
-                for (int i = 0; i < map->positionMap.Width*map->positionMap.Height; i++)
-                {
-                    dst[i * 3] = buffer[i * 4];
-                    dst[i * 3 + 1] = buffer[i * 4 + 1];
-                    dst[i * 3 + 2] = buffer[i * 4 + 2];
-                }
-                buffer.SetSize(map->normalMap.Width * map->normalMap.Height * 4);
-                texNormal->GetData(0, buffer.Buffer(), map->normalMap.Width*map->normalMap.Height * sizeof(float) * 4);
-                uint32_t* dstNormal = (uint32_t*)map->normalMap.GetBuffer();
-                for (int i = 0; i < map->normalMap.Width*map->normalMap.Height; i++)
-                {
-                    dstNormal[i] = PackRGB10(buffer[i * 4], buffer[i * 4 + 1], buffer[i * 4 + 2]);
-                }
+
+                ReadAndDownSample(texDiffuse.Ptr(), (uint32_t*)map->diffuseMap.GetBuffer(), (uint32_t)0, width, height, SuperSampleFactor, 
+                    [](uint32_t x) {return x; });
+                ReadAndDownSample(texPosition.Ptr(), (VectorMath::Vec4*)map->positionMap.GetBuffer(), VectorMath::Vec4::Create(0.0f), width, height, SuperSampleFactor, 
+                    [](VectorMath::Vec4 x) {return x; });
+                ReadAndDownSample(texNormal.Ptr(), (uint32_t*)map->normalMap.GetBuffer(), VectorMath::Vec4::Create(0.0f), width, height, SuperSampleFactor,
+                    [](VectorMath::Vec4 x) {return PackRGB10(x.x, x.y, x.z); });
             }
         }
 
@@ -132,8 +155,9 @@ namespace GameEngine
                     auto nDotL = VectorMath::Vec3::Dot(normal, l);
                     Ray shadowRay;
                     shadowRay.tMax = FLT_MAX;
-                    shadowRay.Origin = pos + normal * settings.ShadowBias + l * settings.ShadowBias;
+                    shadowRay.Origin = pos;
                     shadowRay.Dir = l;
+                    auto p1 = shadowRay.Origin + shadowRay.Dir * 1000.0f;
                     auto shadowFactor = TraceShadowRay(shadowRay);
                     result += light.Intensity * shadowFactor * Math::Max(0.0f, nDotL);
                     break;
@@ -156,7 +180,7 @@ namespace GameEngine
                         }
                         Ray shadowRay;
                         shadowRay.tMax = dist;
-                        shadowRay.Origin = pos + normal * settings.ShadowBias + l * settings.ShadowBias;
+                        shadowRay.Origin = pos;
                         shadowRay.Dir = l;
                         auto shadowFactor = TraceShadowRay(shadowRay);
                         result += light.Intensity * actualDecay * shadowFactor * Math::Max(0.0f, nDotL);
@@ -170,6 +194,14 @@ namespace GameEngine
 
         void ComputeLightmaps(LightmapSet& lightmaps)
         {
+            VectorMath::Vec3 tangentDirs[] =
+            {
+                VectorMath::Vec3::Create(1.0f, 0.0f, 0.0f),
+                VectorMath::Vec3::Create(-1.0f, 0.0f, 0.0f),
+                VectorMath::Vec3::Create(0.0f, 0.0f, 1.0f),
+                VectorMath::Vec3::Create(0.0f, 0.0f, -1.0f)
+            };
+
             for (auto & map : maps)
             {
                 int imageSize = map.Value.diffuseMap.Width * map.Value.diffuseMap.Height;
@@ -180,15 +212,39 @@ namespace GameEngine
                     int y = pixelIdx / map.Value.diffuseMap.Width;
                     VectorMath::Vec4 lighting;
                     lighting.SetZero();
-                    if (x == 140 && y == 587)
-                        printf("break");
                     auto diffuse = map.Value.diffuseMap.GetPixel(x, y);
                     // compute lighting only for lightmap pixels that represent valid surface regions
                     if (diffuse.x > 1e-6f || diffuse.y > 1e-6f || diffuse.z > 1e-6f)
                     {
-                        auto pos = map.Value.positionMap.GetPixel(x, y).xyz();
+                        auto posPixel = map.Value.positionMap.GetPixel(x, y);
+                        auto pos = posPixel.xyz();
+                        auto bias = posPixel.w * 0.6f;
                         auto normal = map.Value.normalMap.GetPixel(x, y).xyz().Normalize();
-                        lighting = VectorMath::Vec4::Create(ComputeDirectLighting(pos, normal), 1.0f);
+                        // shoot random rays and find if the ray hits the back of some nearby face,
+                        // if so, shift pos to the front of that face to avoid shadow leaking
+                        VectorMath::Vec3 tangent, binormal;
+                        VectorMath::GetOrthoVec(tangent, normal);
+                        binormal = VectorMath::Vec3::Cross(normal, tangent);
+                        auto biasedPos = pos + normal * settings.ShadowBias;
+                        float minT = FLT_MAX;
+                        for (auto tangentDir : tangentDirs)
+                        {
+                            auto testDir = tangent * tangentDir.x + normal * tangentDir.y + binormal * tangentDir.z;
+                            Ray testRay;
+                            testRay.Origin = biasedPos;
+                            testRay.Dir = testDir;
+                            testRay.tMax = bias;
+                            auto inter = staticScene->TraceRay(testRay);
+                            if (inter.IsHit && VectorMath::Vec3::Dot(inter.Normal, testDir) > 0.0f)
+                            {
+                                if (inter.T < minT)
+                                {
+                                    minT = inter.T;
+                                    biasedPos = testRay.Origin + testRay.Dir * inter.T + inter.Normal * settings.ShadowBias;
+                                }
+                            }
+                        }
+                        lighting = VectorMath::Vec4::Create(ComputeDirectLighting(biasedPos, normal), 1.0f);
                     }
                     map.Value.lightMap.SetPixel(x, y, lighting);
                 }
@@ -216,6 +272,7 @@ namespace GameEngine
     {
         LightmapBaker baker;
         baker.settings = settings;
+        baker.settings.ResolutionScale = 0.5f;
         baker.BakeLightmaps(lightmaps, pLevel);
     }
 }

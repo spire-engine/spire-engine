@@ -61,12 +61,11 @@ namespace GameEngine
                 for (int j = 0; j < w; j++)
                 {
                     Ray ray;
-                    if (i == 512 && j == 520)
-                        printf("break");
                     GetCameraRay(ray, w, h, (float)j, (float)i);
                     auto inter = scene->TraceRay(ray);
                     if (inter.IsHit)
                     {
+                        auto hitPoint = ray.Origin + ray.Dir * inter.T;
                         auto & diffuseMap = diffuseMaps[inter.MapId];
                         auto & lightMap = lightMaps.Lightmaps[inter.MapId];
                         pixels[i * w + j] = diffuseMap.Sample(inter.UV) * lightMap.Sample(inter.UV);

@@ -3273,6 +3273,21 @@ namespace VK
 		}
 	};
 
+    vk::PolygonMode TranslatePolygonMode(PolygonMode mode)
+    {
+        switch (mode)
+        {
+        case PolygonMode::Fill:
+            return vk::PolygonMode::eFill;
+        case PolygonMode::Line:
+            return vk::PolygonMode::eLine;
+        case PolygonMode::Point:
+            return vk::PolygonMode::ePoint;
+        default:
+            return vk::PolygonMode::eFill;
+        }
+    }
+
 	Pipeline::Pipeline(RenderTargetLayout* renderTargetLayout, PipelineBuilder* pipelineBuilder)
 	{
 #if _DEBUG
@@ -3315,7 +3330,7 @@ namespace VK
 			.setFlags(vk::PipelineRasterizationStateCreateFlags())
 			.setDepthClampEnable(VK_FALSE)
 			.setRasterizerDiscardEnable(VK_FALSE)
-			.setPolygonMode(vk::PolygonMode::eFill)
+			.setPolygonMode(TranslatePolygonMode(pipelineBuilder->FixedFunctionStates.PolygonFillMode))
 			.setCullMode(TranslateCullMode(pipelineBuilder->FixedFunctionStates.CullMode))
 			.setFrontFace(vk::FrontFace::eClockwise)
 			.setDepthBiasEnable(pipelineBuilder->FixedFunctionStates.EnablePolygonOffset)

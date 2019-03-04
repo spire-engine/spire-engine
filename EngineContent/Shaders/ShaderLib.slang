@@ -830,6 +830,11 @@ struct StandardVertexFormat<TUVSet : IVertexUVSet, TTangentFrame : ITangentFrame
 	}
 };
 
+struct LightmapGBufferGlobalParams
+{
+    RWStructuredBuffer<float3> vertices;
+};
+
 [__AttributeUsage(_AttributeTargets.Struct)]
 struct TransparentAttribute
 {

@@ -733,6 +733,11 @@ namespace GameEngine
 		Pipeline() {}
 	};
 
+    enum class PolygonMode
+    {
+        Fill, Line, Point
+    };
+
 	class FixedFunctionPipelineStates
 	{
 	public:
@@ -746,6 +751,7 @@ namespace GameEngine
 		CompareFunc DepthCompareFunc = CompareFunc::Disabled, StencilCompareFunc = CompareFunc::Disabled;
 		StencilOp StencilFailOp = StencilOp::Keep, StencilDepthFailOp = StencilOp::Keep, StencilDepthPassOp = StencilOp::Keep;
 		BlendMode BlendMode = GameEngine::BlendMode::Replace;
+        PolygonMode PolygonFillMode = PolygonMode::Fill;
 		unsigned int StencilMask = 0xFFFFFFFF;
 		unsigned int StencilReference = 0;
 		CullMode CullMode = GameEngine::CullMode::CullBackFace;

@@ -21,16 +21,18 @@ namespace GameEngine
         ShaderSet shaders;
         RendererService * rendererService;
         ShaderEntryPoint* vsEntryPoint, *psEntryPoint;
-        PipelineContext pipeContext;
+        PipelineContext pipeContext[3];
         RenderStat renderStats;
         RefPtr<CommandBuffer> cmdBuffer, layoutTransferCmdBuffer1, layoutTransferCmdBuffer2;
-        ModuleInstance viewParams;
+        ModuleInstance viewParams, globalMemoryParams;
         DeviceMemory uniformMemory;
+        DeviceMemory globalMemory;
         StandardViewUniforms viewUniform;
     public:
         ~ObjectSpaceGBufferRendererImpl()
         {
             viewParams = ModuleInstance();
+            globalMemoryParams = ModuleInstance();
         }
         virtual void Init(HardwareRenderer * hw, RendererService * service, CoreLib::String shaderFileName) override
         {
@@ -38,7 +40,8 @@ namespace GameEngine
             rendererService = service;
             vsEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "vs_main");
             psEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "ps_main");
-            pipeContext.Init(hwRenderer, &renderStats);
+            for (auto &pctx : pipeContext)
+                pctx.Init(hwRenderer, &renderStats);
             cmdBuffer = hwRenderer->CreateCommandBuffer();
             layoutTransferCmdBuffer1 = hwRenderer->CreateCommandBuffer();
             layoutTransferCmdBuffer2 = hwRenderer->CreateCommandBuffer();
@@ -53,6 +56,7 @@ namespace GameEngine
             auto sharedRes = Engine::Instance()->GetRenderer()->GetSharedResource();
             uniformMemory.Init(hw, BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
             sharedRes->CreateModuleInstance(viewParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), &uniformMemory);
+            
             for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
             {
                 auto descSet = viewParams.GetDescriptorSet(i);
@@ -61,6 +65,16 @@ namespace GameEngine
                 descSet->EndUpdate();
             }
             viewParams.SetUniformData(&viewUniform, sizeof(viewUniform));
+
+            globalMemory.Init(hw, BufferUsage::StorageBuffer, false, 26, sharedRes->hardwareRenderer->StorageBufferAlignment());
+            sharedRes->CreateModuleInstance(globalMemoryParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("LightmapGBufferGlobalParams"), &uniformMemory);
+            for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
+            {
+                auto descSet = globalMemoryParams.GetDescriptorSet(i);
+                descSet->BeginUpdate();
+                descSet->Update(0, globalMemory.GetBuffer());
+                descSet->EndUpdate();
+            }
         }
         virtual void RenderObjectSpaceMap(ArrayView<Texture2D*> dest, ArrayView<StorageFormat> attachmentFormats, Actor * actor, int width, int height) override
         {
@@ -70,7 +84,10 @@ namespace GameEngine
             {
                 AttachmentLayout layout;
                 layout.ImageFormat = attachmentFormats[i];
-                layout.Usage = TextureUsage::ColorAttachment;
+                if (attachmentFormats[i] == StorageFormat::Depth32)
+                    layout.Usage = TextureUsage::DepthAttachment;
+                else
+                    layout.Usage = TextureUsage::ColorAttachment;
                 attachments.Add(layout);
                 renderAttachments.SetAttachment(i, dest[i]);
             }
@@ -89,14 +106,6 @@ namespace GameEngine
             param.UseSkeleton = false;
             actor->GetDrawables(param);
             
-            FixedFunctionPipelineStates fixStates;
-            fixStates.CullMode = CullMode::Disabled;
-            fixStates.DepthCompareFunc = CompareFunc::Disabled;
-            fixStates.BlendMode = BlendMode::Replace;
-            fixStates.ConsevativeRasterization = true;
-            pipeContext.BindEntryPoint(vsEntryPoint, psEntryPoint, renderTargetLayout.Ptr(), &fixStates);
-            pipeContext.PushModuleInstance(&viewParams);
-            
             layoutTransferCmdBuffer1->BeginRecording();
             layoutTransferCmdBuffer1->TransferLayout(destTextures.GetArrayView(),
                 TextureLayoutTransfer::UndefinedToRenderAttachment);
@@ -106,32 +115,58 @@ namespace GameEngine
             cmdBuffer->BeginRecording(frameBuffer.Ptr());
             cmdBuffer->SetViewport(0, 0, width, height);
             cmdBuffer->ClearAttachments(frameBuffer.Ptr());
-            auto processDrawable = [&](Drawable* drawable)
+            
+            for (int k = 0; k < 3; k++)
             {
-                cmdBuffer->BindVertexBuffer(drawable->GetMesh()->GetVertexBuffer(), drawable->GetMesh()->vertexBufferOffset);
-                cmdBuffer->BindIndexBuffer(drawable->GetMesh()->GetIndexBuffer(), drawable->GetMesh()->indexBufferOffset);
+                FixedFunctionPipelineStates fixStates;
+                fixStates.CullMode = CullMode::Disabled;
+                fixStates.DepthCompareFunc = CompareFunc::Less;
+                fixStates.BlendMode = BlendMode::Replace;
+                fixStates.ConsevativeRasterization = false;
+                switch (k)
+                {
+                case 0:
+                    fixStates.PolygonFillMode = PolygonMode::Fill;
+                    break;
+                case 1:
+                    fixStates.PolygonFillMode = PolygonMode::Line;
+                    break;
+                case 2:
+                    fixStates.PolygonFillMode = PolygonMode::Point;
+                    break;
+                }
+                pipeContext[k].BindEntryPoint(vsEntryPoint, psEntryPoint, renderTargetLayout.Ptr(), &fixStates);
+                pipeContext[k].PushModuleInstance(&viewParams);
+                pipeContext[k].PushModuleInstance(&globalMemoryParams);
 
-                DescriptorSetBindingArray bindings;
-                pipeContext.PushModuleInstance(&drawable->GetMaterial()->MaterialModule);
-                pipeContext.PushModuleInstance(drawable->GetTransformModule());
-                auto pipeline = pipeContext.GetPipeline(&drawable->GetVertexFormat(), drawable->GetPrimitiveType());
-                cmdBuffer->BindPipeline(pipeline->pipeline.Ptr());
-                pipeContext.GetBindings(bindings);
-                for (int i = 0; i < bindings.Count(); i++)
-                    cmdBuffer->BindDescriptorSet(i, bindings[i]);
-                auto range = drawable->GetElementRange();
-                cmdBuffer->DrawIndexed(range.StartIndex, range.Count);
-                pipeContext.PopModuleInstance();
-                pipeContext.PopModuleInstance();
-            };
-            for (auto drawable : sink.GetDrawables(false))
-            {
-                processDrawable(drawable);
+                auto processDrawable = [&](Drawable* drawable)
+                {
+                    cmdBuffer->BindVertexBuffer(drawable->GetMesh()->GetVertexBuffer(), drawable->GetMesh()->vertexBufferOffset);
+                    cmdBuffer->BindIndexBuffer(drawable->GetMesh()->GetIndexBuffer(), drawable->GetMesh()->indexBufferOffset);
+
+                    DescriptorSetBindingArray bindings;
+                    pipeContext[k].PushModuleInstance(&drawable->GetMaterial()->MaterialModule);
+                    pipeContext[k].PushModuleInstance(drawable->GetTransformModule());
+                    auto pipeline = pipeContext[k].GetPipeline(&drawable->GetVertexFormat(), drawable->GetPrimitiveType());
+                    cmdBuffer->BindPipeline(pipeline->pipeline.Ptr());
+                    pipeContext[k].GetBindings(bindings);
+                    for (int i = 0; i < bindings.Count(); i++)
+                        cmdBuffer->BindDescriptorSet(i, bindings[i]);
+                    auto range = drawable->GetElementRange();
+                    cmdBuffer->DrawIndexed(range.StartIndex, range.Count);
+                    pipeContext[k].PopModuleInstance();
+                    pipeContext[k].PopModuleInstance();
+                };
+                for (auto drawable : sink.GetDrawables(false))
+                {
+                    processDrawable(drawable);
+                }
+                for (auto drawable : sink.GetDrawables(true))
+                {
+                    processDrawable(drawable);
+                }
             }
-            for (auto drawable : sink.GetDrawables(true))
-            {
-                processDrawable(drawable);
-            }
+
             cmdBuffer->EndRecording();
             hwRenderer->ExecuteRenderPass(frameBuffer.Ptr(), MakeArrayView(cmdBuffer.Ptr()), nullptr);
             layoutTransferCmdBuffer2->BeginRecording();
