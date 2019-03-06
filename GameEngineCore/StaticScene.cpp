@@ -127,7 +127,7 @@ namespace GameEngine
                 {
                     auto pointLight = (PointLightActor*)(light);
                     StaticLight lightData;
-                    lightData.Type = pointLight->IsSpotLight ? StaticLightType::Spot : StaticLightType::Spot;
+                    lightData.Type = pointLight->IsSpotLight ? StaticLightType::Spot : StaticLightType::Point;
                     lightData.Intensity = pointLight->Color.GetValue();
                     lightData.Direction = pointLight->GetDirection();
                     auto localTransform = pointLight->GetLocalTransform();

@@ -266,7 +266,7 @@ Mesh CreateStickmanMesh(const BBox& bbox, Skeleton * skeleton, float width)
 	return rs;
 }
 
-void Export(ExportArguments args)
+void ExportFBX(ExportArguments args)
 {
 	BvhFile file = BvhFile::FromFile(args.FileName);
 	Skeleton skeleton;
@@ -570,7 +570,7 @@ public:
 						if (cmbEuler->GetSelectionIndex() > 0)
 							args.EulerOrder = cmbEuler->GetItem(cmbEuler->GetSelectionIndex());
 						SetCursor(LoadCursor(NULL, IDC_WAIT));
-						Export(args);
+						ExportFBX(args);
 						SetCursor(LoadCursor(NULL, IDC_ARROW));
 					}
 				}
@@ -604,7 +604,7 @@ int wmain(int argc, const wchar_t** argv)
 					args.SkeletonFileName = String::FromWString(argv[i + 1]);
 				else if (String::FromWString(argv[i]) == "-rig" && i < argc - 1)
 					args.RigMappingFileName = String::FromWString(argv[i + 1]);
-			Export(args);
+			ExportFBX(args);
 		}
 		catch (const Exception & e)
 		{

@@ -3,8 +3,11 @@
 //#include "FBXImport/include/postprocess.h"
 #include "CoreLib/Basic.h"
 #include "CoreLib/LibIO.h"
+#include "CoreLib/Graphics/ObjModel.h"
 #include "Skeleton.h"
 #include "Mesh.h"
+
+#include "LightmapUVGeneration.h"
 #include "WinForm/WinButtons.h"
 #include "WinForm/WinCommonDlg.h"
 #include "WinForm/WinForm.h"
@@ -274,7 +277,7 @@ FbxNode * FindFirstSkeletonNode(FbxNode * node)
 	return nullptr;
 }
 
-void Export(ExportArguments args)
+void ExportFBX(ExportArguments args)
 {
 	if (args.FlipYZ)
 	{
@@ -779,8 +782,10 @@ endOfSkeletonExport:
 		if (meshOut->ElementRanges.Count())
 		{
 			auto optimizedMesh = meshOut->DeduplicateVertices();
-			optimizedMesh.SaveToFile(Path::ReplaceExt(outFileName, "mesh"));
-			wprintf(L"mesh converted: elements %d, faces: %d, vertices: %d, skeletal: %s.\n", optimizedMesh.ElementRanges.Count(), optimizedMesh.Indices.Count() / 3, optimizedMesh.GetVertexCount(),
+            Mesh lightmappedMesh;
+            GenerateLightmapUV(&lightmappedMesh, &optimizedMesh, 512, 1);
+            lightmappedMesh.SaveToFile(Path::ReplaceExt(outFileName, "mesh"));
+			wprintf(L"mesh converted: elements %d, faces: %d, vertices: %d, skeletal: %s.\n", lightmappedMesh.ElementRanges.Count(), lightmappedMesh.Indices.Count() / 3, lightmappedMesh.GetVertexCount(),
 				hasBones ? L"true" : L"false");
 		}
 	}
@@ -831,6 +836,48 @@ endOfSkeletonExport:
 	
 	// Destroy the SDK manager and all the other objects it was handling.
 	lSdkManager->Destroy();
+}
+
+
+void ExportObj(ExportArguments & args)
+{
+    CoreLib::Graphics::ObjModel objModel;
+    CoreLib::Graphics::LoadObj(objModel, args.FileName.Buffer());
+    if (!objModel.Normals.Count())
+        CoreLib::Graphics::RecomputeNormals(objModel);
+    Mesh mesh;
+    mesh.SetVertexFormat(MeshVertexFormat(0, objModel.TexCoords.Count() ? 1 : 0, true, false));
+    mesh.AllocVertexBuffer(objModel.Faces.Count() * 3);
+    int vid = 0;
+    for (auto & f : objModel.Faces)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            auto v = objModel.Vertices[f.VertexIds[i]];
+            auto n = objModel.Normals[f.NormalIds[i]];
+            VectorMath::Vec3 tangent;
+            VectorMath::GetOrthoVec(tangent, n);
+            VectorMath::Vec3 bitangent = Vec3::Cross(tangent, n);
+            auto tangentFrame = VectorMath::Quaternion::FromCoordinates(tangent, n, bitangent);
+            mesh.SetVertexTangentFrame(vid, tangentFrame);
+            mesh.SetVertexPosition(vid, v);
+            if (objModel.TexCoords.Count())
+            {
+                auto t = objModel.TexCoords[f.TexCoordIds[i]];
+                mesh.SetVertexUV(vid, 0, t);
+            }
+            mesh.Indices.Add(vid);
+            vid++;
+        }
+    }
+    MeshElementRange range;
+    range.StartIndex = 0;
+    range.Count = mesh.Indices.Count();
+    mesh.ElementRanges.Add(range);
+    auto optimizedMesh = mesh;// .DeduplicateVertices();
+    Mesh lightmappedMesh;
+    GenerateLightmapUV(&lightmappedMesh, &optimizedMesh, 512, 1);
+    lightmappedMesh.SaveToFile(Path::ReplaceExt(args.FileName, "mesh"));
 }
 
 /*
@@ -951,7 +998,10 @@ public:
 					args.RootFixTransform = ParseRootTransform(txtRootFixTransform->GetText());
 
 					args.CreateMeshFromSkeleton = chkCreateSkeletonMesh->GetChecked();
-					Export(args);
+                    if (file.ToLower().EndsWith("fbx"))
+                        ExportFBX(args);
+                    else
+                        ExportObj(args);
 				}
 			}
 		});
@@ -965,7 +1015,10 @@ int wmain(int argc, const wchar_t** argv)
 	{
 		ExportArguments args;
 		args.FileName = String::FromWString(argv[1]);
-		Export(args);
+        if (args.FileName.ToLower().EndsWith("fbx"))
+            ExportFBX(args);
+        else
+            ExportObj(args);
 	}
 	else
 	{

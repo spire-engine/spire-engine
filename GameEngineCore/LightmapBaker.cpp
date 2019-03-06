@@ -212,30 +212,37 @@ namespace GameEngine
             VectorMath::Vec3 result;
             result.SetZero();
             static const float invPi = 1.0f / Math::Pi;
+            VectorMath::Vec3 binormal;
+            VectorMath::GetOrthoVec(binormal, normal);
+            auto tangent = VectorMath::Vec3::Cross(normal, binormal);
             for (int i = 0; i < settings.SampleCount; i++)
             {
                 float r1 = random.NextFloat();
                 float r2 = random.NextFloat();
                 Ray ray;
                 ray.Origin = pos;
-                ray.Dir = UniformSampleHemisphere(r1, r2);
+                auto tanDir = UniformSampleHemisphere(r1, r2);
+                ray.Dir = tangent * tanDir.x + normal * tanDir.y + binormal * tanDir.z;
                 ray.tMax = FLT_MAX;
                 auto inter = staticScene->TraceRay(ray);
                 if (inter.IsHit)
                 {
-                    auto directDiffuse = maps[inter.MapId].lightMap.Sample(inter.UV).xyz();
-                    auto indirectDiffuse = maps[inter.MapId].indirectLightmap.Sample(inter.UV).xyz();
-                    auto color = directDiffuse * invPi + indirectDiffuse * 2.0f;
-                    color *= maps[inter.MapId].diffuseMap.Sample(inter.UV).xyz();
-                    color *= r1;
-                    result += color;
+                    if (VectorMath::Vec3::Dot(inter.Normal, ray.Dir) < 0.0f)
+                    {
+                        auto directDiffuse = maps[inter.MapId].lightMap.Sample(inter.UV).xyz();
+                        auto indirectDiffuse = maps[inter.MapId].indirectLightmap.Sample(inter.UV).xyz();
+                        auto color = directDiffuse + indirectDiffuse;
+                        color *= maps[inter.MapId].diffuseMap.Sample(inter.UV).xyz();
+                        color *= r1;
+                        result += color;
+                    }
                 }
             }
-            result *= 1.0 / (float)settings.SampleCount;
+            result *= 2.0f / (float)settings.SampleCount;
             return result;
         }
 
-        void ComputeLightmaps(LightmapSet& lightmaps, bool computeDirectLight)
+        void ComputeLightmaps(bool computeDirectLight)
         {
             static int iteration = 0;
             iteration++;
@@ -253,9 +260,9 @@ namespace GameEngine
                 #pragma omp parallel for
                 for (int pixelIdx = 0; pixelIdx < imageSize; pixelIdx++)
                 {
-                    Random random(pixelIdx);
                     int x = pixelIdx % map.diffuseMap.Width;
                     int y = pixelIdx / map.diffuseMap.Width;
+                    Random random((x * 7147901 + y * 6391));
                     VectorMath::Vec4 lighting;
                     lighting.SetZero();
                     auto diffuse = map.diffuseMap.GetPixel(x, y);
@@ -304,11 +311,17 @@ namespace GameEngine
                         map.indirectLightmap.SetPixel(x, y, lighting);
                 }
             }
-            // move lightmaps to return value
+        }
+        void CompositeLightmaps(LightmapSet& lightmaps)
+        {
             lightmaps.Lightmaps.SetSize(maps.Count());
             for (int i = 0; i < maps.Count(); i++)
             {
-                lightmaps.Lightmaps[i] = _Move(maps[i].lightMap);
+                auto & lm = lightmaps.Lightmaps[i];
+                lm.Init(RawObjectSpaceMap::DataType::RGB32F, maps[i].lightMap.Width, maps[i].lightMap.Height);
+                for (int y = 0; y < lm.Height; y++)
+                    for (int x = 0; x < lm.Width; x++)
+                        lm.SetPixel(x, y, maps[i].lightMap.GetPixel(x, y) + maps[i].indirectLightmap.GetPixel(x, y));
             }
         }
     public:
@@ -318,9 +331,10 @@ namespace GameEngine
             AllocLightmaps(lightmaps);
             BakeLightmapGBuffers(lightmaps);
             staticScene = BuildStaticScene(level);
-            ComputeLightmaps(lightmaps, true);
-            ComputeLightmaps(lightmaps, false);
-
+            ComputeLightmaps(true);
+            ComputeLightmaps(false);
+            CompositeLightmaps(lightmaps);
+            lightmaps.Lightmaps[3].DebugSaveAsImage("lm.bmp");
         }
     };
 
