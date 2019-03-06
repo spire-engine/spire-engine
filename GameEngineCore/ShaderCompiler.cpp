@@ -165,7 +165,7 @@ namespace GameEngine
                         if (field->getType()->getKind() == slang::TypeReflection::Kind::Array)
                         {
                             desc.Type = SlangResourceKindToDescriptorType(field->getType()->getElementType()->getKind(), field->getType()->getResourceShape());
-                            desc.ArraySize = field->getType()->getElementCount();
+                            desc.ArraySize = (int)field->getType()->getElementCount();
                         }
                         else
                         {
@@ -260,7 +260,7 @@ namespace GameEngine
                     if (kind == slang::TypeReflection::Kind::Array)
                     {
                         kind = field->getType()->getElementType()->getKind();
-                        varLayout.BindingLength = field->getType()->getElementCount();
+                        varLayout.BindingLength = (int)field->getType()->getElementCount();
                     }
                     else
                         varLayout.BindingLength = 1;

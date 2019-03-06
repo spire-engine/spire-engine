@@ -19,33 +19,37 @@ namespace GameEngine
     private:
         struct RawMapSet
         {
-            RawObjectSpaceMap lightMap, diffuseMap, normalMap, positionMap;
+            RawObjectSpaceMap lightMap, indirectLightmap, diffuseMap, normalMap, positionMap;
             void Init(int w, int h)
             {
                 lightMap.Init(RawObjectSpaceMap::DataType::RGB32F, w, h);
+                indirectLightmap.Init(RawObjectSpaceMap::DataType::RGB32F, w, h);
                 diffuseMap.Init(RawObjectSpaceMap::DataType::RGBA8, w, h);
                 normalMap.Init(RawObjectSpaceMap::DataType::RGB10_X2_SIGNED, w, h);
                 positionMap.Init(RawObjectSpaceMap::DataType::RGBA32F, w, h);
             }
         };
-        EnumerableDictionary<Actor*, RawMapSet> maps;
+        List<RawMapSet> maps;
         Level* level = nullptr;
         RefPtr<StaticScene> staticScene;
         void AllocLightmaps(LightmapSet& lmSet)
         {
             // in the future we may support a wider range of actors.
             // for now we only allocate lightmaps for static mesh actors.
+            List<int> mapResolutions;
             for (auto actor : level->Actors)
             {
                 if (auto smActor = actor.Value.As<StaticMeshActor>())
                 {
                     auto size = (smActor->Bounds.Max - smActor->Bounds.Min).Length();
                     int resolution = Math::Clamp(1 << Math::Log2Ceil((int)(size * settings.ResolutionScale)), settings.MinResolution, settings.MaxResolution);
-                    lmSet.ActorLightmapIds[actor.Value.Ptr()] = maps.Count();
-                    maps[smActor.Ptr()] = RawMapSet();
-                    maps[smActor.Ptr()]().Init(resolution, resolution);
+                    lmSet.ActorLightmapIds[actor.Value.Ptr()] = mapResolutions.Count();
+                    mapResolutions.Add(resolution);
                 }
             }
+            maps.SetSize(mapResolutions.Count());
+            for (int i = 0; i < maps.Count(); i++)
+                maps[i].Init(mapResolutions[i], mapResolutions[i]);
         }
         template<typename TResult, typename TSource, typename TSelectFunc>
         void ReadAndDownSample(Texture2D* texture, TResult* dstBuffer, TSource srcZero, int w, int h, int superSample, const TSelectFunc & select)
@@ -75,7 +79,7 @@ namespace GameEngine
                 }
 
         }
-        void BakeLightmapGBuffers()
+        void BakeLightmapGBuffers(LightmapSet& lmSet)
         {
             const int SuperSampleFactor = 1;
             HardwareRenderer* hwRenderer = Engine::Instance()->GetRenderer()->GetHardwareRenderer();
@@ -83,8 +87,9 @@ namespace GameEngine
             renderer->Init(Engine::Instance()->GetRenderer()->GetHardwareRenderer(), Engine::Instance()->GetRenderer()->GetRendererService(), "LightmapGBufferGen.slang");
             for (auto actor : level->Actors)
             {
-                auto map = maps.TryGetValue(actor.Value.Ptr());
-                if (!map) continue;
+                auto mapId = lmSet.ActorLightmapIds.TryGetValue(actor.Value.Ptr());
+                if (!mapId) continue;
+                auto map = maps.Buffer() + *mapId;
                 int width = map->diffuseMap.Width * SuperSampleFactor;
                 int height = map->diffuseMap.Height * SuperSampleFactor;
                 RefPtr<Texture2D> texDiffuse = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, width, height, 1, StorageFormat::RGBA_8);
@@ -116,11 +121,11 @@ namespace GameEngine
 
         void RenderDebugView(String fileName, LightmapSet & lightmaps)
         {
-            List<RawObjectSpaceMap> diffuseMaps;
-            diffuseMaps.SetSize(staticScene->MapIds.Count());
-            for (auto mid : staticScene->MapIds)
+            List<RawObjectSpaceMap*> diffuseMaps;
+            diffuseMaps.SetSize(maps.Count());
+            for (int i = 0; i < diffuseMaps.Count(); i++)
             {
-                diffuseMaps[mid.Value] = maps[mid.Key]().diffuseMap;
+                diffuseMaps[i] = &maps[i].diffuseMap;
             }
             RefPtr<StaticSceneRenderer> staticRenderer = CreateStaticSceneRenderer();
             staticRenderer->SetCamera(level->CurrentCamera->GetCameraTransform(), level->CurrentCamera->FOV, 1024, 1024);
@@ -193,8 +198,47 @@ namespace GameEngine
             return result;
         }
 
-        void ComputeLightmaps(LightmapSet& lightmaps)
+        VectorMath::Vec3 UniformSampleHemisphere(float r1, float r2)
         {
+            float sinTheta = sqrtf(1 - r1 * r1);
+            float phi = 2.0f * Math::Pi * r2;
+            float x = sinTheta * cosf(phi);
+            float z = sinTheta * sinf(phi);
+            return VectorMath::Vec3::Create(x, r1, z);
+        }
+
+        VectorMath::Vec3 ComputeIndirectLighting(Random & random, VectorMath::Vec3 pos, VectorMath::Vec3 normal)
+        {
+            VectorMath::Vec3 result;
+            result.SetZero();
+            static const float invPi = 1.0f / Math::Pi;
+            for (int i = 0; i < settings.SampleCount; i++)
+            {
+                float r1 = random.NextFloat();
+                float r2 = random.NextFloat();
+                Ray ray;
+                ray.Origin = pos;
+                ray.Dir = UniformSampleHemisphere(r1, r2);
+                ray.tMax = FLT_MAX;
+                auto inter = staticScene->TraceRay(ray);
+                if (inter.IsHit)
+                {
+                    auto directDiffuse = maps[inter.MapId].lightMap.Sample(inter.UV).xyz();
+                    auto indirectDiffuse = maps[inter.MapId].indirectLightmap.Sample(inter.UV).xyz();
+                    auto color = directDiffuse * invPi + indirectDiffuse * 2.0f;
+                    color *= maps[inter.MapId].diffuseMap.Sample(inter.UV).xyz();
+                    color *= r1;
+                    result += color;
+                }
+            }
+            result *= 1.0 / (float)settings.SampleCount;
+            return result;
+        }
+
+        void ComputeLightmaps(LightmapSet& lightmaps, bool computeDirectLight)
+        {
+            static int iteration = 0;
+            iteration++;
             VectorMath::Vec3 tangentDirs[] =
             {
                 VectorMath::Vec3::Create(1.0f, 0.0f, 0.0f),
@@ -205,22 +249,23 @@ namespace GameEngine
 
             for (auto & map : maps)
             {
-                int imageSize = map.Value.diffuseMap.Width * map.Value.diffuseMap.Height;
+                int imageSize = map.diffuseMap.Width * map.diffuseMap.Height;
                 #pragma omp parallel for
                 for (int pixelIdx = 0; pixelIdx < imageSize; pixelIdx++)
                 {
-                    int x = pixelIdx % map.Value.diffuseMap.Width;
-                    int y = pixelIdx / map.Value.diffuseMap.Width;
+                    Random random(pixelIdx);
+                    int x = pixelIdx % map.diffuseMap.Width;
+                    int y = pixelIdx / map.diffuseMap.Width;
                     VectorMath::Vec4 lighting;
                     lighting.SetZero();
-                    auto diffuse = map.Value.diffuseMap.GetPixel(x, y);
+                    auto diffuse = map.diffuseMap.GetPixel(x, y);
                     // compute lighting only for lightmap pixels that represent valid surface regions
                     if (diffuse.x > 1e-6f || diffuse.y > 1e-6f || diffuse.z > 1e-6f)
                     {
-                        auto posPixel = map.Value.positionMap.GetPixel(x, y);
+                        auto posPixel = map.positionMap.GetPixel(x, y);
                         auto pos = posPixel.xyz();
                         auto bias = posPixel.w * 0.6f;
-                        auto normal = map.Value.normalMap.GetPixel(x, y).xyz().Normalize();
+                        auto normal = map.normalMap.GetPixel(x, y).xyz().Normalize();
                         // shoot random rays and find if the ray hits the back of some nearby face,
                         // if so, shift pos to the front of that face to avoid shadow leaking
                         VectorMath::Vec3 tangent, binormal;
@@ -245,16 +290,25 @@ namespace GameEngine
                                 }
                             }
                         }
-                        lighting = VectorMath::Vec4::Create(ComputeDirectLighting(biasedPos, normal), 1.0f);
+                        if (computeDirectLight)
+                            lighting = VectorMath::Vec4::Create(ComputeDirectLighting(biasedPos, normal), 1.0f);
+                        else
+                            lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(random, biasedPos, normal), 1.0f);
                     }
-                    map.Value.lightMap.SetPixel(x, y, lighting);
+                    if (computeDirectLight)
+                    {
+                        map.lightMap.SetPixel(x, y, lighting);
+                        map.indirectLightmap.SetPixel(x, y, VectorMath::Vec4::Create(0.0f));
+                    }
+                    else
+                        map.indirectLightmap.SetPixel(x, y, lighting);
                 }
             }
             // move lightmaps to return value
             lightmaps.Lightmaps.SetSize(maps.Count());
-            for (auto mid : staticScene->MapIds)
+            for (int i = 0; i < maps.Count(); i++)
             {
-                lightmaps.Lightmaps[mid.Value] = _Move(maps[mid.Key]().lightMap);
+                lightmaps.Lightmaps[i] = _Move(maps[i].lightMap);
             }
         }
     public:
@@ -262,10 +316,11 @@ namespace GameEngine
         {
             level = pLevel;
             AllocLightmaps(lightmaps);
-            BakeLightmapGBuffers();
+            BakeLightmapGBuffers(lightmaps);
             staticScene = BuildStaticScene(level);
-            ComputeLightmaps(lightmaps);
-            RenderDebugView("LightmapView.bmp", lightmaps);
+            ComputeLightmaps(lightmaps, true);
+            ComputeLightmaps(lightmaps, false);
+
         }
     };
 

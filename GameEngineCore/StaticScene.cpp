@@ -152,7 +152,6 @@ namespace GameEngine
         {
             if (auto smActor = actor.Value.As<StaticMeshActor>())
             {
-                scene->MapIds[actor.Value.Ptr()] = id;
                 AddMeshInstance(faces, smActor->Mesh, smActor->LocalTransform.GetValue(), id);
                 id++;
             }

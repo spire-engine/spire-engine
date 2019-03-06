@@ -34,7 +34,6 @@ namespace GameEngine
     class StaticScene : public CoreLib::RefObject
     {
     public:
-        CoreLib::EnumerableDictionary<Actor*, int> MapIds;
         CoreLib::List<StaticLight> lights;
         virtual StaticSceneTracingResult TraceRay(const Ray & ray) = 0;
     };

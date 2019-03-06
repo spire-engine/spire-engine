@@ -51,7 +51,7 @@ namespace GameEngine
             camRight.x = 1.0f;
             camUp.y = 1.0f;
         }
-        virtual CoreLib::Imaging::BitmapF& Render(StaticScene* scene, CoreLib::List<RawObjectSpaceMap> & diffuseMaps, LightmapSet & lightMaps) override
+        virtual CoreLib::Imaging::BitmapF& Render(StaticScene* scene, CoreLib::List<RawObjectSpaceMap*> & diffuseMaps, LightmapSet & lightMaps) override
         {
             auto pixels = frameBuffer->GetPixels();
             int h = frameBuffer->GetHeight();
@@ -66,7 +66,7 @@ namespace GameEngine
                     if (inter.IsHit)
                     {
                         auto hitPoint = ray.Origin + ray.Dir * inter.T;
-                        auto & diffuseMap = diffuseMaps[inter.MapId];
+                        auto & diffuseMap = *diffuseMaps[inter.MapId];
                         auto & lightMap = lightMaps.Lightmaps[inter.MapId];
                         pixels[i * w + j] = diffuseMap.Sample(inter.UV) * lightMap.Sample(inter.UV);
                     }
