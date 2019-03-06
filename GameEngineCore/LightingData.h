@@ -55,6 +55,7 @@ namespace GameEngine
 	private:
 		bool useEnvMap = true;
 		CoreLib::RefPtr<TextureCubeArray> emptyEnvMapArray;
+        CoreLib::RefPtr<Texture2DArray> emptyLightmapArray;
 		void AddShadowPass(FrameRenderTask & tasks, WorldRenderPass * shadowRenderPass, DrawableSink * sink, ShadowMapResource & shadowMapRes, int shadowMapId,
 			StandardViewUniforms & shadowMapView, int & shadowMapViewInstancePtr);
 	public:
@@ -67,6 +68,7 @@ namespace GameEngine
 		CoreLib::RefPtr<Buffer> lightBuffer, lightProbeBuffer;
 		CoreLib::List<ModuleInstance> shadowViewInstances;
 		CoreLib::List<Drawable*> drawableBuffer, reorderBuffer;
+        DeviceLightmapSet * deviceLightmapSet = nullptr;
 		RendererSharedResource * sharedRes;
 		void* lightBufferPtr, *lightProbeBufferPtr;
 		int lightBufferSize, lightProbeBufferSize;
@@ -74,6 +76,7 @@ namespace GameEngine
 		void GatherInfo(FrameRenderTask & tasks, DrawableSink * sink, const RenderProcedureParameters & params, int w, int h, StandardViewUniforms & cameraView, WorldRenderPass * shadowPass);
 		void Init(RendererSharedResource & sharedRes, DeviceMemory * uniformMemory, bool pUseEnvMap);
 		void UpdateSharedResourceBinding();
+        void UpdateSceneResourceBinding(SceneResource* sceneRes);
 	};
 }
 

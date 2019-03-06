@@ -60,6 +60,7 @@ namespace GameEngine
 	public:
 		virtual void Init(Renderer * renderer, ViewResource * pViewRes) = 0;
 		virtual void UpdateSharedResourceBinding() = 0;
+        virtual void UpdateSceneResourceBinding(SceneResource* sceneRes) = 0;
 		virtual void Run(FrameRenderTask & task, const RenderProcedureParameters & params) = 0;
 		virtual RenderTarget* GetOutput() = 0;
 	};

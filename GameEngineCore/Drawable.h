@@ -58,6 +58,7 @@ namespace GameEngine
 		CoreLib::Array<PipelineClass*, MaxWorldRenderPasses> pipelineCache;
 		SceneResource * scene = nullptr;
 	public:
+        uint32_t lightmapId = 0xFFFFFFFF;
 		CoreLib::Graphics::BBox Bounds;
 		bool CastShadow = true;
         bool RenderCustomDepth = false;
@@ -91,6 +92,7 @@ namespace GameEngine
 			return elementRange;
 		}
 		void UpdateMaterialUniform();
+        void UpdateLightmapIndex(uint32_t lightmapIndex);
 		void UpdateTransformUniform(const VectorMath::Matrix4 & localTransform);
 		void UpdateTransformUniform(const VectorMath::Matrix4 & localTransform, const Pose & pose, RetargetFile * retarget = nullptr);
 	};

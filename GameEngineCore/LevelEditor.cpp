@@ -181,6 +181,8 @@ namespace GameEngine
             LightmapSet lightmaps;
             LightmapBakingSettings settings;
             GameEngine::BakeLightmaps(lightmaps, settings, level);
+            lightmaps.SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
+            Engine::Instance()->GetRenderer()->UpdateLightmap(lightmaps);
         }
 		void InitUI()
 		{

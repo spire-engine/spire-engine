@@ -321,6 +321,7 @@ namespace GameEngine
 		this->useEnvMap = pUseEnvMap;
 		if (!useEnvMap)
 			emptyEnvMapArray = pSharedRes.hardwareRenderer->CreateTextureCubeArray(TextureUsage::Sampled, 2, 2, MaxEnvMapCount, StorageFormat::RGBA_F16);
+        emptyLightmapArray = pSharedRes.hardwareRenderer->CreateTexture2DArray(TextureUsage::Sampled, 2, 2, 2, 1, StorageFormat::RGBA_F16);
 		sharedRes->CreateModuleInstance(moduleInstance, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("LightingEnvironment"), uniformMemory, sizeof(LightingUniform));
 		lightBufferSize = Math::RoundUpToAlignment((int)sizeof(GpuLightData) * MaxLights, sharedRes->hardwareRenderer->UniformBufferAlignment());
 		lightBuffer = sharedRes->hardwareRenderer->CreateMappedBuffer(GameEngine::BufferUsage::StorageBuffer, lightBufferSize * DynamicBufferLengthMultiplier);
@@ -359,5 +360,26 @@ namespace GameEngine
 			descSet->EndUpdate();
 		}
 	}
-
+    void LightingEnvironment::UpdateSceneResourceBinding(SceneResource* sceneRes)
+    {
+        Array<Texture*, 12> lightmapTextures;
+        lightmapTextures.SetSize(lightmapTextures.GetCapacity());
+        for (auto & t : lightmapTextures)
+            t = emptyLightmapArray.Ptr();
+        if (sceneRes->deviceLightmapSet)
+        {
+            auto tex = sceneRes->deviceLightmapSet->GetTextureArrayView();
+            for (int i = 0; i < tex.Count(); i++)
+                if (tex[i] != nullptr)
+                    lightmapTextures[i] = tex[i];
+        }
+        deviceLightmapSet = sceneRes->deviceLightmapSet.Ptr();
+        for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
+        {
+            auto descSet = moduleInstance.GetDescriptorSet(i);
+            descSet->BeginUpdate();
+            descSet->Update(7, lightmapTextures.GetArrayView(), TextureAspect::Color);
+            descSet->EndUpdate();
+        }
+    }
 }

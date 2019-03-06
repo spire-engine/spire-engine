@@ -172,6 +172,7 @@
     <ClCompile Include="CustomDepthRenderPass.cpp" />
     <ClCompile Include="DebugGraphics.cpp" />
     <ClCompile Include="DebugGraphicsRenderPass.cpp" />
+    <ClCompile Include="DeviceLightmapSet.cpp" />
     <ClCompile Include="DeviceMemory.cpp" />
     <ClCompile Include="DirectionalLightActor.cpp" />
     <ClCompile Include="Drawable.cpp" />
@@ -195,6 +196,7 @@
     <ClCompile Include="LightActor.cpp" />
     <ClCompile Include="LightingData.cpp" />
     <ClCompile Include="LightmapBaker.cpp" />
+    <ClCompile Include="LightmapSet.cpp" />
     <ClCompile Include="LightmapUVGeneration.cpp" />
     <ClCompile Include="LightProbeRenderer.cpp" />
     <ClCompile Include="Material.cpp" />
@@ -260,6 +262,7 @@
     <ClInclude Include="CameraActor.h" />
     <ClInclude Include="CatmullSpline.h" />
     <ClInclude Include="DebugGraphics.h" />
+    <ClInclude Include="DeviceLightmapSet.h" />
     <ClInclude Include="DisjointSet.h" />
     <ClInclude Include="EnvMapActor.h" />
     <ClInclude Include="FrameIdDisplayActor.h" />

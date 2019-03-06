@@ -199,6 +199,10 @@
     <ClCompile Include="DebugGraphics.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="LightmapSet.cpp" />
+    <ClCompile Include="DeviceLightmapSet.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -418,6 +422,9 @@
       <Filter>Geometry</Filter>
     </ClInclude>
     <ClInclude Include="DebugGraphics.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="DeviceLightmapSet.h">
       <Filter>Renderer</Filter>
     </ClInclude>
   </ItemGroup>

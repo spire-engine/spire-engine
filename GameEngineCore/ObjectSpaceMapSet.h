@@ -3,6 +3,7 @@
 
 #include "CoreLib/VectorMath.h"
 #include "CoreLib/Basic.h"
+#include "CoreLib/LibIO.h"
 
 namespace GameEngine
 {
@@ -11,7 +12,7 @@ namespace GameEngine
     public:
         enum class DataType
         {
-            RGBA8, RGB32F, RGB10_X2_SIGNED, RGBA32F
+            RGBA8, RGB32F, RGB10_X2_SIGNED, RGBA32F, RGB16F
         };
     private:
         DataType dataType;
@@ -23,7 +24,13 @@ namespace GameEngine
         void SetPixel(int x, int y, VectorMath::Vec4 value);
         void * GetBuffer() { return data.Buffer(); }
         void Init(DataType type, int w, int h);
-        void SaveToFile(CoreLib::String fileName);
+        void DebugSaveAsImage(CoreLib::String fileName);
+        void LoadFromStream(CoreLib::IO::BinaryReader& reader);
+        void SaveToStream(CoreLib::IO::BinaryWriter& writer);
+        DataType GetDataType()
+        {
+            return dataType;
+        }
     };
     uint32_t PackRGBA8(float x, float y, float z, float w);
     uint32_t PackRGB10(float x, float y, float z);

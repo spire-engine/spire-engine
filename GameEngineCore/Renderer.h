@@ -17,6 +17,7 @@ namespace GameEngine
 	class Level;
 	class RenderStat;
     class RendererService;
+    struct LightmapSet;
 	class Renderer : public CoreLib::Object
 	{
 	public:
@@ -34,6 +35,7 @@ namespace GameEngine
 		virtual Texture2D * GetRenderedImage() = 0;
 		virtual HardwareRenderer * GetHardwareRenderer() = 0;
         virtual RendererService* GetRendererService() = 0;
+        virtual void UpdateLightmap(LightmapSet& lightmapSet) = 0;
 	};
 
 	Renderer* CreateRenderer(RenderAPI api);

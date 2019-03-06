@@ -66,7 +66,7 @@ namespace GameEngine
 		DeviceMemory * UniformMemory = nullptr;
 		int BufferOffset = 0, BufferLength = 0;
 		CoreLib::String BindingName;
-		void SetUniformData(void * data, int length);
+		void SetUniformData(void * data, int length, int dstOffset = 0);
 		ModuleInstance() = default;
 		void Init(ShaderTypeSymbol * m)
 		{

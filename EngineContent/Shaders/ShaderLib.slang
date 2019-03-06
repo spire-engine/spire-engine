@@ -81,10 +81,12 @@ struct VertexPositionInfo
 interface IWorldSpaceTransform
 {
 	VertexPositionInfo getWorldSpacePos<TVertAttribs : IVertexAttribs>(VertexPositionInfo input, TVertAttribs vertAttribs);
+	uint getLightmapId();
 };
 
 struct StaticMeshTransform : IWorldSpaceTransform
 {
+	uint4 lightmapId;
 	float4x4 worldMat;
   	VertexPositionInfo getWorldSpacePos<TVertAttribs : IVertexAttribs>(VertexPositionInfo input, TVertAttribs vertAttribs)
 	{
@@ -96,12 +98,16 @@ struct StaticMeshTransform : IWorldSpaceTransform
         rs.tangentFrame.binormalSign = input.tangentFrame.binormalSign;
 		return rs;
 	}
+	uint getLightmapId()
+	{
+		return lightmapId.x;
+	}
 };
 
 struct SkeletalAnimationTransform : IWorldSpaceTransform
 {
+    uint4 lightmapId;
     float4x4 boneTransforms[128];
-    
     VertexPositionInfo getWorldSpacePos<TVertAttribs : IVertexAttribs>(VertexPositionInfo input, TVertAttribs vertAttribs)
     {
         VertexPositionInfo result;
@@ -126,6 +132,10 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
         result.tangentFrame.binormalSign = input.tangentFrame.binormalSign;
         return result;
     }
+	uint getLightmapId()
+	{
+		return lightmapId.x;
+	}
 };
 
 interface IHeightField
@@ -364,13 +374,16 @@ struct LightingEnvironment
     Texture2DArray shadowMapArray;
     SamplerComparisonState shadowMapSampler;
     TextureCubeArray envMap;
+	Texture2DArray lightmapArrays[12];
 };
 
 interface IMaterialPattern
 {
 	float4 computeForwardLighting(LightingEnvironment lightEnv,
 		VertexPositionInfo shadingPoint,
-		ViewParams viewParams);
+		ViewParams viewParams,
+		uint lightmapId,
+		float2 lightmapUV);
     bool alphaTest();
     float4 getDiffuse();
     [mutating]
@@ -437,97 +450,109 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 	float4 computeForwardLighting(
 		LightingEnvironment lightEnv,
 		VertexPositionInfo shadingPoint,
-		ViewParams viewParams)
+		ViewParams viewParams,
+		uint lightmapId,
+		float2 lightmapUV)
 	{
+		float3 color = 0;
 		float3 wnormal = shadingPoint.tangentFrame.TangentSpaceToWorldSpace(normal);
 		float3 view = normalize(viewParams.cameraPos - shadingPoint.vertPos);
 		float3 lNormal;
-        if (isDoubleSided)
-        {
-            lNormal = dot(wnormal, view) < 0 ? -wnormal : wnormal;
-        }
-        else
-        {
-            lNormal = wnormal;
-        }
-  
-        float dielectricSpecluar = 0.02*specular;
-        float3 diffuseColor = albedo - albedo * metallic;
-        float3 specularColor = float3(dielectricSpecluar - dielectricSpecluar * metallic) + albedo * metallic;
-        float3 viewPos = mul(viewParams.viewTransform, float4(shadingPoint.vertPos, 1.0)).xyz;
-        float3 color = diffuseColor * lightEnv.ambient.xyz;
-        float3 R = reflect(-view, lNormal);
+		if (isDoubleSided)
+		{
+			lNormal = dot(wnormal, view) < 0 ? -wnormal : wnormal;
+		}
+		else
+		{
+			lNormal = wnormal;
+		}
+		float3 R = reflect(-view, lNormal);
+		float dielectricSpecluar = 0.02*specular;
+		float3 diffuseColor = albedo - albedo * metallic;
+		float3 specularColor = float3(dielectricSpecluar - dielectricSpecluar * metallic) + albedo * metallic;
+		float3 viewPos = mul(viewParams.viewTransform, float4(shadingPoint.vertPos, 1.0)).xyz;
 
-        if (lightEnv.sunLightEnabled != 0)
-        {
-            float shadow = selfShadow.get(lightEnv.sunLightDir);
-            
-            if (lightEnv.numCascades)
-            {
-                for (int i = 0; i < lightEnv.numCascades; i++)
-                {
-                    if (-viewPos.z < lightEnv.zPlanes[i>>2][i&3])
-                    {
-                        float4 lightSpacePosT = mul(lightEnv.lightMatrix[i], float4(shadingPoint.vertPos, 1.0));
-                        float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
-                        float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler, 
-                            float3(lightSpacePos.xy, i+lightEnv.shadowMapId), lightSpacePos.z);
-                        shadow *= val;
-                        break;
-                    }
-                }
-            }
-            
-            float NoV = max(dot(lNormal, view), 0.0);
-            float3 fspecularColor = EnvBRDFApprox(specularColor, roughness, NoV);
-            float3 R = reflect(-view, lNormal);
-            float RoL = max(0, dot(R, lightEnv.sunLightDir));
-            float dotNL = clamp(dot(lNormal, lightEnv.sunLightDir), 0.01, 0.99);
-            color += lightEnv.sunLightColor.xyz * dotNL * 
-                    (diffuseColor + fspecularColor * PhongApprox(roughness, RoL)) * shadow;
-        }
+		if (lightmapId != 0xFFFFFFFF)
+		{
+			uint array = lightmapId >> 24;
+			uint level = lightmapId & 0xFFFFFF;
+			color = diffuseColor * lightEnv.lightmapArrays[array].Sample(viewParams.textureSampler, float3(lightmapUV, (float)level)).xyz;
+		}
+		else
+		{
+			color = diffuseColor * lightEnv.ambient.xyz;
 
-        for (int i = 0; i < lightEnv.lightCount; i++)
-        {
-            Light light = lightEnv.lights[i];
-            uint lightType = light.lightType_shadowMapId & 65535;
-            uint shadowMapId = light.lightType_shadowMapId >> 16;
-            float3 lightDir = float3(0.0);
-            float actualDecay = 1.0;
-            if (lightType == 0 || lightType == 2) //point light
-            {
-                float3 path = light.position - shadingPoint.vertPos;
-                float dist = dot(path, path);
-                lightDir = normalize(path);
-                actualDecay = 1.0 / max(1.0, dist * light.decay);
-                if (lightType == 2)
-                {
-                    float ang = acos(dot(lightDir, UnpackDir(light.direction)));
-                    actualDecay *= lerp(1.0, 0.0, clamp((ang-light.startAngle) / (light.endAngle-light.startAngle), 0.0, 1.0));
-                }
-            }
-            else if (lightType == 1) // directional light
-            {
-                lightDir = UnpackDir(light.direction);
-            }
-            float shadow = selfShadow.get(lightDir);
+			if (lightEnv.sunLightEnabled != 0)
+			{
+				float shadow = selfShadow.get(lightEnv.sunLightDir);
             
-            if (shadowMapId != 65535)
-            {
-                float4 lightSpacePosT = mul(light.lightMatrix, float4(shadingPoint.vertPos, 1.0));
-                float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
-                float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler, 
-                    float3(lightSpacePos.xy, shadowMapId), lightSpacePos.z);
-                shadow *= val;
-            }
+				if (lightEnv.numCascades)
+				{
+					for (int i = 0; i < lightEnv.numCascades; i++)
+					{
+						if (-viewPos.z < lightEnv.zPlanes[i>>2][i&3])
+						{
+							float4 lightSpacePosT = mul(lightEnv.lightMatrix[i], float4(shadingPoint.vertPos, 1.0));
+							float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
+							float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler, 
+								float3(lightSpacePos.xy, i+lightEnv.shadowMapId), lightSpacePos.z);
+							shadow *= val;
+							break;
+						}
+					}
+				}
             
-            float dotNL = clamp(dot(lNormal, lightDir), 0.01, 0.99);
-            float NoV = max(dot(lNormal, view), 0.0);
-            float3 fspecularColor = EnvBRDFApprox(specularColor, roughness, NoV);
+				float NoV = max(dot(lNormal, view), 0.0);
+				float3 fspecularColor = EnvBRDFApprox(specularColor, roughness, NoV);
+				float3 R = reflect(-view, lNormal);
+				float RoL = max(0, dot(R, lightEnv.sunLightDir));
+				float dotNL = clamp(dot(lNormal, lightEnv.sunLightDir), 0.01, 0.99);
+				color += lightEnv.sunLightColor.xyz * dotNL * 
+						(diffuseColor + fspecularColor * PhongApprox(roughness, RoL)) * shadow;
+			}
+
+			for (int i = 0; i < lightEnv.lightCount; i++)
+			{
+				Light light = lightEnv.lights[i];
+				uint lightType = light.lightType_shadowMapId & 65535;
+				uint shadowMapId = light.lightType_shadowMapId >> 16;
+				float3 lightDir = float3(0.0);
+				float actualDecay = 1.0;
+				if (lightType == 0 || lightType == 2) //point light
+				{
+					float3 path = light.position - shadingPoint.vertPos;
+					float dist = dot(path, path);
+					lightDir = normalize(path);
+					actualDecay = 1.0 / max(1.0, dist * light.decay);
+					if (lightType == 2)
+					{
+						float ang = acos(dot(lightDir, UnpackDir(light.direction)));
+						actualDecay *= lerp(1.0, 0.0, clamp((ang-light.startAngle) / (light.endAngle-light.startAngle), 0.0, 1.0));
+					}
+				}
+				else if (lightType == 1) // directional light
+				{
+					lightDir = UnpackDir(light.direction);
+				}
+				float shadow = selfShadow.get(lightDir);
             
-            float RoL = max(0, dot(R, lightDir));
-            color += light.color * (diffuseColor * dotNL + fspecularColor * PhongApprox(roughness, RoL)) * (shadow * actualDecay);
-        }
+				if (shadowMapId != 65535)
+				{
+					float4 lightSpacePosT = mul(light.lightMatrix, float4(shadingPoint.vertPos, 1.0));
+					float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
+					float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler, 
+						float3(lightSpacePos.xy, shadowMapId), lightSpacePos.z);
+					shadow *= val;
+				}
+            
+				float dotNL = clamp(dot(lNormal, lightDir), 0.01, 0.99);
+				float NoV = max(dot(lNormal, view), 0.0);
+				float3 fspecularColor = EnvBRDFApprox(specularColor, roughness, NoV);
+            
+				float RoL = max(0, dot(R, lightDir));
+				color += light.color * (diffuseColor * dotNL + fspecularColor * PhongApprox(roughness, RoL)) * (shadow * actualDecay);
+			}
+		}
 
         // find closest light probe
         

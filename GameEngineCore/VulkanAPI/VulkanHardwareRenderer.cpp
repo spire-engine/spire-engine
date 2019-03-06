@@ -1130,7 +1130,9 @@ namespace VK
 		CoreLib::List<vk::ImageView> views;
 		vk::DeviceMemory memory;
 		vk::ImageLayout currentLayout;
-		Texture(TextureUsage usage, int width, int height, int depth, int mipLevels, int arrayLayers, int numSamples, StorageFormat format, vk::ImageCreateFlags createFlags = vk::ImageCreateFlags())
+		Texture(TextureUsage usage, int width, int height, int depth, int mipLevels, int arrayLayers, int numSamples, StorageFormat format, 
+            bool isArray,
+            vk::ImageCreateFlags createFlags = vk::ImageCreateFlags())
 		{
 			this->usage = usage;
 			this->format = format;
@@ -1199,18 +1201,15 @@ namespace VK
 			vk::ImageViewType viewType = vk::ImageViewType::e2D;
 			if (depth == 1)
 			{
-				if (arrayLayers != 1)
-				{
-					if (createFlags & vk::ImageCreateFlagBits::eCubeCompatible)
-					{
-						if (arrayLayers > 6)
-							viewType = vk::ImageViewType::eCubeArray;
-						else
-							viewType = vk::ImageViewType::eCube;
-					}
-					else
-						viewType = vk::ImageViewType::e2DArray;
-				}
+                if (createFlags & vk::ImageCreateFlagBits::eCubeCompatible)
+                {
+                    if (isArray)
+                        viewType = vk::ImageViewType::eCubeArray;
+                    else
+                        viewType = vk::ImageViewType::eCube;
+                }
+                else if (isArray)
+                    viewType = vk::ImageViewType::e2DArray;
 			}
 			else viewType = vk::ImageViewType::e3D;
 
@@ -1337,6 +1336,11 @@ namespace VK
 			this->currentLayout = targetLayout;
 		}
 
+        DataType GetDataTypeElementType(DataType type)
+        {
+            return (DataType)((int)(type)&(~3));
+        }
+
 		void SetData(int level, int layer, int xOffset, int yOffset, int zOffset, int pwidth, int pheight, int pdepth, int layerCount, DataType inputType, void* data)
 		{
 			if (numSamples > 1)
@@ -1360,7 +1364,8 @@ namespace VK
 
 			int dataTypeSize = DataTypeSize(inputType);
 			List<unsigned short> translatedBuffer;
-			if (format == StorageFormat::R_F16 || format == StorageFormat::RG_F16 || format == StorageFormat::RGBA_F16)
+			if ((format == StorageFormat::R_F16 || format == StorageFormat::RG_F16 || format == StorageFormat::RGBA_F16)
+                && (GetDataTypeElementType(inputType) != DataType::Half))
 			{
 				// transcode f32 to f16
 				int channelCount = 1;
@@ -1841,7 +1846,7 @@ namespace VK
 		//TODO: Need some way of determining layouts and performing transitions properly. 
 	public:
 		Texture2D(TextureUsage usage, int width, int height, int mipLevelCount, StorageFormat format)
-			: VK::Texture(usage, width, height, 1, mipLevelCount, 1, 1, format) {};
+			: VK::Texture(usage, width, height, 1, mipLevelCount, 1, 1, format, false) {};
         virtual void SetCurrentLayout(TextureLayout layout) override
         {
             currentLayout = TranslateImageLayout(layout);
@@ -1873,7 +1878,7 @@ namespace VK
 	{
 	public:
 		Texture2DArray(TextureUsage usage, int width, int height, int mipLevels, int arrayLayers, StorageFormat newFormat)
-			: VK::Texture(usage, width, height, 1, mipLevels, arrayLayers, 1, newFormat) {};
+			: VK::Texture(usage, width, height, 1, mipLevels, arrayLayers, 1, newFormat, true) {};
         virtual void SetCurrentLayout(TextureLayout layout) override
         {
             currentLayout = TranslateImageLayout(layout);
@@ -1900,7 +1905,7 @@ namespace VK
 	{
 	public:
 		TextureCube(TextureUsage usage, int psize, int mipLevels, StorageFormat format)
-			: VK::Texture(usage, psize, psize, 1, mipLevels, 6, 1, format, vk::ImageCreateFlagBits::eCubeCompatible), size(psize)
+			: VK::Texture(usage, psize, psize, 1, mipLevels, 6, 1, format, false, vk::ImageCreateFlagBits::eCubeCompatible), size(psize)
 		{
 			List<float> zeroMem;
 			zeroMem.SetSize(psize * psize * 6 * 4);
@@ -1925,7 +1930,7 @@ namespace VK
 	public:
 		int count;
 		TextureCubeArray(TextureUsage usage, int cubeCount, int psize, int mipLevels, StorageFormat format)
-			: VK::Texture(usage, psize, psize, 1, mipLevels, cubeCount * 6, 1, format, vk::ImageCreateFlagBits::eCubeCompatible), size(psize)
+			: VK::Texture(usage, psize, psize, 1, mipLevels, cubeCount * 6, 1, format, true, vk::ImageCreateFlagBits::eCubeCompatible), size(psize)
 		{
 			this->isCubeArray = true;
 			List<float> zeroMem;
@@ -1952,7 +1957,7 @@ namespace VK
 	{
 	public:
 		Texture3D(TextureUsage usage, int width, int height, int depth, int mipLevels, StorageFormat newFormat)
-			: VK::Texture(usage, width, height, depth, mipLevels, 1, 1, newFormat) {};
+			: VK::Texture(usage, width, height, depth, mipLevels, 1, 1, newFormat, false) {};
 
 		virtual void GetSize(int& pwidth, int& pheight, int& pdepth) override
 		{
@@ -2920,7 +2925,7 @@ namespace VK
 					vk::DescriptorSetLayoutBinding()
 					.setBinding(desc.Location)
 					.setDescriptorType(TranslateBindingType(desc.Type))
-					.setDescriptorCount(1)
+					.setDescriptorCount(desc.ArraySize)
 					.setStageFlags(TranslateStageFlags(desc.Stages))
 					.setPImmutableSamplers(nullptr)
 				);
@@ -2976,44 +2981,53 @@ namespace VK
 			writeDescriptorSets.Clear();
 		}
 
+        virtual void Update(int location, ArrayView<GameEngine::Texture*> textures, TextureAspect aspect) override
+        {
+            int imageInfoStart = imageInfo.Count();
+            for (auto texture : textures)
+            {
+                if (texture)
+                {
+                    VK::Texture* internalTexture = dynamic_cast<VK::Texture*>(texture);
+
+                    vk::ImageView view = internalTexture->views[0];
+                    if (isDepthFormat(internalTexture->format) && aspect == TextureAspect::Depth)
+                        view = internalTexture->views[1];
+                    if (internalTexture->format == StorageFormat::Depth24Stencil8 &&  aspect == TextureAspect::Stencil)
+                        view = internalTexture->views[2];
+
+                    imageInfo.Add(
+                        vk::DescriptorImageInfo()
+                        .setSampler(vk::Sampler())
+                        .setImageView(view)
+                        .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)//
+                    );
+                }
+                else
+                    imageInfo.Add(
+                        vk::DescriptorImageInfo()
+                        .setSampler(vk::Sampler())
+                        .setImageView(vk::ImageView())
+                        .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)//
+                    );
+            }
+
+            writeDescriptorSets.Add(
+                vk::WriteDescriptorSet()
+                .setDstSet(this->descriptorSet)
+                .setDstBinding(location)
+                .setDstArrayElement(0)
+                .setDescriptorCount(textures.Count())
+                .setDescriptorType(vk::DescriptorType::eSampledImage)
+                .setPImageInfo(imageInfo.Buffer() + imageInfoStart)
+                .setPBufferInfo(nullptr)
+                .setPTexelBufferView(nullptr)
+            );
+        }
+
 		virtual void Update(int location, GameEngine::Texture* texture, TextureAspect aspect) override
 		{
-            if (texture)
-            {
-                VK::Texture* internalTexture = dynamic_cast<VK::Texture*>(texture);
-
-                vk::ImageView view = internalTexture->views[0];
-                if (isDepthFormat(internalTexture->format) && aspect == TextureAspect::Depth)
-                    view = internalTexture->views[1];
-                if (internalTexture->format == StorageFormat::Depth24Stencil8 &&  aspect == TextureAspect::Stencil)
-                    view = internalTexture->views[2];
-
-                imageInfo.Add(
-                    vk::DescriptorImageInfo()
-                    .setSampler(vk::Sampler())
-                    .setImageView(view)
-                    .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)//
-                );
-            }
-            else
-                imageInfo.Add(
-                    vk::DescriptorImageInfo()
-                    .setSampler(vk::Sampler())
-                    .setImageView(vk::ImageView())
-                    .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)//
-                );
-
-			writeDescriptorSets.Add(
-				vk::WriteDescriptorSet()
-				.setDstSet(this->descriptorSet)
-				.setDstBinding(location)
-				.setDstArrayElement(0)
-				.setDescriptorCount(1)
-				.setDescriptorType(vk::DescriptorType::eSampledImage)
-				.setPImageInfo(&imageInfo.Last())
-				.setPBufferInfo(nullptr)
-				.setPTexelBufferView(nullptr)
-			);
+            Update(location, MakeArrayView(texture), aspect);
 		}
 
 		virtual void Update(int location, GameEngine::TextureSampler* sampler) override

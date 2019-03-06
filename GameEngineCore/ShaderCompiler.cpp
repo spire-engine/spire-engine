@@ -162,7 +162,15 @@ namespace GameEngine
                         DescriptorLayout desc;
                         desc.Location = field->getBindingIndex() + slotOffset;
                         desc.Name = field->getName();
-                        desc.Type = SlangResourceKindToDescriptorType(field->getType()->getKind(), field->getType()->getResourceShape());
+                        if (field->getType()->getKind() == slang::TypeReflection::Kind::Array)
+                        {
+                            desc.Type = SlangResourceKindToDescriptorType(field->getType()->getElementType()->getKind(), field->getType()->getResourceShape());
+                            desc.ArraySize = field->getType()->getElementCount();
+                        }
+                        else
+                        {
+                            desc.Type = SlangResourceKindToDescriptorType(field->getType()->getKind(), field->getType()->getResourceShape());
+                        }
                         desc.Stages = stageFlags;
                         set.Descriptors.Add(desc);
                     }
@@ -249,6 +257,13 @@ namespace GameEngine
                     auto kind = field->getType()->getKind();
                     if (kind == slang::TypeReflection::Kind::None)
                         continue;
+                    if (kind == slang::TypeReflection::Kind::Array)
+                    {
+                        kind = field->getType()->getElementType()->getKind();
+                        varLayout.BindingLength = field->getType()->getElementCount();
+                    }
+                    else
+                        varLayout.BindingLength = 1;
                     auto bindingType = SlangResourceKindToDescriptorType(kind, field->getType()->getResourceShape());
                     switch (bindingType)
                     {
@@ -269,7 +284,6 @@ namespace GameEngine
                     }
                     varLayout.BindingOffset = field->getBindingIndex() + offset;
                     varLayout.BindingSpace = field->getBindingSpace();
-                    varLayout.BindingLength = field->getCategoryCount();
                 }
                 sym->VarLayouts.Add(varLayout.Name, varLayout);
             }

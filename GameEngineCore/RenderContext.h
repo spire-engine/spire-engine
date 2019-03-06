@@ -17,6 +17,7 @@
 #include "ViewResource.h"
 #include "Renderer.h"
 #include "CoreLib/PerformanceCounter.h"
+#include "DeviceLightmapSet.h"
 
 namespace GameEngine
 {
@@ -215,6 +216,7 @@ namespace GameEngine
 		Texture2D* LoadTexture2D(const CoreLib::String & name, CoreLib::Graphics::TextureFile & data);
 		Texture2D* LoadTexture(const CoreLib::String & filename);
 	public:
+        CoreLib::RefPtr<DeviceLightmapSet> deviceLightmapSet;
 		DeviceMemory instanceUniformMemory, transformMemory;
 		void RegisterMaterial(Material * material);
 		

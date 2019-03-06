@@ -138,7 +138,7 @@ namespace GameEngine
 		return pipelineClass.Ptr();
 	}
 
-	void ModuleInstance::SetUniformData(void * data, int length)
+	void ModuleInstance::SetUniformData(void * data, int length, int dstOffset)
 	{
 #ifdef _DEBUG
 		if (length > BufferLength)
@@ -149,7 +149,7 @@ namespace GameEngine
 			currentDescriptor++;
 			currentDescriptor = currentDescriptor % DynamicBufferLengthMultiplier;
 			int alternateBufferOffset = currentDescriptor * BufferLength;
-			UniformMemory->SetDataAsync(BufferOffset + alternateBufferOffset, data, length);
+			UniformMemory->SetDataAsync(BufferOffset + alternateBufferOffset + dstOffset, data, length);
 		}
 	}
 

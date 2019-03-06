@@ -11,8 +11,8 @@
 #include "CoreLib/WinForm/Debug.h"
 #include "LightProbeRenderer.h"
 #include "TextureCompressor.h"
+#include "DeviceLightmapSet.h"
 #include <fstream>
-
 #include "DeviceMemory.h"
 #include "WorldRenderPass.h"
 #include "PostRenderPass.h"
@@ -59,6 +59,9 @@ namespace GameEngine
 			{
 				auto sceneResources = renderer->sceneRes.Ptr();
 				renderer->sharedRes.CreateModuleInstance(rs, Engine::GetShaderCompiler()->LoadSystemTypeSymbol(name), &sceneResources->transformMemory, uniformBufferSize);
+                uint32_t lightmapId = 0xFFFFFFFF;
+                for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
+                    rs.SetUniformData(&lightmapId, sizeof(lightmapId));
 			}
 
 			virtual CoreLib::RefPtr<Drawable> CreateStaticDrawable(Mesh * mesh, int elementId, Material * material, bool cacheMesh) override
@@ -186,7 +189,16 @@ namespace GameEngine
         {
             return renderService.Ptr();
         }
-
+        virtual void UpdateLightmap(LightmapSet& lightmapSet) override
+        {
+            if (level)
+            {
+                Wait();
+                sceneRes->deviceLightmapSet = new DeviceLightmapSet();
+                sceneRes->deviceLightmapSet->Init(hardwareRenderer, lightmapSet);
+                renderProcedure->UpdateSceneResourceBinding(sceneRes.Ptr());
+            }
+        }
 		RefPtr<ViewResource> cubemapRenderView;
 		RefPtr<IRenderProcedure> cubemapRenderProc;
 		virtual void UpdateLightProbes() override
@@ -211,17 +223,36 @@ namespace GameEngine
 				lpRenderer.RenderLightProbe(sharedRes.envMapArray.Ptr(), defaultEnvMapId, level, Vec3::Create(0.0f, 1000.0f, 0.0f));
 			}
 		}
+        void TryLoadLightmap()
+        {
+            auto lightmapFile = Engine::Instance()->FindFile(Path::ReplaceExt(level->FileName, "lightmap"), ResourceType::Level);
+            if (lightmapFile.Length())
+            {
+                LightmapSet lightmapSet;
+                lightmapSet.LoadFromFile(level, lightmapFile);
+                sceneRes->deviceLightmapSet = new DeviceLightmapSet();
+                sceneRes->deviceLightmapSet->Init(hardwareRenderer, lightmapSet);
+            }
+            else
+            {
+                sceneRes->deviceLightmapSet = nullptr;
+            }
+        }
 		virtual void InitializeLevel(Level* pLevel) override
 		{
 			if (!pLevel) return;
 			level = pLevel;
+            TryLoadLightmap();
+
 			cubemapRenderView = new ViewResource(hardwareRenderer);
 			cubemapRenderView->Resize(EnvMapSize, EnvMapSize);
 			cubemapRenderProc = CreateStandardRenderProcedure(false, false);
 			cubemapRenderProc->Init(this, cubemapRenderView.Ptr());
+            cubemapRenderProc->UpdateSceneResourceBinding(sceneRes.Ptr());
 			defaultEnvMapId = -1;
 			UpdateLightProbes();
 			renderProcedure->UpdateSharedResourceBinding();
+            renderProcedure->UpdateSceneResourceBinding(sceneRes.Ptr());
 			RunRenderProcedure();
 			hardwareRenderer->TransferBarrier(DynamicBufferLengthMultiplier);
 			RenderFrame();

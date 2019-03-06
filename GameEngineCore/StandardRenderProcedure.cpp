@@ -108,6 +108,11 @@ namespace GameEngine
 					return viewRes->LoadSharedRenderTarget("litColor", StorageFormat::RGBA_F16).Ptr();
 			}
 		}
+        virtual void UpdateSceneResourceBinding(SceneResource* sceneRes) override
+        {
+            lighting.UpdateSceneResourceBinding(sceneRes);
+        }
+
 		virtual void UpdateSharedResourceBinding() override
 		{
 			for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
@@ -271,7 +276,28 @@ namespace GameEngine
 			for (auto & actor : params.level->Actors)
 			{
 				levelBounds.Union(actor.Value->Bounds);
-				actor.Value->GetDrawables(getDrawableParam);
+                int lastTransparentDrawableCount = sink.GetDrawables(true).Count();
+                int lastOpaqueDrawableCount = sink.GetDrawables(false).Count();
+				
+                // obtain drawables from actor
+                actor.Value->GetDrawables(getDrawableParam);
+                
+                // if a LightmapSet is available, update drawable's lightmapIndex uniform parameter (do a CPU--GPU memory transfer if needed)
+                if (lighting.deviceLightmapSet)
+                {
+                    uint32_t lightmapIndex = lighting.deviceLightmapSet->GetDeviceLightmapId(actor.Value.Ptr());
+                    auto transparentDrawables = sink.GetDrawables(true);
+                    for (int i = lastTransparentDrawableCount; i < transparentDrawables.Count(); i++)
+                    {
+                        transparentDrawables.Buffer()[i]->UpdateLightmapIndex(lightmapIndex);
+                    }
+                    auto opaqueDrawables = sink.GetDrawables(false);
+                    for (int i = lastOpaqueDrawableCount; i < opaqueDrawables.Count(); i++)
+                    {
+                        opaqueDrawables.Buffer()[i]->UpdateLightmapIndex(lightmapIndex);
+                    }
+                }
+
 				auto actorType = actor.Value->GetEngineType();
 				if (actorType == EngineActorType::Atmosphere)
 				{

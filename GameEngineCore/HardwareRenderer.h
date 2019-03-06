@@ -694,12 +694,14 @@ namespace GameEngine
 		StageFlags Stages = sfGraphics;
 		BindingType Type; //< type of the resource binding this descriptor is about
         CoreLib::String Name;
+        int ArraySize = 1;
 		DescriptorLayout() {}
-		DescriptorLayout(StageFlags stage,int loc, BindingType type)
+		DescriptorLayout(StageFlags stage, int loc, BindingType type, int arraySize = 1)
 		{
 			Stages = stage;
 			Location = loc;
 			Type = type;
+            ArraySize = arraySize;
 		}
 	};
 
@@ -717,6 +719,7 @@ namespace GameEngine
 	public:
 		virtual void BeginUpdate() = 0;
 		virtual void Update(int location, Texture* texture, TextureAspect aspect) = 0;
+        virtual void Update(int location, CoreLib::ArrayView<Texture*> texture, TextureAspect aspect) = 0;
 		virtual void Update(int location, TextureSampler* sampler) = 0;
 		virtual void Update(int location, Buffer* buffer, int offset = 0, int length = -1) = 0;
 		virtual void EndUpdate() = 0;

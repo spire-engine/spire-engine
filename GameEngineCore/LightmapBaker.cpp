@@ -31,7 +31,7 @@ namespace GameEngine
         EnumerableDictionary<Actor*, RawMapSet> maps;
         Level* level = nullptr;
         RefPtr<StaticScene> staticScene;
-        void AllocLightmaps()
+        void AllocLightmaps(LightmapSet& lmSet)
         {
             // in the future we may support a wider range of actors.
             // for now we only allocate lightmaps for static mesh actors.
@@ -41,6 +41,7 @@ namespace GameEngine
                 {
                     auto size = (smActor->Bounds.Max - smActor->Bounds.Min).Length();
                     int resolution = Math::Clamp(1 << Math::Log2Ceil((int)(size * settings.ResolutionScale)), settings.MinResolution, settings.MaxResolution);
+                    lmSet.ActorLightmapIds[actor.Value.Ptr()] = maps.Count();
                     maps[smActor.Ptr()] = RawMapSet();
                     maps[smActor.Ptr()]().Init(resolution, resolution);
                 }
@@ -260,7 +261,7 @@ namespace GameEngine
         void BakeLightmaps(LightmapSet& lightmaps, Level* pLevel)
         {
             level = pLevel;
-            AllocLightmaps();
+            AllocLightmaps(lightmaps);
             BakeLightmapGBuffers();
             staticScene = BuildStaticScene(level);
             ComputeLightmaps(lightmaps);

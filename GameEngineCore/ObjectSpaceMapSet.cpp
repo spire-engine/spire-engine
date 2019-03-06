@@ -68,13 +68,46 @@ namespace GameEngine
         Width = w;
         Height = h;
     }
-    void RawObjectSpaceMap::SaveToFile(String fileName)
+    void RawObjectSpaceMap::DebugSaveAsImage(String fileName)
     {
         CoreLib::Imaging::BitmapF bmp = CoreLib::Imaging::BitmapF(Width, Height);
         auto pixels = bmp.GetPixels();
         for (int i = 0; i < Width * Height; i++)
             pixels[i] = GetPixel(i % Width, i / Width);
         bmp.GetImageRef().SaveAsBmpFile(fileName);
+    }
+
+    struct TextureMapFileHeader
+    {
+        char identifier[4] = { 'T', 'E', 'X', 'M' };
+        unsigned int Size = 0;
+        int Version = 0;
+        int Width, Height;
+        RawObjectSpaceMap::DataType DataType;
+        int Reserved[16] = {};
+    };
+
+    void RawObjectSpaceMap::SaveToStream(CoreLib::IO::BinaryWriter& writer)
+    {
+        TextureMapFileHeader header;
+        header.Width = Width;
+        header.Height = Height;
+        header.DataType = dataType;
+        header.Size = sizeof(TextureMapFileHeader) + data.Count();
+        writer.Write(header);
+        writer.Write(data.Buffer(), data.Count());
+    }
+    void RawObjectSpaceMap::LoadFromStream(CoreLib::IO::BinaryReader& reader)
+    {
+        TextureMapFileHeader header;
+        reader.Read(header);
+        if (strncmp(header.identifier, "TEXM", 4) != 0 || sizeof(TextureMapFileHeader) + header.Width*header.Height*GetElementSize(header.DataType) != header.Size)
+            throw IO::IOException("Invalid texture data file.");
+        Width = header.Width;
+        Height = header.Height;
+        dataType = header.DataType;
+        data.SetSize(header.Width*header.Height*GetElementSize(header.DataType));
+        reader.Read(data.Buffer(), data.Count());
     }
     uint32_t PackRGB10(float x, float y, float z)
     {

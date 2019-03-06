@@ -12,62 +12,72 @@
 
 namespace GameEngine
 {
-	using namespace CoreLib;
-	using namespace CoreLib::IO;
-	using namespace VectorMath;
+    using namespace CoreLib;
+    using namespace CoreLib::IO;
+    using namespace VectorMath;
 
-	PipelineClass * Drawable::GetPipeline(int passId, PipelineContext & pipelineManager)
-	{
-		if (!Engine::Instance()->GetGraphicsSettings().UsePipelineCache || pipelineCache[passId] == nullptr)
-		{
-			auto rs = pipelineManager.GetPipeline(&vertFormat, primType);
-			pipelineCache[passId] = rs;
-		}
-		return pipelineCache[passId];
-	}
+    PipelineClass * Drawable::GetPipeline(int passId, PipelineContext & pipelineManager)
+    {
+        if (!Engine::Instance()->GetGraphicsSettings().UsePipelineCache || pipelineCache[passId] == nullptr)
+        {
+            auto rs = pipelineManager.GetPipeline(&vertFormat, primType);
+            pipelineCache[passId] = rs;
+        }
+        return pipelineCache[passId];
+    }
 
-	bool Drawable::IsTransparent()
-	{
-		return material->IsTransparent;
-	}
+    bool Drawable::IsTransparent()
+    {
+        return material->IsTransparent;
+    }
 
-	void Drawable::UpdateMaterialUniform()
-	{
-		if (material->ParameterDirty)
-		{
-			material->ParameterDirty = false;
-			for (auto & p : pipelineCache)
-				p = nullptr;
+    void Drawable::UpdateMaterialUniform()
+    {
+        if (material->ParameterDirty)
+        {
+            material->ParameterDirty = false;
+            for (auto & p : pipelineCache)
+                p = nullptr;
 
-			auto update = [=](ModuleInstance & moduleInstance)
-			{
-				if (moduleInstance.BufferLength)
-				{
-					unsigned char * ptr0 = (unsigned char*)moduleInstance.UniformMemory->BufferPtr() + moduleInstance.BufferOffset;
-					auto ptr = ptr0;
-					auto end = ptr + moduleInstance.BufferLength;
-					material->FillInstanceUniformBuffer([](const String&) {},
-						[&](auto & val)
-					{
-						if (ptr + sizeof(val) > end)
-							throw InvalidOperationException("insufficient buffer.");
-						*((decltype(&val))ptr) = val;
-						ptr += sizeof(val);
-					},
-						[&](int alignment)
-					{
-						if (auto m = (int)(((unsigned long long)(void*)ptr) % alignment))
-						{
-							ptr += (alignment - m);
-						}
-					}
-					);
-					scene->instanceUniformMemory.Sync(ptr0, moduleInstance.BufferLength);
-				}
-			};
-			update(material->MaterialModule);
-		}
-	}
+            auto update = [=](ModuleInstance & moduleInstance)
+            {
+                if (moduleInstance.BufferLength)
+                {
+                    unsigned char * ptr0 = (unsigned char*)moduleInstance.UniformMemory->BufferPtr() + moduleInstance.BufferOffset;
+                    auto ptr = ptr0;
+                    auto end = ptr + moduleInstance.BufferLength;
+                    material->FillInstanceUniformBuffer([](const String&) {},
+                        [&](auto & val)
+                    {
+                        if (ptr + sizeof(val) > end)
+                            throw InvalidOperationException("insufficient buffer.");
+                        *((decltype(&val))ptr) = val;
+                        ptr += sizeof(val);
+                    },
+                        [&](int alignment)
+                    {
+                        if (auto m = (int)(((unsigned long long)(void*)ptr) % alignment))
+                        {
+                            ptr += (alignment - m);
+                        }
+                    }
+                    );
+                    scene->instanceUniformMemory.Sync(ptr0, moduleInstance.BufferLength);
+                }
+            };
+            update(material->MaterialModule);
+        }
+    }
+
+    void Drawable::UpdateLightmapIndex(uint32_t lightmapIndex)
+    {
+        if (lightmapId != lightmapIndex)
+        {
+            lightmapId = lightmapIndex;
+            for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
+                transformModule->SetUniformData(&lightmapIndex, sizeof(uint32_t));
+        }
+    }
 
 	void Drawable::UpdateTransformUniform(const VectorMath::Matrix4 & localTransform)
 	{
@@ -75,7 +85,7 @@ namespace GameEngine
 			throw InvalidOperationException("cannot update non-static drawable with static transform data.");
 		if (!transformModule->UniformMemory)
 			throw InvalidOperationException("invalid buffer.");
-		transformModule->SetUniformData((void*)&localTransform, sizeof(Matrix4));
+		transformModule->SetUniformData((void*)&localTransform, sizeof(Matrix4), 16);
 	}
 
 	void Drawable::UpdateTransformUniform(const VectorMath::Matrix4 & localTransform, const Pose & pose, RetargetFile * retarget)
@@ -96,7 +106,7 @@ namespace GameEngine
 		{
 			Matrix4::Multiply(matrices[i], localTransform, matrices[i]);
 		}
-		transformModule->SetUniformData((void*)matrices.Buffer(), sizeof(Matrix4) * matrices.Count());
+		transformModule->SetUniformData((void*)matrices.Buffer(), sizeof(Matrix4) * matrices.Count(), 16);
 	}
     RefPtr<DrawableMesh> SceneResource::CreateDrawableMesh(Mesh * mesh)
     {
@@ -348,6 +358,7 @@ namespace GameEngine
 		Destroy();
 		meshes = CoreLib::EnumerableDictionary<CoreLib::String, RefPtr<DrawableMesh>>();
 		textures = EnumerableDictionary<String, RefPtr<Texture2D>>();
+        deviceLightmapSet = nullptr;
 	}
 
 	// Converts StorageFormat to DataType
@@ -504,6 +515,7 @@ namespace GameEngine
 						descLayout.Type = BindingType::StorageBuffer;
 						break;
 					}
+                    descLayout.ArraySize = v.Value.BindingLength;
 					descs.Add(descLayout);
 				}
 			}
