@@ -391,7 +391,9 @@ namespace GameEngine
             staticScene = BuildStaticScene(level);
             BiasGBufferPositions();
             ComputeLightmaps_Direct();
-            ComputeLightmaps_Indirect();
+            for (int i = 0; i < settings.IndirectLightingBounces; i++)
+                ComputeLightmaps_Indirect();
+            
             CompositeLightmaps(lightmaps);
             lightmaps.Lightmaps[3].DebugSaveAsImage("lm.bmp");
         }
@@ -401,8 +403,9 @@ namespace GameEngine
     {
         LightmapBaker baker;
         baker.settings = settings;
-        baker.settings.SampleCount = 64;
+        baker.settings.SampleCount = 16;
         baker.settings.ResolutionScale = 0.5f;
+        baker.settings.IndirectLightingBounces = 10;
         baker.BakeLightmaps(lightmaps, pLevel);
     }
 }
