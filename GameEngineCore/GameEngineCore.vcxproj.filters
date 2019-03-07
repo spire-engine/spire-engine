@@ -170,25 +170,25 @@
       <Filter>Actors</Filter>
     </ClCompile>
     <ClCompile Include="LightmapUVGeneration.cpp">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClCompile>
     <ClCompile Include="Rasterizer.cpp">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClCompile>
     <ClCompile Include="ObjectSpaceMapSet.cpp">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClCompile>
     <ClCompile Include="ObjectSpaceGBufferRenderer.cpp">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClCompile>
     <ClCompile Include="LightmapBaker.cpp">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClCompile>
     <ClCompile Include="StaticScene.cpp">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClCompile>
     <ClCompile Include="StaticSceneRenderer.cpp">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClCompile>
     <ClCompile Include="VulkanAPI\volk.c">
       <Filter>Renderer\RenderAPI\Vulkan API</Filter>
@@ -383,34 +383,31 @@
       <Filter>OS</Filter>
     </ClInclude>
     <ClInclude Include="LightmapUVGeneration.h">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="Rasterizer.h">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="DisjointSet.h">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="ObjectSpaceMapSet.h">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="ObjectSpaceGBufferRenderer.h">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="StaticScene.h">
-      <Filter>Geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="Ray.h">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="Bvh.h">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="StaticSceneRenderer.h">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="LightmapBaker.h">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="VulkanAPI\volk.h">
       <Filter>Renderer\RenderAPI\Vulkan API</Filter>
@@ -419,12 +416,15 @@
       <Filter>Renderer\RenderAPI\Vulkan API</Filter>
     </ClInclude>
     <ClInclude Include="LightmapSet.h">
-      <Filter>Geometry</Filter>
+      <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="DebugGraphics.h">
       <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="DeviceLightmapSet.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Ray.h">
       <Filter>Renderer</Filter>
     </ClInclude>
   </ItemGroup>
@@ -465,7 +465,7 @@
     <Filter Include="OS\Win32">
       <UniqueIdentifier>{2133fcad-31c4-46a6-b793-c47ee61c2391}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Geometry">
+    <Filter Include="LightmapBaking">
       <UniqueIdentifier>{00f671f8-688c-415a-8049-97fe129e2d2f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>

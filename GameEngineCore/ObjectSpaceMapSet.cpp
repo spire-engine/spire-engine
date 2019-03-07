@@ -75,7 +75,7 @@ namespace GameEngine
         auto pixels = bmp.GetPixels();
         for (int i = 0; i < Width * Height; i++)
             pixels[i] = GetPixel(i % Width, i / Width);
-        bmp.GetImageRef().SaveAsBmpFile(fileName);
+        bmp.GetImageRef().SaveAsPfmFile(fileName);
     }
 
     struct TextureMapFileHeader

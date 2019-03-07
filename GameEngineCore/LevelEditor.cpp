@@ -275,6 +275,8 @@ namespace GameEngine
 			auto mnLighting = new MenuItem(mainMenu, "&Lighting");
             auto mnPrebakeLighting = new MenuItem(mnLighting, "&Bake Lightmaps");
             mnPrebakeLighting->OnClick.Bind(this, &LevelEditorImpl::mnBakeLightmaps_Clicked);
+            auto mnExportLightmap = new MenuItem(mnLighting, "Ex&port Lightmap...");
+            mnExportLightmap->OnClick.Bind(this, &LevelEditorImpl::mnExportLightmap_Clicked);
 			auto mnUpdateLightProbes = new MenuItem(mnLighting, "&Update Light Probes", "F12");
 			mnUpdateLightProbes->OnClick.Bind(this, &LevelEditorImpl::mnUpdateLightProbes_Clicked);
 
@@ -595,6 +597,31 @@ namespace GameEngine
 		{
 			Engine::Instance()->UpdateLightProbes();
 		}
+        void mnExportLightmap_Clicked(UI_Base*)
+        {
+            if (selectedActor)
+            {
+                LightmapSet lightmapSet;
+                auto lightmapFileName = Path::ReplaceExt(level->FileName, "lightmap");
+                if (File::Exists(lightmapFileName))
+                {
+                    lightmapSet.LoadFromFile(level, lightmapFileName);
+                    int lightmapId = -1;
+                    if (lightmapSet.ActorLightmapIds.TryGetValue(selectedActor, lightmapId))
+                    {
+                        RefPtr<FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+                        dlg->DefaultEXT = "pfm";
+                        dlg->Filter = "Portable Float Map|*.pfm";
+                        if (dlg->ShowSave())
+                        {
+                            lightmapSet.Lightmaps[lightmapId].DebugSaveAsImage(dlg->FileName);
+                            return;
+                        }
+                    }
+                }
+                OsApplication::ShowMessage(String("Lightmap for actor '") + selectedActor->Name.GetValue() + "' does not exist.", "Error");
+            }
+        }
         void mnBakeLightmaps_Clicked(UI_Base*)
         {
             BakeLightmaps();

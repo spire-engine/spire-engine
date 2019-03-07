@@ -399,10 +399,30 @@ namespace GameEngine
         }
 
         RawObjectSpaceMap blurTempMap;
+        Dictionary<int, List<float>> blurKernels;
+        ArrayView<float> GetBlurKernel(int radius)
+        {
+            int size = radius + 1;
+            if (auto rs = blurKernels.TryGetValue(size))
+                return rs->GetArrayView();
+            List<float> kernel;
+            kernel.SetSize(size);
+            float sigma = 0.4f;
+            float invTwoSigmaSquare = 1.0f / (2.0f * sigma * sigma);
+            for (int i = 0; i < size; i++)
+            {
+                float dist = i / (float)radius;
+                float weight = exp(-dist * dist * invTwoSigmaSquare);
+                kernel[i] = weight;
+            }
+            blurKernels[size] = kernel;
+            return blurKernels[size]().GetArrayView();
+        }
         void BlurIndirectLightmap(IntSet& validPixels, RawObjectSpaceMap & lightmap)
         {
             int blurRadius = Math::Clamp(lightmap.Width / 100, 1, 20);
             blurTempMap.Init(lightmap.GetDataType(), lightmap.Width, lightmap.Height);
+            ArrayView<float> kernel = GetBlurKernel(blurRadius);
             #pragma omp parallel for
             for (int y = 0; y < lightmap.Height; y++)
             {
@@ -411,14 +431,14 @@ namespace GameEngine
                     if (validPixels.Contains(y*lightmap.Width + x))
                     {
                         VectorMath::Vec3 value;
+                        float sumWeight = kernel[0];
                         value = lightmap.GetPixel(x, y).xyz();
-                        int count = 1;
                         for (int ix = x - 1; ix >= Math::Max(0, x - blurRadius); ix--)
                         {
                             if (validPixels.Contains(y*lightmap.Width + ix))
                             {
-                                value += lightmap.GetPixel(ix, y).xyz();
-                                count++;
+                                value += lightmap.GetPixel(ix, y).xyz() * kernel[x-ix];
+                                sumWeight += kernel[x - ix];
                             }
                             else
                                 break;
@@ -427,13 +447,13 @@ namespace GameEngine
                         {
                             if (validPixels.Contains(y*lightmap.Width + ix))
                             {
-                                value += lightmap.GetPixel(ix, y).xyz();
-                                count++;
+                                value += lightmap.GetPixel(ix, y).xyz() * kernel[ix - x];
+                                sumWeight += kernel[ix - x];
                             }
                             else
                                 break;
                         }
-                        value *= 1.0f / (float)count;
+                        value *= 1.0f / sumWeight;
                         blurTempMap.SetPixel(x, y, VectorMath::Vec4::Create(value, 1.0f));
                     }
                 }
@@ -448,13 +468,13 @@ namespace GameEngine
                     {
                         VectorMath::Vec3 value;
                         value = blurTempMap.GetPixel(x, y).xyz();
-                        int count = 1;
+                        float sumWeight = kernel[0];
                         for (int iy = y - 1; iy >= Math::Max(0, y - blurRadius); iy--)
                         {
                             if (validPixels.Contains(iy*lightmap.Width + x))
                             {
-                                value += blurTempMap.GetPixel(x, iy).xyz();
-                                count++;
+                                value += blurTempMap.GetPixel(x, iy).xyz() * kernel[y - iy];
+                                sumWeight += kernel[y - iy];
                             }
                             else
                                 break;
@@ -463,13 +483,13 @@ namespace GameEngine
                         {
                             if (validPixels.Contains(iy*lightmap.Width + x))
                             {
-                                value += blurTempMap.GetPixel(x, iy).xyz();
-                                count++;
+                                value += blurTempMap.GetPixel(x, iy).xyz() * kernel[iy - y];
+                                sumWeight += kernel[iy - y];
                             }
                             else
                                 break;
                         }
-                        value *= 1.0f / (float)count;
+                        value *= 1.0f / sumWeight;
                         lightmap.SetPixel(x, y, VectorMath::Vec4::Create(value, 1.0f));
                     }
                 }
@@ -484,9 +504,31 @@ namespace GameEngine
                 auto & lm = lightmaps.Lightmaps[i];
                 lm.Init(RawObjectSpaceMap::DataType::RGB32F, maps[i].lightMap.Width, maps[i].lightMap.Height);
                 BlurIndirectLightmap(maps[i].validPixels, maps[i].indirectLightmap);
+                // composite
+                #pragma omp parallel for
                 for (int y = 0; y < lm.Height; y++)
                     for (int x = 0; x < lm.Width; x++)
                         lm.SetPixel(x, y, maps[i].lightMap.GetPixel(x, y) + maps[i].indirectLightmap.GetPixel(x, y));
+
+                // dilate
+                #pragma omp parallel for
+                for (int y = 0; y < lm.Height; y++)
+                    for (int x = 0; x < lm.Width; x++)
+                    {
+                        if (!maps[i].validPixels.Contains(y * lm.Width + x))
+                        {
+                            for (int iy = Math::Max(y-1, 0); iy <= Math::Min(y + 1, lm.Height-1); iy++)
+                                for (int ix = Math::Max(x - 1, 0); ix <= Math::Min(x + 1, lm.Width - 1); ix++)
+                                {
+                                    if (maps[i].validPixels.Contains(iy * lm.Width + ix))
+                                    {
+                                        lm.SetPixel(x, y, lm.GetPixel(ix, iy));
+                                        goto outContinue;
+                                    }
+                                }
+                        outContinue:;
+                        }
+                    }
             }
         }
     public:
