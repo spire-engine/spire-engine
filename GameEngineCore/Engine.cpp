@@ -507,6 +507,11 @@ namespace GameEngine
 		levelEditor->OnLoad();
 	}
 
+    void Engine::DoEvents()
+    {
+        OsApplication::DoEvents();
+    }
+
 	void Engine::SetEngineMode(EngineMode newMode)
 	{
 		engineMode = newMode;

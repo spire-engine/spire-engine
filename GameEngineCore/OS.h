@@ -46,6 +46,7 @@ namespace GameEngine
         virtual bool IsVisible() = 0;
         virtual void Show() = 0;
         virtual void Hide() = 0;
+        virtual void Invoke(const CoreLib::Event<> & func) = 0;
         virtual DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags = MessageBoxFlags::OKOnly) = 0;
     };
 
@@ -121,6 +122,7 @@ namespace GameEngine
         static void SetMainLoopEventHandler(CoreLib::Procedure<> handler);
         static DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags = MessageBoxFlags::OKOnly);
         static void Run(SystemWindow* mainWindow);
+        static void DoEvents();
         static void Dispose();
         static void DebugPrint(const char * buffer);
         static void DebugWriteLine(const char * buffer)

@@ -194,6 +194,7 @@ namespace GameEngine
 		{
 			return engineMode;
 		}
+        void DoEvents();
 		void SetEngineMode(EngineMode newMode);
         SystemWindow * CreateSystemWindow(int log2BufferSize = 20);
 	public:

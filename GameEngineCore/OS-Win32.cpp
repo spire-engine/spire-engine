@@ -27,6 +27,11 @@ namespace GameEngine
         return dynamic_cast<SystemWindow*>(rs);
     }
 
+    void OsApplication::DoEvents()
+    {
+        WinForm::Application::DoEvents();
+    }
+
     void OsApplication::Run(SystemWindow* mainWindow)
     {
         WinForm::Application::Run(dynamic_cast<Win32SystemWindow*>(mainWindow), true);

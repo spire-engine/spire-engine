@@ -176,13 +176,43 @@ namespace GameEngine
 			}
 		}
 
+        RefPtr<LightmapBaker> lightmapBaker;
         void BakeLightmaps()
         {
-            LightmapSet lightmaps;
+            if (lightmapBaker)
+                lightmapBaker->Cancel();
+            lightmapBaker = CreateLightmapBaker();
             LightmapBakingSettings settings;
-            GameEngine::BakeLightmaps(lightmaps, settings, level);
-            lightmaps.SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
-            Engine::Instance()->GetRenderer()->UpdateLightmap(lightmaps);
+            lightmapBaker->OnCompleted.Bind([this]()
+            {
+                Engine::Instance()->GetMainWindow()->Invoke(Event<>([this]()
+                {
+                    lightmapBaker->GetLightmapSet().SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
+                    Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
+                }));
+            });
+            lightmapBaker->OnIterationCompleted.Bind([this]()
+            {
+                Engine::Instance()->GetMainWindow()->Invoke(Event<>([this]() 
+                {
+                    Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
+                }));
+            });
+            lightmapBaker->OnProgressChanged.Bind([this](LightmapBakerProgressChangedEventArgs /*e*/)
+            {
+                Engine::Instance()->GetMainWindow()->Invoke(Event<>([&]()
+                {
+                    // todo: update progress bar
+                }));
+            });
+            lightmapBaker->OnStatusChanged.Bind([this](String txt)
+            {
+                Engine::Instance()->GetMainWindow()->Invoke(Event<>([&]()
+                {
+                    Engine::Print("Lightmap baker: %s\n", txt.Buffer());
+                }));
+            });
+            lightmapBaker->Start(settings, level);
         }
 		void InitUI()
 		{
@@ -644,6 +674,12 @@ namespace GameEngine
 			}
 			return false;
 		}
+    public:
+        ~LevelEditorImpl()
+        {
+            if (lightmapBaker)
+                lightmapBaker->Cancel();
+        }
 	};
 	LevelEditor * GameEngine::CreateLevelEditor()
 	{

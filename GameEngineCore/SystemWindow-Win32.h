@@ -109,6 +109,10 @@ namespace GameEngine
         {
             BaseForm::SetVisible(false);
         }
+        virtual void Invoke(const Event<>& f) override
+        {
+            BaseForm::Invoke(f);
+        }
         virtual GameEngine::DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags) override
         {
             UINT style = GetWin32MsgBoxFlags(flags);

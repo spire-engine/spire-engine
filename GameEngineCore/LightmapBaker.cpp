@@ -7,15 +7,24 @@
 #include "VectorMath.h"
 #include "Engine.h"
 #include "CameraActor.h"
+#include "CoreLib/Threading.h"
+#include <atomic>
 
 namespace GameEngine
 {
     using namespace CoreLib;
+    static int pixelCounter = 0;
+    static bool threadCancelled = false;
+    static unsigned int threadRandomSeed = 0;
+    #pragma omp threadprivate(pixelCounter)
+    #pragma omp threadprivate(threadCancelled)
+    #pragma omp threadprivate(threadRandomSeed)
 
-    class LightmapBaker
+    class LightmapBakerImpl : public LightmapBaker
     {
     public:
         LightmapBakingSettings settings;
+        LightmapSet lightmaps;
     private:
         struct RawMapSet
         {
@@ -34,7 +43,7 @@ namespace GameEngine
         List<RawMapSet> maps;
         Level* level = nullptr;
         RefPtr<StaticScene> staticScene;
-        void AllocLightmaps(LightmapSet& lmSet)
+        void AllocLightmaps()
         {
             // in the future we may support a wider range of actors.
             // for now we only allocate lightmaps for static mesh actors.
@@ -45,13 +54,14 @@ namespace GameEngine
                 {
                     auto size = (smActor->Bounds.Max - smActor->Bounds.Min).Length();
                     int resolution = Math::Clamp(1 << Math::Log2Ceil((int)(size * settings.ResolutionScale)), settings.MinResolution, settings.MaxResolution);
-                    lmSet.ActorLightmapIds[actor.Value.Ptr()] = mapResolutions.Count();
+                    lightmaps.ActorLightmapIds[actor.Value.Ptr()] = mapResolutions.Count();
                     mapResolutions.Add(resolution);
                 }
             }
             maps.SetSize(mapResolutions.Count());
             for (int i = 0; i < maps.Count(); i++)
                 maps[i].Init(mapResolutions[i], mapResolutions[i]);
+            lightmaps.Lightmaps.SetSize(mapResolutions.Count());
         }
         template<typename TResult, typename TSource, typename TSelectFunc>
         void ReadAndDownSample(Texture2D* texture, TResult* dstBuffer, TSource srcZero, int w, int h, int superSample, const TSelectFunc & select)
@@ -81,15 +91,18 @@ namespace GameEngine
                 }
 
         }
-        void BakeLightmapGBuffers(LightmapSet& lmSet)
+        void BakeLightmapGBuffers()
         {
             const int SuperSampleFactor = 1;
             HardwareRenderer* hwRenderer = Engine::Instance()->GetRenderer()->GetHardwareRenderer();
             RefPtr<ObjectSpaceGBufferRenderer> renderer = CreateObjectSpaceGBufferRenderer();
             renderer->Init(Engine::Instance()->GetRenderer()->GetHardwareRenderer(), Engine::Instance()->GetRenderer()->GetRendererService(), "LightmapGBufferGen.slang");
+            int progress = 0;
+            StatusChanged("Baking G-Buffers...");
+            ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
             for (auto actor : level->Actors)
             {
-                auto mapId = lmSet.ActorLightmapIds.TryGetValue(actor.Value.Ptr());
+                auto mapId = lightmaps.ActorLightmapIds.TryGetValue(actor.Value.Ptr());
                 if (!mapId) continue;
                 auto map = maps.Buffer() + *mapId;
                 int width = map->diffuseMap.Width * SuperSampleFactor;
@@ -125,10 +138,12 @@ namespace GameEngine
                         if (diffusePixel.x > 1e-5f || diffusePixel.y > 1e-5f || diffusePixel.z > 1e-5f)
                             map->validPixels.Add(i * width + j);
                     }
+                progress++;
+                ProgressChanged(LightmapBakerProgressChangedEventArgs(progress, lightmaps.ActorLightmapIds.Count()));
             }
         }
 
-        void RenderDebugView(String fileName, LightmapSet & lightmaps)
+        void RenderDebugView(String fileName)
         {
             List<RawObjectSpaceMap*> diffuseMaps;
             diffuseMaps.SetSize(maps.Count());
@@ -216,7 +231,7 @@ namespace GameEngine
             return VectorMath::Vec3::Create(x, r1, z);
         }
 
-        VectorMath::Vec3 ComputeIndirectLighting(Random & random, VectorMath::Vec3 pos, VectorMath::Vec3 normal)
+        VectorMath::Vec3 ComputeIndirectLighting(Random & random, VectorMath::Vec3 pos, VectorMath::Vec3 normal, int sampleCount)
         {
             VectorMath::Vec3 result;
             result.SetZero();
@@ -224,7 +239,7 @@ namespace GameEngine
             VectorMath::Vec3 tangent;
             VectorMath::GetOrthoVec(tangent, normal);
             auto binormal = VectorMath::Vec3::Cross(tangent, normal);
-            for (int i = 0; i < settings.SampleCount; i++)
+            for (int i = 0; i < sampleCount; i++)
             {
                 float r1 = random.NextFloat();
                 float r2 = random.NextFloat();
@@ -251,7 +266,7 @@ namespace GameEngine
                     result += staticScene->ambientColor * r1;
                 }
             }
-            result *= 2.0f / (float)settings.SampleCount;
+            result *= 2.0f / (float)sampleCount;
             return result;
         }
 
@@ -267,6 +282,7 @@ namespace GameEngine
             for (auto & map : maps)
             {
                 int imageSize = map.diffuseMap.Width * map.diffuseMap.Height;
+                if (isCancelled) return;
                 #pragma omp parallel for
                 for (int pixelIdx = 0; pixelIdx < imageSize; pixelIdx++)
                 {
@@ -316,96 +332,264 @@ namespace GameEngine
             iteration++;
             for (auto & map : maps)
             {
+                if (isCancelled) return;
                 int imageSize = map.diffuseMap.Width * map.diffuseMap.Height;
                 #pragma omp parallel for
                 for (int pixelIdx = 0; pixelIdx < imageSize; pixelIdx++)
                 {
-                    int x = pixelIdx % map.diffuseMap.Width;
-                    int y = pixelIdx / map.diffuseMap.Width;
-                    Random random((x*15579 + y * 2397) * iteration);
-                    VectorMath::Vec4 lighting;
-                    lighting.SetZero();
-                    auto diffuse = map.diffuseMap.GetPixel(x, y);
-                    // compute lighting only for lightmap pixels that represent valid surface regions
-                    if (diffuse.x > 1e-6f || diffuse.y > 1e-6f || diffuse.z > 1e-6f)
+                    if (map.validPixels.Contains(pixelIdx))
                     {
+                        pixelCounter++;
+                        if (threadCancelled || (pixelCounter & 15) == 0)
+                        {
+                            threadCancelled = isCancelled;
+                        }
+                        if (threadCancelled) continue;
+                        int x = pixelIdx % map.diffuseMap.Width;
+                        int y = pixelIdx / map.diffuseMap.Width;
+                        
+                        VectorMath::Vec4 lighting;
+                        lighting.SetZero();
+                        auto diffuse = map.diffuseMap.GetPixel(x, y);
                         auto posPixel = map.positionMap.GetPixel(x, y);
                         auto pos = posPixel.xyz();
                         auto normal = map.normalMap.GetPixel(x, y).xyz().Normalize();
                         lighting = VectorMath::Vec4::Create(ComputeDirectLighting(pos, normal), 1.0f);
+                        map.lightMap.SetPixel(x, y, lighting);
                     }
-                    map.lightMap.SetPixel(x, y, lighting);
                 }
             }
         }
 
-        void ComputeLightmaps_Indirect()
+        void ComputeLightmaps_Indirect(int sampleCount)
         {
             static int iteration = 0;
             iteration++;
             for (auto & map : maps)
             {
+                if (isCancelled) return;
                 int imageSize = map.diffuseMap.Width * map.diffuseMap.Height;
                 auto resultMap = map.indirectLightmap;
                 #pragma omp parallel for
                 for (int pixelIdx = 0; pixelIdx < imageSize; pixelIdx++)
                 {
-                    int x = pixelIdx % map.diffuseMap.Width;
-                    int y = pixelIdx / map.diffuseMap.Width;
-                    Random random((x * 15579 + y * 2397) * iteration);
-                    VectorMath::Vec4 lighting;
-                    lighting.SetZero();
-                    auto diffuse = map.diffuseMap.GetPixel(x, y);
-                    // compute lighting only for lightmap pixels that represent valid surface regions
-                    if (diffuse.x > 1e-6f || diffuse.y > 1e-6f || diffuse.z > 1e-6f)
+                    if (map.validPixels.Contains(pixelIdx))
                     {
+                        pixelCounter++;
+                        if (threadCancelled || (pixelCounter & 15) == 0)
+                        {
+                            threadCancelled = isCancelled;
+                        }
+                        if (threadCancelled) continue;
+                        int x = pixelIdx % map.diffuseMap.Width;
+                        int y = pixelIdx / map.diffuseMap.Width;
+                        VectorMath::Vec4 lighting;
+                        lighting.SetZero();
                         auto posPixel = map.positionMap.GetPixel(x, y);
                         auto pos = posPixel.xyz();
                         auto normal = map.normalMap.GetPixel(x, y).xyz().Normalize();
-                        lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(random, pos, normal), 1.0f);
+                        Random threadRandom(threadRandomSeed);
+                        lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(threadRandom, pos, normal, sampleCount), 1.0f);
+                        threadRandomSeed = threadRandom.GetSeed();
+                        resultMap.SetPixel(x, y, lighting);
                     }
-                    resultMap.SetPixel(x, y, lighting);
                 }
                 map.indirectLightmap = _Move(resultMap);
             }
         }
 
-        void CompositeLightmaps(LightmapSet& lightmaps)
+        RawObjectSpaceMap blurTempMap;
+        void BlurIndirectLightmap(IntSet& validPixels, RawObjectSpaceMap & lightmap)
+        {
+            int blurRadius = Math::Clamp(lightmap.Width / 100, 1, 20);
+            blurTempMap.Init(lightmap.GetDataType(), lightmap.Width, lightmap.Height);
+            #pragma omp parallel for
+            for (int y = 0; y < lightmap.Height; y++)
+            {
+                for (int x = 0; x < lightmap.Width; x++)
+                {
+                    if (validPixels.Contains(y*lightmap.Width + x))
+                    {
+                        VectorMath::Vec3 value;
+                        value = lightmap.GetPixel(x, y).xyz();
+                        int count = 1;
+                        for (int ix = x - 1; ix >= Math::Max(0, x - blurRadius); ix--)
+                        {
+                            if (validPixels.Contains(y*lightmap.Width + ix))
+                            {
+                                value += lightmap.GetPixel(ix, y).xyz();
+                                count++;
+                            }
+                            else
+                                break;
+                        }
+                        for (int ix = x + 1; ix <= Math::Min(lightmap.Width - 1, x + blurRadius); ix++)
+                        {
+                            if (validPixels.Contains(y*lightmap.Width + ix))
+                            {
+                                value += lightmap.GetPixel(ix, y).xyz();
+                                count++;
+                            }
+                            else
+                                break;
+                        }
+                        value *= 1.0f / (float)count;
+                        blurTempMap.SetPixel(x, y, VectorMath::Vec4::Create(value, 1.0f));
+                    }
+                }
+            }
+
+            #pragma omp parallel for
+            for (int y = 0; y < lightmap.Height; y++)
+            {
+                for (int x = 0; x < lightmap.Width; x++)
+                {
+                    if (validPixels.Contains(y*lightmap.Width + x))
+                    {
+                        VectorMath::Vec3 value;
+                        value = blurTempMap.GetPixel(x, y).xyz();
+                        int count = 1;
+                        for (int iy = y - 1; iy >= Math::Max(0, y - blurRadius); iy--)
+                        {
+                            if (validPixels.Contains(iy*lightmap.Width + x))
+                            {
+                                value += blurTempMap.GetPixel(x, iy).xyz();
+                                count++;
+                            }
+                            else
+                                break;
+                        }
+                        for (int iy = y + 1; iy <= Math::Min(lightmap.Height - 1, y + blurRadius); iy++)
+                        {
+                            if (validPixels.Contains(iy*lightmap.Width + x))
+                            {
+                                value += blurTempMap.GetPixel(x, iy).xyz();
+                                count++;
+                            }
+                            else
+                                break;
+                        }
+                        value *= 1.0f / (float)count;
+                        lightmap.SetPixel(x, y, VectorMath::Vec4::Create(value, 1.0f));
+                    }
+                }
+            }
+        }
+
+        void CompositeLightmaps()
         {
             lightmaps.Lightmaps.SetSize(maps.Count());
             for (int i = 0; i < maps.Count(); i++)
             {
                 auto & lm = lightmaps.Lightmaps[i];
                 lm.Init(RawObjectSpaceMap::DataType::RGB32F, maps[i].lightMap.Width, maps[i].lightMap.Height);
+                BlurIndirectLightmap(maps[i].validPixels, maps[i].indirectLightmap);
                 for (int y = 0; y < lm.Height; y++)
                     for (int x = 0; x < lm.Width; x++)
                         lm.SetPixel(x, y, maps[i].lightMap.GetPixel(x, y) + maps[i].indirectLightmap.GetPixel(x, y));
             }
         }
     public:
-        void BakeLightmaps(LightmapSet& lightmaps, Level* pLevel)
+        std::atomic<bool> isCancelled = false;
+        std::atomic<bool> started = false;
+        CoreLib::Threading::Thread computeThread;
+        void StatusChanged(String status)
         {
-            level = pLevel;
-            AllocLightmaps(lightmaps);
-            BakeLightmapGBuffers(lightmaps);
+            if (!isCancelled)
+                OnStatusChanged(status);
+        }
+        void ProgressChanged(LightmapBakerProgressChangedEventArgs e)
+        {
+            if (!isCancelled)
+                OnProgressChanged(e);
+        }
+        void ComputeThreadMain()
+        {
+            StatusChanged("Building BVH...");
+            ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
+
             staticScene = BuildStaticScene(level);
+            if (isCancelled) goto computeThreadEnd;
             BiasGBufferPositions();
+            if (isCancelled) goto computeThreadEnd;
+
+            StatusChanged("Computing direct lighting...");
+            ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
             ComputeLightmaps_Direct();
+            if (isCancelled) goto computeThreadEnd;
+
             for (int i = 0; i < settings.IndirectLightingBounces; i++)
-                ComputeLightmaps_Indirect();
-            
-            CompositeLightmaps(lightmaps);
-            lightmaps.Lightmaps[3].DebugSaveAsImage("lm.bmp");
+            {
+                StringBuilder statusTextSB;
+                statusTextSB << "Computing indirect lighting, pass " << i + 1 << "/" << settings.IndirectLightingBounces;
+                if (i == settings.IndirectLightingBounces - 1)
+                    statusTextSB << "(final gather)";
+                statusTextSB << "...";
+                auto statusText = statusTextSB.ToString();
+                StatusChanged(statusText);
+                ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
+                ComputeLightmaps_Indirect(i == settings.IndirectLightingBounces-1 ? settings.FinalGatherSampleCount : settings.SampleCount);
+                CompositeLightmaps();
+                if (isCancelled) goto computeThreadEnd;
+                OnIterationCompleted();
+            }
+        computeThreadEnd:;
+            if (!isCancelled)
+            {
+                StatusChanged("Baking completed.");
+                ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
+                OnCompleted();
+            }
+            else
+            {
+                StatusChanged("Baking cancelled.");
+                ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
+            }
+            started = false;
+        }
+        virtual void Start(const LightmapBakingSettings & pSettings, Level* pLevel) override
+        {
+            settings = pSettings;
+            level = pLevel;
+            StatusChanged("Initializing lightmaps...");
+            ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
+            AllocLightmaps();
+            BakeLightmapGBuffers();
+            started = true;
+            isCancelled = false;
+            computeThread.Start(new CoreLib::Threading::ThreadProc([this]() 
+            {
+                ComputeThreadMain();
+            }));
+        }
+        virtual bool IsRunning() override
+        {
+            return started;
+        }
+        virtual bool IsCancelled() override
+        {
+            return isCancelled;
+        }
+        virtual LightmapSet& GetLightmapSet() override
+        {
+            return lightmaps;
+        }
+        virtual void Wait() override
+        {
+            while (started)
+            {
+                Engine::Instance()->DoEvents();
+            }
+            computeThread.Join();
+        }
+        virtual void Cancel() override
+        {
+            isCancelled = true;
+            Wait();
         }
     };
-
-    void BakeLightmaps(LightmapSet& lightmaps, const LightmapBakingSettings & settings, Level* pLevel)
+    LightmapBaker * CreateLightmapBaker()
     {
-        LightmapBaker baker;
-        baker.settings = settings;
-        baker.settings.SampleCount = 16;
-        baker.settings.ResolutionScale = 0.5f;
-        baker.settings.IndirectLightingBounces = 10;
-        baker.BakeLightmaps(lightmaps, pLevel);
+        return new LightmapBakerImpl();
     }
 }

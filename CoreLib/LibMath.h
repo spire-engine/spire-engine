@@ -194,10 +194,16 @@ namespace CoreLib
 		private:
 			unsigned int seed;
 		public:
+            Random()
+            {}
 			Random(int seed)
 			{
 				this->seed = seed;
 			}
+            unsigned int GetSeed()
+            {
+                return seed;
+            }
             int Next() // random between 0 and RandMax (currently 0x7fff)
             {
                 return (((seed = seed * 214013L + 2531011L) >> 16) & 0x7fff);
