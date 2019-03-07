@@ -35,6 +35,7 @@ namespace GameEngine
     {
     public:
         CoreLib::List<StaticLight> lights;
+        VectorMath::Vec3 ambientColor;
         virtual StaticSceneTracingResult TraceRay(const Ray & ray) = 0;
     };
 

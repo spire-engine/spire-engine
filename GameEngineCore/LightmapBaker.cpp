@@ -20,6 +20,7 @@ namespace GameEngine
         struct RawMapSet
         {
             RawObjectSpaceMap lightMap, indirectLightmap, diffuseMap, normalMap, positionMap;
+            IntSet validPixels;
             void Init(int w, int h)
             {
                 lightMap.Init(RawObjectSpaceMap::DataType::RGB32F, w, h);
@@ -27,6 +28,7 @@ namespace GameEngine
                 diffuseMap.Init(RawObjectSpaceMap::DataType::RGBA8, w, h);
                 normalMap.Init(RawObjectSpaceMap::DataType::RGB10_X2_SIGNED, w, h);
                 positionMap.Init(RawObjectSpaceMap::DataType::RGBA32F, w, h);
+                validPixels.SetMax(w * h);
             }
         };
         List<RawMapSet> maps;
@@ -116,6 +118,13 @@ namespace GameEngine
                     [](VectorMath::Vec4 x) {return x; });
                 ReadAndDownSample(texNormal.Ptr(), (uint32_t*)map->normalMap.GetBuffer(), VectorMath::Vec4::Create(0.0f), width, height, SuperSampleFactor,
                     [](VectorMath::Vec4 x) {return PackRGB10(x.x, x.y, x.z); });
+                for (int i = 0; i < height; i++)
+                    for (int j = 0; j < width; j++)
+                    {
+                        auto diffusePixel = map->diffuseMap.GetPixel(j, i);
+                        if (diffusePixel.x > 1e-5f || diffusePixel.y > 1e-5f || diffusePixel.z > 1e-5f)
+                            map->validPixels.Add(i * width + j);
+                    }
             }
         }
 
@@ -212,9 +221,9 @@ namespace GameEngine
             VectorMath::Vec3 result;
             result.SetZero();
             static const float invPi = 1.0f / Math::Pi;
-            VectorMath::Vec3 binormal;
-            VectorMath::GetOrthoVec(binormal, normal);
-            auto tangent = VectorMath::Vec3::Cross(normal, binormal);
+            VectorMath::Vec3 tangent;
+            VectorMath::GetOrthoVec(tangent, normal);
+            auto binormal = VectorMath::Vec3::Cross(tangent, normal);
             for (int i = 0; i < settings.SampleCount; i++)
             {
                 float r1 = random.NextFloat();
@@ -237,15 +246,17 @@ namespace GameEngine
                         result += color;
                     }
                 }
+                else
+                {
+                    result += staticScene->ambientColor * r1;
+                }
             }
             result *= 2.0f / (float)settings.SampleCount;
             return result;
         }
 
-        void ComputeLightmaps(bool computeDirectLight)
+        void BiasGBufferPositions()
         {
-            static int iteration = 0;
-            iteration++;
             VectorMath::Vec3 tangentDirs[] =
             {
                 VectorMath::Vec3::Create(1.0f, 0.0f, 0.0f),
@@ -253,7 +264,6 @@ namespace GameEngine
                 VectorMath::Vec3::Create(0.0f, 0.0f, 1.0f),
                 VectorMath::Vec3::Create(0.0f, 0.0f, -1.0f)
             };
-
             for (auto & map : maps)
             {
                 int imageSize = map.diffuseMap.Width * map.diffuseMap.Height;
@@ -262,9 +272,6 @@ namespace GameEngine
                 {
                     int x = pixelIdx % map.diffuseMap.Width;
                     int y = pixelIdx / map.diffuseMap.Width;
-                    Random random((x * 7147901 + y * 6391));
-                    VectorMath::Vec4 lighting;
-                    lighting.SetZero();
                     auto diffuse = map.diffuseMap.GetPixel(x, y);
                     // compute lighting only for lightmap pixels that represent valid surface regions
                     if (diffuse.x > 1e-6f || diffuse.y > 1e-6f || diffuse.z > 1e-6f)
@@ -297,21 +304,72 @@ namespace GameEngine
                                 }
                             }
                         }
-                        if (computeDirectLight)
-                            lighting = VectorMath::Vec4::Create(ComputeDirectLighting(biasedPos, normal), 1.0f);
-                        else
-                            lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(random, biasedPos, normal), 1.0f);
+                        map.positionMap.SetPixel(x, y, VectorMath::Vec4::Create(biasedPos, posPixel.w));
                     }
-                    if (computeDirectLight)
-                    {
-                        map.lightMap.SetPixel(x, y, lighting);
-                        map.indirectLightmap.SetPixel(x, y, VectorMath::Vec4::Create(0.0f));
-                    }
-                    else
-                        map.indirectLightmap.SetPixel(x, y, lighting);
                 }
             }
         }
+
+        void ComputeLightmaps_Direct()
+        {
+            static int iteration = 0;
+            iteration++;
+            for (auto & map : maps)
+            {
+                int imageSize = map.diffuseMap.Width * map.diffuseMap.Height;
+                #pragma omp parallel for
+                for (int pixelIdx = 0; pixelIdx < imageSize; pixelIdx++)
+                {
+                    int x = pixelIdx % map.diffuseMap.Width;
+                    int y = pixelIdx / map.diffuseMap.Width;
+                    Random random((x*15579 + y * 2397) * iteration);
+                    VectorMath::Vec4 lighting;
+                    lighting.SetZero();
+                    auto diffuse = map.diffuseMap.GetPixel(x, y);
+                    // compute lighting only for lightmap pixels that represent valid surface regions
+                    if (diffuse.x > 1e-6f || diffuse.y > 1e-6f || diffuse.z > 1e-6f)
+                    {
+                        auto posPixel = map.positionMap.GetPixel(x, y);
+                        auto pos = posPixel.xyz();
+                        auto normal = map.normalMap.GetPixel(x, y).xyz().Normalize();
+                        lighting = VectorMath::Vec4::Create(ComputeDirectLighting(pos, normal), 1.0f);
+                    }
+                    map.lightMap.SetPixel(x, y, lighting);
+                }
+            }
+        }
+
+        void ComputeLightmaps_Indirect()
+        {
+            static int iteration = 0;
+            iteration++;
+            for (auto & map : maps)
+            {
+                int imageSize = map.diffuseMap.Width * map.diffuseMap.Height;
+                auto resultMap = map.indirectLightmap;
+                #pragma omp parallel for
+                for (int pixelIdx = 0; pixelIdx < imageSize; pixelIdx++)
+                {
+                    int x = pixelIdx % map.diffuseMap.Width;
+                    int y = pixelIdx / map.diffuseMap.Width;
+                    Random random((x * 15579 + y * 2397) * iteration);
+                    VectorMath::Vec4 lighting;
+                    lighting.SetZero();
+                    auto diffuse = map.diffuseMap.GetPixel(x, y);
+                    // compute lighting only for lightmap pixels that represent valid surface regions
+                    if (diffuse.x > 1e-6f || diffuse.y > 1e-6f || diffuse.z > 1e-6f)
+                    {
+                        auto posPixel = map.positionMap.GetPixel(x, y);
+                        auto pos = posPixel.xyz();
+                        auto normal = map.normalMap.GetPixel(x, y).xyz().Normalize();
+                        lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(random, pos, normal), 1.0f);
+                    }
+                    resultMap.SetPixel(x, y, lighting);
+                }
+                map.indirectLightmap = _Move(resultMap);
+            }
+        }
+
         void CompositeLightmaps(LightmapSet& lightmaps)
         {
             lightmaps.Lightmaps.SetSize(maps.Count());
@@ -331,8 +389,9 @@ namespace GameEngine
             AllocLightmaps(lightmaps);
             BakeLightmapGBuffers(lightmaps);
             staticScene = BuildStaticScene(level);
-            ComputeLightmaps(true);
-            ComputeLightmaps(false);
+            BiasGBufferPositions();
+            ComputeLightmaps_Direct();
+            ComputeLightmaps_Indirect();
             CompositeLightmaps(lightmaps);
             lightmaps.Lightmaps[3].DebugSaveAsImage("lm.bmp");
         }
@@ -342,6 +401,7 @@ namespace GameEngine
     {
         LightmapBaker baker;
         baker.settings = settings;
+        baker.settings.SampleCount = 64;
         baker.settings.ResolutionScale = 0.5f;
         baker.BakeLightmaps(lightmaps, pLevel);
     }

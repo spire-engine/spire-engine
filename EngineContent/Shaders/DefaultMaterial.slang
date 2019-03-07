@@ -13,9 +13,9 @@ struct DefaultMaterial : IMaterial
         rs.init();
         rs.albedo = float3(0.9, 0.9, 0.9);
         rs.normal = float3(0.0, 0.0, 1.0);
-        rs.specular = 0.2;
-        rs.roughness = 0.7;
-        rs.metallic = 0.4;
+        rs.specular = 0.0;
+        rs.roughness = 1.0;
+        rs.metallic = 0.0;
         rs.isDoubleSided = false;
         rs.opacity = 1.0;
         rs.ao = 1.0;

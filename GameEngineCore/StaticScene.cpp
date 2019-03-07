@@ -5,6 +5,7 @@
 #include "StaticMeshActor.h"
 #include "PointLightActor.h"
 #include "DirectionalLightActor.h"
+#include "AmbientLightActor.h"
 
 namespace GameEngine
 {
@@ -103,6 +104,8 @@ namespace GameEngine
 
     static void GatherLights(StaticSceneImpl* scene, Level* level)
     {
+        scene->ambientColor.SetZero();
+
         for (auto & actor : level->Actors)
         {
             auto actorType = actor.Value->GetEngineType();
@@ -137,6 +140,10 @@ namespace GameEngine
                     lightData.SpotFadingEndAngle = pointLight->SpotLightEndAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
                     lightData.Decay = 10.0f / (pointLight->DecayDistance90Percent.GetValue() * pointLight->DecayDistance90Percent.GetValue());
                     scene->lights.Add(lightData);
+                }
+                else if (light->lightType == LightType::Ambient)
+                {
+                    scene->ambientColor = ((AmbientLightActor*)(light))->Ambient.GetValue();
                 }
             }
         }

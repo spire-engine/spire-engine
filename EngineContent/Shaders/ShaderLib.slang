@@ -576,9 +576,13 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
         {
             float3 specularIBL = specularColor * lightEnv.envMap.SampleLevel(lightEnv.envMapSampler, float4(R, float(lightProbeId)), 
                                 clamp(roughness, 0.0, 1.0) * 6.0).xyz;
-            float3 diffuseIBL = diffuseColor * (lightEnv.envMap.SampleLevel(lightEnv.envMapSampler, float4(lNormal, float(lightProbeId)), 
-                                6.0).xyz);
-            color += (specularIBL + diffuseIBL) * lpTint;
+			color += specularIBL * lpTint;
+			if (lightmapId == 0xFFFFFFFF)
+			{
+				float3 diffuseIBL = diffuseColor * (lightEnv.envMap.SampleLevel(lightEnv.envMapSampler, float4(lNormal, float(lightProbeId)), 
+									6.0).xyz);
+				color += diffuseIBL * lpTint;
+			}
         }
         
         color *= ao;

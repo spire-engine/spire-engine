@@ -65,6 +65,7 @@ namespace GameEngine
         dataType = type;
         int elementSize = GetElementSize(type);
         data.SetSize(elementSize*w*h);
+        memset(data.Buffer(), 0, data.Count());
         Width = w;
         Height = h;
     }
