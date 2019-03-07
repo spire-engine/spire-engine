@@ -198,6 +198,7 @@ namespace GameEngine
                 sceneRes->deviceLightmapSet = new DeviceLightmapSet();
                 sceneRes->deviceLightmapSet->Init(hardwareRenderer, lightmapSet);
                 renderProcedure->UpdateSceneResourceBinding(sceneRes.Ptr());
+                cubemapRenderProc->UpdateSceneResourceBinding(sceneRes.Ptr());
             }
         }
 		RefPtr<ViewResource> cubemapRenderView;
