@@ -838,8 +838,6 @@ namespace GameEngine
 
 	class HardwareRenderer : public CoreLib::RefObject
 	{
-	protected:
-		HardwareRenderer() {};
 	public:
 		virtual void ClearTexture(GameEngine::Texture2D* texture) = 0;
 		virtual void ExecuteRenderPass(FrameBuffer* frameBuffer, CoreLib::ArrayView<CommandBuffer*> commands, Fence* fence) = 0;
@@ -879,7 +877,7 @@ namespace GameEngine
 	};
 
 	// HardwareRenderer instance constructors
-	HardwareRenderer* CreateVulkanHardwareRenderer(int gpuId);
+	HardwareRenderer* CreateVulkanHardwareRenderer(int gpuId, CoreLib::String cacheLocation);
 }
 
 #endif

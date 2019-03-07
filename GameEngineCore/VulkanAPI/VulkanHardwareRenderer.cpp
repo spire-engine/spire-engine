@@ -229,6 +229,7 @@ namespace VK
 		vk::Queue transferQueue;
 
 		vk::PipelineCache pipelineCache;
+        CoreLib::String pipelineCacheLocation;
 
 		CoreLib::RefPtr<CoreLib::List<DescriptorPoolObject*>> descriptorPoolChain;
 
@@ -483,10 +484,14 @@ namespace VK
 			CreateDevice();
 			CreateCommandPool();
 			CreateDescriptorPoolChain();
-
+            List<unsigned char> initialData;
+            if (File::Exists(State().pipelineCacheLocation))
+            {
+                initialData = File::ReadAllBytes(State().pipelineCacheLocation);
+            }
 			vk::PipelineCacheCreateInfo createInfo = vk::PipelineCacheCreateInfo()
-				.setInitialDataSize(0)
-				.setPInitialData(nullptr);
+				.setInitialDataSize(initialData.Count())
+				.setPInitialData(initialData.Buffer());
 
 			State().pipelineCache = State().device.createPipelineCache(createInfo);
 		}
@@ -541,6 +546,18 @@ namespace VK
 		static void UninitDevice()
 		{
 			State().device.waitIdle();
+            if (State().pipelineCacheLocation.Length())
+            {
+                const size_t maxPipelineCacheSize = (64 << 20); // limit cache size to 64MB
+                size_t size = maxPipelineCacheSize;
+                vkGetPipelineCacheData(State().device, State().PipelineCache(), &size, nullptr);
+                if (size > maxPipelineCacheSize)
+                    size = maxPipelineCacheSize;
+                List<unsigned char> buffer;
+                buffer.SetSize((int)size);
+                vkGetPipelineCacheData(State().device, State().PipelineCache(), &size, buffer.Buffer());
+                File::WriteAllBytes(State().pipelineCacheLocation, buffer.Buffer(), (size_t)buffer.Count());
+            }
 			State().device.destroyPipelineCache(State().pipelineCache);
 			DestroyDescriptorPoolChain();
 			DestroyCommandPool();
@@ -555,6 +572,7 @@ namespace VK
 
 			UninitDevice();
 			DestroyInstance();
+            State().SetPipelineCacheLocation(String());
 			State().initialized = false;
 		};
 
@@ -688,6 +706,12 @@ namespace VK
 			}
 			else return res;
 		}
+
+
+        static void SetPipelineCacheLocation(String loc)
+        {
+            State().pipelineCacheLocation = loc;
+        }
 
 		// Bookkeeping for multiple instances of HardwareRenderer
 		static void AddRenderer()
@@ -4529,8 +4553,9 @@ namespace VK
 		}
 		
 	public:
-		HardwareRenderer()
+		HardwareRenderer(String pipelineCacheLocation)
 		{
+            RendererState::SetPipelineCacheLocation(pipelineCacheLocation);
 			RendererState::AddRenderer();
 		};
 		~HardwareRenderer()
@@ -5053,8 +5078,8 @@ namespace VK
 	};
 }
 
-HardwareRenderer* GameEngine::CreateVulkanHardwareRenderer(int gpuId)
+HardwareRenderer* GameEngine::CreateVulkanHardwareRenderer(int gpuId, String pipelineCacheLocation)
 {
 	VK::GpuId = gpuId;
-	return new VK::HardwareRenderer();
+	return new VK::HardwareRenderer(pipelineCacheLocation);
 }

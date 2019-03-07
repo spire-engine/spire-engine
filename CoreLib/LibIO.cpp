@@ -246,6 +246,12 @@ namespace CoreLib
 			return _Move(buffer);
 		}
 
+        void File::WriteAllBytes(const CoreLib::Basic::String & fileName, void * data, size_t size)
+        {
+            FileStream fs = FileStream(fileName, FileMode::Create);
+            fs.Write(data, (Int64)size);
+        }
+
 		void File::WriteAllText(const CoreLib::Basic::String & fileName, const CoreLib::Basic::String & text)
 		{
 			StreamWriter writer(new FileStream(fileName, FileMode::Create));

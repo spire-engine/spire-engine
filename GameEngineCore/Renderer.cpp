@@ -133,7 +133,8 @@ namespace GameEngine
 			switch (api)
 			{
 			case RenderAPI::Vulkan:
-				hardwareRenderer = CreateVulkanHardwareRenderer(Engine::Instance()->GpuId);
+				hardwareRenderer = CreateVulkanHardwareRenderer(Engine::Instance()->GpuId, 
+                    Path::Combine(Engine::Instance()->GetDirectory(false, ResourceType::ShaderCache), "pipeline_cache.tmp"));
 				break;
 			}
 			hardwareRenderer->SetMaxTempBufferVersions(DynamicBufferLengthMultiplier);
