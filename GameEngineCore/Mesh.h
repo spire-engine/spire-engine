@@ -87,7 +87,8 @@ namespace GameEngine
 		int MeshFileVersion = CurrentMeshFileVersion;
 		int ElementCount = 0;
         int PrimitiveType = 0; // 0 = Triangles
-		int Reserved[7] = { 0,0,0,0,0,0,0 };
+        unsigned char HasUniqueParameterization = 0;
+        unsigned char Reserved[27] = { };
 	};
 
 	struct MeshElementRange
