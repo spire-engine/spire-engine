@@ -47,6 +47,7 @@ namespace GameEngine
         virtual void Show() = 0;
         virtual void Hide() = 0;
         virtual void Invoke(const CoreLib::Event<> & func) = 0;
+        virtual void InvokeAsync(const CoreLib::Event<> & func) = 0;
         virtual DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags = MessageBoxFlags::OKOnly) = 0;
     };
 

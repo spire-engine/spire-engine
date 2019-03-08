@@ -75,7 +75,6 @@ namespace GameEngine
                 rs->primType = mesh->GetPrimitiveType();
 				rs->elementRange = mesh->ElementRanges[elementId];
 				CreateTransformModuleInstance(*rs->transformModule, "StaticMeshTransform", (int)(sizeof(Vec4) * 4));
-				rs->vertFormat = mesh->GetVertexFormat();
 				return rs;
 			}
 			virtual CoreLib::RefPtr<Drawable> CreateSkeletalDrawable(Mesh * mesh, int elementId, Skeleton * skeleton, Material * material, bool cacheMesh) override
@@ -89,7 +88,6 @@ namespace GameEngine
 				rs->skeleton = skeleton;
 				int poseMatrixSize = skeleton->Bones.Count() * (sizeof(Vec4) * 4);
 				CreateTransformModuleInstance(*rs->transformModule, "SkeletalAnimationTransform", poseMatrixSize);
-				rs->vertFormat = mesh->GetVertexFormat();
 				return rs;
 			}
 		};

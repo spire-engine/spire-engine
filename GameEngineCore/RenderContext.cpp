@@ -20,7 +20,7 @@ namespace GameEngine
     {
         if (!Engine::Instance()->GetGraphicsSettings().UsePipelineCache || pipelineCache[passId] == nullptr)
         {
-            auto rs = pipelineManager.GetPipeline(&vertFormat, primType);
+            auto rs = pipelineManager.GetPipeline(&mesh->meshVertexFormat, primType);
             pipelineCache[passId] = rs;
         }
         return pipelineCache[passId];
@@ -114,11 +114,21 @@ namespace GameEngine
         result->vertexBufferOffset = (int)((char*)rendererResource->vertexBufferMemory.Alloc(mesh->GetVertexCount() * mesh->GetVertexSize()) - (char*)rendererResource->vertexBufferMemory.BufferPtr());
         result->indexBufferOffset = (int)((char*)rendererResource->indexBufferMemory.Alloc(mesh->Indices.Count() * sizeof(mesh->Indices[0])) - (char*)rendererResource->indexBufferMemory.BufferPtr());
         result->vertexFormat = rendererResource->pipelineManager.LoadVertexFormat(mesh->GetVertexFormat());
+        result->meshVertexFormat = mesh->GetVertexFormat();
         result->vertexCount = mesh->GetVertexCount();
         rendererResource->indexBufferMemory.SetDataAsync(result->indexBufferOffset, mesh->Indices.Buffer(), mesh->Indices.Count() * sizeof(mesh->Indices[0]));
         rendererResource->vertexBufferMemory.SetDataAsync(result->vertexBufferOffset, mesh->GetVertexBuffer(), mesh->GetVertexCount() * result->vertexFormat.Size());
         result->indexCount = mesh->Indices.Count();
         return result;
+    }
+    void SceneResource::UpdateDrawableMesh(Mesh * mesh)
+    {
+        RefPtr<DrawableMesh> existingMesh;
+        if (meshes.TryGetValue(mesh->GetUID(), existingMesh))
+        {
+            auto newDrawableMesh = CreateDrawableMesh(mesh);
+            existingMesh->MoveFrom(*newDrawableMesh);
+        }
     }
 	RefPtr<DrawableMesh> SceneResource::LoadDrawableMesh(Mesh * mesh)
 	{
@@ -634,12 +644,17 @@ namespace GameEngine
 	{
 		return renderRes->indexBufferMemory.GetBuffer();
 	}
+    void DrawableMesh::Free()
+    {
+        if (vertexCount)
+            renderRes->vertexBufferMemory.Free((char*)renderRes->vertexBufferMemory.BufferPtr() + vertexBufferOffset, vertexCount * vertexFormat.Size());
+        if (indexCount)
+            renderRes->indexBufferMemory.Free((char*)renderRes->indexBufferMemory.BufferPtr() + indexBufferOffset, indexCount * sizeof(int));
+        vertexCount = indexCount = 0;
+    }
 	DrawableMesh::~DrawableMesh()
 	{
-		if (vertexCount)
-			renderRes->vertexBufferMemory.Free((char*)renderRes->vertexBufferMemory.BufferPtr() + vertexBufferOffset, vertexCount * vertexFormat.Size());
-		if (indexCount)
-			renderRes->indexBufferMemory.Free((char*)renderRes->indexBufferMemory.BufferPtr() + indexBufferOffset, indexCount * sizeof(int));
+        Free();
 	}
 	
 	inline void BindDescSet(DescriptorSet** curStates, CommandBuffer* cmdBuf, int id, DescriptorSet * descSet)

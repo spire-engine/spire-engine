@@ -64,7 +64,9 @@ namespace GameEngine
 		MeshHeader header;
 		reader.Read(header);
         primitiveType = ReadPrimitiveType(header.PrimitiveType);
-		if (!CheckMeshIdentifier(header.MeshFileIdentifier))
+        surfaceArea = header.SurfaceArea;
+        minLightmapResolution = header.MinLightmapResolution;
+        if (!CheckMeshIdentifier(header.MeshFileIdentifier))
 		{
 			stream->Seek(SeekOrigin::Start, 0);
 			header = MeshHeader();
@@ -72,7 +74,7 @@ namespace GameEngine
 		int typeId = reader.ReadInt32();
 		vertexFormat = MeshVertexFormat(typeId);
 		vertCount = reader.ReadInt32();
-	
+	    
 		int indexCount = reader.ReadInt32();
 		reader.Read(&Bounds, 1);
 		AllocVertexBuffer(vertCount);
@@ -108,6 +110,8 @@ namespace GameEngine
 		MeshHeader header;
 		header.ElementCount = ElementRanges.Count();
         header.PrimitiveType = WritePrimitiveType(primitiveType);
+        header.MinLightmapResolution = minLightmapResolution;
+        header.SurfaceArea = surfaceArea;
 		writer.Write(header);
 		writer.Write(GetVertexTypeId());
 		writer.Write(vertCount);

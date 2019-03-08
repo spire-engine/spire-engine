@@ -16,6 +16,7 @@ namespace CoreLib
 			{
 				return false;
 			}
+            virtual FuncPtr<TResult, Arguments...>* Clone() = 0;
 			virtual ~FuncPtr() {}
 		};
 
@@ -31,6 +32,11 @@ namespace CoreLib
 				:funcPtr(func)
 			{
 			}
+            virtual FuncPtr<TResult, Arguments...>* Clone() override
+            {
+                auto rs = new CdeclFuncPtr<TResult, Arguments...>(funcPtr);
+                return rs;
+            }
 
 			virtual TResult operator()(Arguments... params) const override
 			{
@@ -60,7 +66,11 @@ namespace CoreLib
 				: funcPtr(func), object(obj)
 			{
 			}
-
+            virtual FuncPtr<TResult, Arguments...>* Clone() override
+            {
+                auto rs = new MemberFuncPtr<Class, TResult, Arguments...>(object, funcPtr);
+                return rs;
+            }
 			virtual TResult operator()(Arguments... params) const override
 			{
 				return (object->*funcPtr)(params...);
@@ -89,6 +99,11 @@ namespace CoreLib
 			{
 				return func(params...);
 			}
+            virtual FuncPtr<TResult, Arguments...>* Clone() override
+            {
+                auto rs = new LambdaFuncPtr<F, TResult, Arguments...>(func);
+                return rs;
+            }
 			virtual bool operator == (const FuncPtr<TResult, Arguments...> * /*ptr*/) override
 			{
 				return false;

@@ -113,6 +113,10 @@ namespace GameEngine
         {
             BaseForm::Invoke(f);
         }
+        virtual void InvokeAsync(const Event<>& f) override
+        {
+            BaseForm::InvokeAsync(f);
+        }
         virtual GameEngine::DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags) override
         {
             UINT style = GetWin32MsgBoxFlags(flags);

@@ -212,7 +212,7 @@ namespace GameEngine
 	public:
 		CoreLib::RefPtr<DrawableMesh> LoadDrawableMesh(Mesh * mesh);
         CoreLib::RefPtr<DrawableMesh> CreateDrawableMesh(Mesh * mesh);
-
+        void UpdateDrawableMesh(Mesh* mesh);
 		Texture2D* LoadTexture2D(const CoreLib::String & name, CoreLib::Graphics::TextureFile & data);
 		Texture2D* LoadTexture(const CoreLib::String & filename);
 	public:

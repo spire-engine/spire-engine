@@ -23,6 +23,7 @@ namespace GameEngine
 		RendererSharedResource * renderRes;
 	public:
 		VertexFormat vertexFormat;
+        MeshVertexFormat meshVertexFormat;
 		int vertexBufferOffset;
 		int indexBufferOffset;
 		int vertexCount = 0;
@@ -33,6 +34,20 @@ namespace GameEngine
 		{
 			renderRes = pRenderRes;
 		}
+        void Free();
+        void MoveFrom(DrawableMesh & other)
+        {
+            Free();
+            vertexFormat = other.vertexFormat;
+            meshVertexFormat = other.meshVertexFormat;
+            renderRes = other.renderRes;
+            vertexBufferOffset = other.vertexBufferOffset;
+            indexBufferOffset = other.indexBufferOffset;
+            vertexCount = other.vertexCount;
+            indexCount = other.indexCount;
+            other.vertexCount = 0;
+            other.indexCount = 0;
+        }
 		~DrawableMesh();
 	};
 
@@ -48,7 +63,6 @@ namespace GameEngine
 		friend class RendererServiceImpl;
 	private:
 		DrawableType type = DrawableType::Static;
-		MeshVertexFormat vertFormat;
         PrimitiveType primType = PrimitiveType::Triangles;
 		CoreLib::RefPtr<DrawableMesh> mesh = nullptr;
 		MeshElementRange elementRange;
@@ -81,7 +95,7 @@ namespace GameEngine
 		}
 		MeshVertexFormat & GetVertexFormat()
 		{
-			return vertFormat;
+			return mesh->meshVertexFormat;
 		}
         PrimitiveType GetPrimitiveType()
         {

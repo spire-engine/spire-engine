@@ -87,8 +87,9 @@ namespace GameEngine
 		int MeshFileVersion = CurrentMeshFileVersion;
 		int ElementCount = 0;
         int PrimitiveType = 0; // 0 = Triangles
-        unsigned char HasUniqueParameterization = 0;
-        unsigned char Reserved[27] = { };
+        int MinLightmapResolution = 0;
+        float SurfaceArea = 0.0f;
+        unsigned char Reserved[20] = { };
 	};
 
 	struct MeshElementRange
@@ -102,6 +103,8 @@ namespace GameEngine
 		static int uid;
 		MeshVertexFormat vertexFormat;
         PrimitiveType primitiveType = PrimitiveType::Triangles;
+        int minLightmapResolution = 0;
+        float surfaceArea = 0.0f;
 		CoreLib::Basic::List<unsigned char> vertexData;
 		int vertCount = 0;
 		CoreLib::String fileName;
@@ -111,6 +114,10 @@ namespace GameEngine
 		CoreLib::Basic::List<MeshElementRange> ElementRanges;
 		Mesh();
 		CoreLib::String GetUID();
+        int GetMinimumLightmapResolution() { return minLightmapResolution; }
+        void SetMinimumLightmapResolution(int val) { minLightmapResolution = val; }
+        float GetSurfaceArea() { return surfaceArea; }
+        void SetSurfaceArea(float val) { surfaceArea = val; }
 		MeshVertexFormat GetVertexFormat() { return vertexFormat; }
 		void SetVertexFormat(const MeshVertexFormat & value) { vertexFormat = value; }
 		void SetVertexPosition(int vertId, const VectorMath::Vec3 & pos)

@@ -185,32 +185,24 @@ namespace GameEngine
             LightmapBakingSettings settings;
             lightmapBaker->OnCompleted.Bind([this]()
             {
-                Engine::Instance()->GetMainWindow()->Invoke(Event<>([this]()
-                {
-                    lightmapBaker->GetLightmapSet().SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
-                    Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
-                }));
+                lightmapBaker->GetLightmapSet().SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
+                Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
             });
             lightmapBaker->OnIterationCompleted.Bind([this]()
             {
-                Engine::Instance()->GetMainWindow()->Invoke(Event<>([this]() 
-                {
-                    Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
-                }));
+                Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
             });
             lightmapBaker->OnProgressChanged.Bind([this](LightmapBakerProgressChangedEventArgs /*e*/)
             {
-                Engine::Instance()->GetMainWindow()->Invoke(Event<>([&]()
-                {
-                    // todo: update progress bar
-                }));
+                // todo: update progress bar
             });
             lightmapBaker->OnStatusChanged.Bind([this](String txt)
             {
-                Engine::Instance()->GetMainWindow()->Invoke(Event<>([&]()
-                {
-                    Engine::Print("Lightmap baker: %s\n", txt.Buffer());
-                }));
+                Engine::Print("Lightmap baker: %s\n", txt.Buffer());
+            });
+            lightmapBaker->OnMeshChanged.Bind([this](Mesh* mesh) 
+            {
+                Engine::Instance()->GetRenderer()->GetSceneResource()->UpdateDrawableMesh(mesh);
             });
             lightmapBaker->Start(settings, level);
         }

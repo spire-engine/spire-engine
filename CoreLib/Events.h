@@ -55,7 +55,7 @@ namespace CoreLib
 
 	***************************************************************************/
 		template <typename... Arguments>
-		class Event
+		class Event : public RefObject
 		{
 		private:
 			List<RefPtr<FuncPtr<void, Arguments... >>> Handlers;

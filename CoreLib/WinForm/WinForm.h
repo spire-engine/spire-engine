@@ -4,6 +4,7 @@
 #include "WinCtrls.h"
 #include "WinMenu.h"
 #include "WinAccel.h"
+#include "../Threading.h"
 
 namespace CoreLib
 {
@@ -34,6 +35,8 @@ namespace CoreLib
 			bool wantTab = false, wantChars = false;
 			BaseForm * dlgOwner;
 			Button * defButton, * cancelButton;
+            CoreLib::Threading::Mutex asyncEventLock;
+            CoreLib::List<CoreLib::RefPtr<CoreLib::Event<>>> asyncEvents;
 			int ProcessMessage(WinMessage & msg);
 			virtual void Create()=0;
 		private:

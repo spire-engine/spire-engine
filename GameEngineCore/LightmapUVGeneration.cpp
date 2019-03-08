@@ -38,16 +38,15 @@ namespace GameEngine
             };
             Vec3 e1 = vertPos[1] - vertPos[0];
             Vec3 e2 = vertPos[2] - vertPos[0];
-            Vec3 n = Vec3::Cross(e1, e2);
-            Vec3 n1 = Vec3::Cross(e1, n);
-            if (n1.Length2() > 0.0f)
-            {
-                n1 = n1.Normalize();
-                float d = -Vec3::Dot(n1, vertPos[0]);
-                return 0.5f * fabs(Vec3::Dot(n1, vertPos[2]) + d) * e1.Length();
-            }
-            else
+            float l1 = e1.Length();
+            float l2 = e2.Length();
+            if (l1 < 1e-7f || l2 < 1e-7f)
                 return 0.0f;
+            e1 *= 1.0f / l1;
+            e2 *= 1.0f / l2;
+            float cosTheta = Vec3::Dot(e1, e2);
+            float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
+            return 0.5f * l1 * l2 * sinTheta;
         }
     };
 
@@ -561,6 +560,12 @@ namespace GameEngine
             mesh = pMeshIn;
             meshOut = pMeshOut;
             BuildFaces();
+
+            float totalSurfaceArea = 0.0f;
+            for (auto & f : faces)
+                totalSurfaceArea += f.GetSurfaceArea(pMeshIn);
+            pMeshOut->SetSurfaceArea(totalSurfaceArea);
+
             BuildCharts();
 
             float scale = 0.0f;
@@ -581,6 +586,7 @@ namespace GameEngine
                 meshOut->SetVertexUV(i, 1, Vec2::Create(UNINITIALIZED_UV, UNINITIALIZED_UV));
             }
             RenormalizeUVs();
+            
             return true;
         }
     };

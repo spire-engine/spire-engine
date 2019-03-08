@@ -8,6 +8,7 @@
 #include "Engine.h"
 #include "CameraActor.h"
 #include "CoreLib/Threading.h"
+#include "LightmapUVGeneration.h"
 #include <atomic>
 
 namespace GameEngine
@@ -52,7 +53,9 @@ namespace GameEngine
             {
                 if (auto smActor = actor.Value.As<StaticMeshActor>())
                 {
-                    auto size = (smActor->Bounds.Max - smActor->Bounds.Min).Length();
+                    auto transformMatrix = smActor->LocalTransform.GetValue();
+                    float scale = Math::Max(transformMatrix.m[0][0], transformMatrix.m[1][1], transformMatrix.m[2][2]);
+                    auto size = sqrt(smActor->Mesh->GetSurfaceArea()) * scale;
                     int resolution = Math::Clamp(1 << Math::Log2Ceil((int)(size * settings.ResolutionScale)), settings.MinResolution, settings.MaxResolution);
                     lightmaps.ActorLightmapIds[actor.Value.Ptr()] = mapResolutions.Count();
                     mapResolutions.Add(resolution);
@@ -531,19 +534,86 @@ namespace GameEngine
                     }
             }
         }
+        void CheckUVs()
+        {
+            CoreLib::EnumerableDictionary<String, Mesh*> referencedMeshes;
+            for (auto & actor : level->Actors)
+            {
+                if (auto staticMeshActor = dynamic_cast<StaticMeshActor*>(actor.Value.Ptr()))
+                {
+                    referencedMeshes.Add(staticMeshActor->MeshFile.GetValue(), staticMeshActor->Mesh);
+                }
+            }
+            auto list = From(referencedMeshes).ToList();
+            #pragma omp parallel for
+            for (int i = 0; i < list.Count(); i++)
+            {
+                if (isCancelled)
+                    continue;
+                auto kv = list[i];
+                if (kv.Value->GetMinimumLightmapResolution() <= 0)
+                {
+                    StatusChanged(String("Generating unique uv for '") + kv.Key + "'...");
+                    Mesh meshOut;
+                    GenerateLightmapUV(&meshOut, kv.Value, settings.MaxResolution, 1 + Math::Log2Ceil(settings.MaxResolution) - Math::Log2Ceil(settings.MinResolution));
+                    meshOut.SetMinimumLightmapResolution(settings.MinResolution);
+                    auto fullFileName = Engine::Instance()->FindFile(kv.Key, ResourceType::Mesh);
+                    try
+                    {
+                        if (fullFileName.Length())
+                            meshOut.SaveToFile(fullFileName);
+                    }
+                    catch (const CoreLib::IO::IOException&)
+                    {
+                        StatusChanged(String("Failed to save mesh to '") + fullFileName + "'.");
+                    }
+                    *kv.Value = _Move(meshOut);
+                    MeshChanged(kv.Value);
+                }
+            }
+        }
     public:
         std::atomic<bool> isCancelled = false;
         std::atomic<bool> started = false;
-        CoreLib::Threading::Thread computeThread;
+        CoreLib::Threading::Thread computeThread, uvThread;
         void StatusChanged(String status)
         {
             if (!isCancelled)
-                OnStatusChanged(status);
+            {
+                Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
+                {
+                   OnStatusChanged(status);
+                });
+            }
+        }
+        void MeshChanged(Mesh* mesh)
+        {
+            Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
+            {
+                OnMeshChanged(mesh);
+            });
         }
         void ProgressChanged(LightmapBakerProgressChangedEventArgs e)
         {
-            if (!isCancelled)
-                OnProgressChanged(e);
+            Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
+            {
+                if (!isCancelled)
+                    OnProgressChanged(e);
+            });
+        }
+        void Completed()
+        {
+            Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
+            {
+                OnCompleted();
+            });
+        }
+        void IterationCompleted()
+        {
+            Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
+            {
+                OnIterationCompleted();
+            });
         }
         void ComputeThreadMain()
         {
@@ -558,6 +628,7 @@ namespace GameEngine
             StatusChanged("Computing direct lighting...");
             ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
             ComputeLightmaps_Direct();
+            IterationCompleted();
             if (isCancelled) goto computeThreadEnd;
 
             for (int i = 0; i < settings.IndirectLightingBounces; i++)
@@ -573,36 +644,58 @@ namespace GameEngine
                 ComputeLightmaps_Indirect(i == settings.IndirectLightingBounces-1 ? settings.FinalGatherSampleCount : settings.SampleCount);
                 CompositeLightmaps();
                 if (isCancelled) goto computeThreadEnd;
-                OnIterationCompleted();
+                IterationCompleted();
             }
         computeThreadEnd:;
             if (!isCancelled)
             {
                 StatusChanged("Baking completed.");
                 ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
-                OnCompleted();
             }
             else
             {
                 StatusChanged("Baking cancelled.");
                 ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
             }
+            Completed();
             started = false;
         }
         virtual void Start(const LightmapBakingSettings & pSettings, Level* pLevel) override
         {
             settings = pSettings;
             level = pLevel;
-            StatusChanged("Initializing lightmaps...");
             ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
-            AllocLightmaps();
-            BakeLightmapGBuffers();
+            StatusChanged("Checking UVs...");
+
             started = true;
             isCancelled = false;
-            computeThread.Start(new CoreLib::Threading::ThreadProc([this]() 
+
+            uvThread.Start(new CoreLib::Threading::ThreadProc([this]()
             {
-                ComputeThreadMain();
+                CheckUVs();
+                if (isCancelled) 
+                {
+                    started = false; 
+                    return;
+                }
+                AllocLightmaps();
+                if (isCancelled)
+                {
+                    started = false;
+                    return;
+                }
+                Engine::Instance()->GetMainWindow()->InvokeAsync(Event<>([&]()
+                {
+                    StatusChanged("Initializing lightmaps...");
+                    BakeLightmapGBuffers();
+                    computeThread.Start(new CoreLib::Threading::ThreadProc([this]()
+                    {
+                        ComputeThreadMain();
+                    }));
+                }));
             }));
+           
+            
         }
         virtual bool IsRunning() override
         {
@@ -622,6 +715,7 @@ namespace GameEngine
             {
                 Engine::Instance()->DoEvents();
             }
+            uvThread.Join();
             computeThread.Join();
         }
         virtual void Cancel() override

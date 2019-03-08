@@ -8,10 +8,12 @@
 namespace GameEngine
 {
     class Level;
+    class Mesh;
+
     struct LightmapBakingSettings
     {
         float ResolutionScale = 1.0f;
-        int MinResolution = 8;
+        int MinResolution = 32;
         int MaxResolution = 1024;
         int IndirectLightingBounces = 12;
         int SampleCount = 8;
@@ -37,6 +39,7 @@ namespace GameEngine
         CoreLib::Event<CoreLib::String> OnStatusChanged;
         CoreLib::Event<> OnIterationCompleted;
         CoreLib::Event<> OnCompleted;
+        CoreLib::Event<Mesh*> OnMeshChanged;
         virtual void Start(const LightmapBakingSettings & settings, Level* pLevel) = 0;
         virtual bool IsRunning() = 0;
         virtual bool IsCancelled() = 0;

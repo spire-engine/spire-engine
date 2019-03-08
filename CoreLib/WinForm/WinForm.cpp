@@ -6,6 +6,8 @@
 namespace CoreLib
 {
 	const int MSG_INVOKE = WM_USER + 0x5001;
+    const int MSG_INVOKE_ASYNC = WM_USER + 0x5002;
+
 
 	namespace WinForm
 	{
@@ -296,7 +298,11 @@ namespace CoreLib
 			}
 			else
 			{
-				PostMessage(handle, MSG_INVOKE, (WPARAM)&func, 0);
+                RefPtr<Event<>> eventObj = new Event<>(func);
+                asyncEventLock.Lock();
+                asyncEvents.Add(eventObj);
+                asyncEventLock.Unlock();
+				PostMessage(handle, MSG_INVOKE_ASYNC, (WPARAM)eventObj.Ptr(), 0);
 			}
 		}
 
@@ -400,6 +406,12 @@ namespace CoreLib
 				((Event<>*)msg.wParam)->Invoke();
 				rs = 0;
 				break;
+            case MSG_INVOKE_ASYNC:
+                ((Event<>*)msg.wParam)->Invoke();
+                asyncEventLock.Lock();
+                asyncEvents.Remove(((Event<>*)msg.wParam));
+                asyncEventLock.Unlock();
+                break;
 			}
 			if (rs == -1)
 				return BaseControl::ProcessMessage(msg);
