@@ -478,7 +478,7 @@ namespace GameEngine
 			shadowMapArrayFreeBits.Remove(i);
 		}
 	}
-    
+        
 	void RendererResource::CreateModuleInstance(ModuleInstance & rs, ShaderTypeSymbol * typeSymbol, DeviceMemory * uniformMemory, int uniformBufferSize)
 	{
 		rs.Init(typeSymbol);

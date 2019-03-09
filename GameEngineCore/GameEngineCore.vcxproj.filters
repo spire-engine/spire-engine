@@ -203,6 +203,9 @@
     <ClCompile Include="DeviceLightmapSet.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="ComputeTaskManager.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -425,6 +428,9 @@
       <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="Ray.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeTaskManager.h">
       <Filter>Renderer</Filter>
     </ClInclude>
   </ItemGroup>

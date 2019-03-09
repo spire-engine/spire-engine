@@ -18,6 +18,8 @@ namespace GameEngine
             return 12;
         case RawObjectSpaceMap::DataType::RGBA32F:
             return 16;
+        case RawObjectSpaceMap::DataType::RGBA16F:
+            return 8;
         }
         return 0;
     }
@@ -33,6 +35,11 @@ namespace GameEngine
             return VectorMath::Vec4::Create(((VectorMath::Vec3*)data.Buffer())[y*Height + x], 1.0f);
         case RawObjectSpaceMap::DataType::RGBA32F:
             return ((VectorMath::Vec4*)data.Buffer())[y*Height + x];
+        case RawObjectSpaceMap::DataType::RGBA16F:
+        {
+            auto ptr = (unsigned short*)(data.Buffer() + (y * Height + x) * 8);
+            return VectorMath::Vec4::Create(HalfToFloat(ptr[0]), HalfToFloat(ptr[1]), HalfToFloat(ptr[2]), HalfToFloat(ptr[3]));
+        }
         }
         return VectorMath::Vec4::Create(0.0f);
     }
@@ -58,6 +65,15 @@ namespace GameEngine
         case RawObjectSpaceMap::DataType::RGBA32F:
             ((VectorMath::Vec4*)data.Buffer())[y*Height + x] = value;
             break;
+        case RawObjectSpaceMap::DataType::RGBA16F:
+        {
+            auto ptr = (unsigned short*)(data.Buffer() + (y * Height + x) * 8);
+            ptr[0] = FloatToHalf(value.x);
+            ptr[1] = FloatToHalf(value.y);
+            ptr[2] = FloatToHalf(value.z);
+            ptr[3] = FloatToHalf(value.w);
+            break;
+        }
         }
     }
     void RawObjectSpaceMap::Init(DataType type, int w, int h)

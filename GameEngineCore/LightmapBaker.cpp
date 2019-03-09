@@ -505,7 +505,7 @@ namespace GameEngine
             for (int i = 0; i < maps.Count(); i++)
             {
                 auto & lm = lightmaps.Lightmaps[i];
-                lm.Init(RawObjectSpaceMap::DataType::RGB32F, maps[i].lightMap.Width, maps[i].lightMap.Height);
+                lm.Init(RawObjectSpaceMap::DataType::RGBA16F, maps[i].lightMap.Width, maps[i].lightMap.Height);
                 BlurIndirectLightmap(maps[i].validPixels, maps[i].indirectLightmap);
                 // composite
                 #pragma omp parallel for
@@ -628,6 +628,7 @@ namespace GameEngine
             StatusChanged("Computing direct lighting...");
             ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
             ComputeLightmaps_Direct();
+            CompositeLightmaps();
             IterationCompleted();
             if (isCancelled) goto computeThreadEnd;
 
@@ -664,14 +665,14 @@ namespace GameEngine
         {
             settings = pSettings;
             level = pLevel;
-            ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
-            StatusChanged("Checking UVs...");
 
             started = true;
             isCancelled = false;
 
             uvThread.Start(new CoreLib::Threading::ThreadProc([this]()
             {
+                ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
+                StatusChanged("Checking UVs...");
                 CheckUVs();
                 if (isCancelled) 
                 {
@@ -694,8 +695,6 @@ namespace GameEngine
                     }));
                 }));
             }));
-           
-            
         }
         virtual bool IsRunning() override
         {

@@ -169,6 +169,7 @@
     <ClCompile Include="AtmospherePostRenderPass.cpp" />
     <ClCompile Include="CameraActor.cpp" />
     <ClCompile Include="CatmullSpline.cpp" />
+    <ClCompile Include="ComputeTaskManager.cpp" />
     <ClCompile Include="CustomDepthRenderPass.cpp" />
     <ClCompile Include="DebugGraphics.cpp" />
     <ClCompile Include="DebugGraphicsRenderPass.cpp" />
@@ -268,6 +269,7 @@
     <ClInclude Include="FrameIdDisplayActor.h" />
     <ClInclude Include="Gizmo.h" />
     <ClInclude Include="GizmoActor.h" />
+    <ClInclude Include="ComputeTaskManager.h" />
     <ClInclude Include="ImageLayoutTransferTaskPool.h" />
     <ClInclude Include="LevelEditor.h" />
     <ClInclude Include="LightBinningPass.h" />

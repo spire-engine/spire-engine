@@ -50,40 +50,29 @@ namespace GameEngine
             int level = lightmapIds[i] >> 24;
             int id = lightmapIds[i] & 0xFFFFFF;
             int size = (1 << level);
-            translatedData.SetSize(size * size * 4);
             auto & srcLightmap = lightmapSet.Lightmaps[i];
             int pixId = 0;
-            if (srcLightmap.GetDataType() != RawObjectSpaceMap::DataType::RGB16F)
+            if (srcLightmap.GetDataType() != RawObjectSpaceMap::DataType::RGBA16F)
             {
+                translatedData.SetSize(size * size * 4);
                 for (int y = 0; y < size; y++)
                 {
                     for (int x = 0; x < size; x++)
                     {
                         auto pix = srcLightmap.GetPixel(x, y);
                         translatedData[pixId * 4] = FloatToHalf(pix.x);
-                        translatedData[pixId * 4 + 1] = FloatToHalf(pix.x);
-                        translatedData[pixId * 4 + 2] = FloatToHalf(pix.x);
-                        translatedData[pixId * 4 + 3] = 0;
+                        translatedData[pixId * 4 + 1] = FloatToHalf(pix.y);
+                        translatedData[pixId * 4 + 2] = FloatToHalf(pix.z);
+                        translatedData[pixId * 4 + 3] = FloatToHalf(pix.w);
                         pixId++;
                     }
                 }
+                textureArrays[level]->SetData(0, 0, 0, id, (1 << level), (1 << level), 1, DataType::Half4, translatedData.Buffer());
             }
             else
             {
-                for (int y = 0; y < size; y++)
-                {
-                    for (int x = 0; x < size; x++)
-                    {
-                        auto pix = ((unsigned short*)srcLightmap.GetBuffer()) + pixId * 3;
-                        translatedData[pixId * 4] = pix[0];
-                        translatedData[pixId * 4 + 1] = pix[1];
-                        translatedData[pixId * 4 + 2] = pix[2];
-                        translatedData[pixId * 4 + 3] = 0;
-                        pixId++;
-                    }
-                }
+                textureArrays[level]->SetData(0, 0, 0, id, (1 << level), (1 << level), 1, DataType::Half4, srcLightmap.GetBuffer());
             }
-            textureArrays[level]->SetData(0, 0, 0, id, (1 << level), (1 << level), 1, DataType::Half4, translatedData.Buffer());
         }
     }
 

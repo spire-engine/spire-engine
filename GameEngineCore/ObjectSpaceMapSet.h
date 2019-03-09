@@ -12,7 +12,7 @@ namespace GameEngine
     public:
         enum class DataType
         {
-            RGBA8, RGB32F, RGB10_X2_SIGNED, RGBA32F, RGB16F
+            RGBA8, RGB32F, RGB10_X2_SIGNED, RGBA32F, RGBA16F
         };
     private:
         DataType dataType;
