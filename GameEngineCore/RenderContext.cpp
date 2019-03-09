@@ -818,7 +818,7 @@ namespace GameEngine
 	}
 	void GeneralRenderTask::Execute(HardwareRenderer * hwRenderer, RenderStat & /*stats*/)
 	{
-		hwRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(commandBuffer->GetBuffer()));
+		hwRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(commandBuffer->GetBuffer()), nullptr);
 	}
 }
 

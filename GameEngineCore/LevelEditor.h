@@ -10,6 +10,7 @@ namespace GameEngine
 	public:
 		virtual void Tick() = 0;
 		virtual void OnLoad() = 0;
+        virtual void OnClose() = 0;
 	};
 
 	LevelEditor * CreateLevelEditor();

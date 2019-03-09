@@ -4,7 +4,6 @@
 #include "CoreLib/WinForm/Debug.h"
 #include "CoreLib/VectorMath.h"
 #include "CoreLib/PerformanceCounter.h"
-
 //using glslang lib for now to generate spirv
 #include "../Engine.h"
 #include "CoreLib/LibIO.h"
@@ -26,8 +25,11 @@ namespace VK
 {
 	const int TargetVulkanVersion_Major = 1;
 	const int TargetVulkanVersion_Minor = 0;
-
+    const int MaxRenderThreads = 4;
+    int MaxThreadCount = MaxRenderThreads;
 	unsigned int GpuId = 0;
+
+    thread_local int renderThreadId = -1;
 
 	namespace VkDebug
 	{
@@ -214,34 +216,31 @@ namespace VK
 		vk::DescriptorSetLayout emptyDescriptorSetLayout;
 		vk::DescriptorSet emptyDescriptorSet;
 		vk::CommandPool swapchainCommandPool;
-		vk::CommandPool transferCommandPool;
-		vk::CommandPool renderCommandPool;
-
-		CoreLib::RefPtr<CoreLib::List<CoreLib::List<vk::CommandBuffer>>> transferCommandBufferPool, renderCommandBufferPool;
-		int currentBufferVersion = 0;
-		int transferCommandBufferAllocPtr = 0;
-		int renderCommandBufferAllocPtr = 0;
+		CoreLib::Array<vk::CommandPool, MaxRenderThreads> renderCommandPools;
+        CoreLib::Array<CoreLib::RefPtr<CoreLib::List<CoreLib::List<vk::CommandBuffer>>>, MaxRenderThreads> renderCommandBufferPools;
+        int currentBufferVersions[MaxRenderThreads] = {};
+        int renderCommandBufferAllocPtrs[MaxRenderThreads] = {};
 
 		int renderQueueIndex;
 		int transferQueueIndex;
 		vk::Queue presentQueue;
-		vk::Queue renderQueue;
+		CoreLib::Array<vk::Queue, MaxRenderThreads> renderQueues;
 		vk::Queue transferQueue;
 
 		vk::PipelineCache pipelineCache;
         CoreLib::String pipelineCacheLocation;
 
-		CoreLib::RefPtr<CoreLib::List<DescriptorPoolObject*>> descriptorPoolChain;
+		CoreLib::Array<CoreLib::RefPtr<CoreLib::List<DescriptorPoolObject*>>, MaxRenderThreads> descriptorPoolChains;
 
 		RendererState() {}
 
 		static vk::CommandBuffer GetTempCommandBuffer(vk::CommandPool cmdPool, CoreLib::List<CoreLib::List<vk::CommandBuffer>> & bufferPool, int & allocPtr)
 		{
-			if (allocPtr == bufferPool[State().currentBufferVersion].Count())
+			if (allocPtr == bufferPool[State().currentBufferVersions[renderThreadId]].Count())
 			{
-				bufferPool[State().currentBufferVersion].Add(CreateCommandBuffer(cmdPool, vk::CommandBufferLevel::ePrimary));
+				bufferPool[State().currentBufferVersions[renderThreadId]].Add(CreateCommandBuffer(cmdPool, vk::CommandBufferLevel::ePrimary));
 			}
-			return bufferPool[State().currentBufferVersion][allocPtr++];
+			return bufferPool[State().currentBufferVersions[renderThreadId]][allocPtr++];
 		}
 
 		static RendererState& State()
@@ -360,10 +359,9 @@ namespace VK
 			renderQueuePriorities.Add(1.0f);
 
 			std::vector<vk::QueueFamilyProperties> queueFamilyProperties = PhysicalDevice().getQueueFamilyProperties();
-			if (queueFamilyProperties[0].queueCount >= 4)
+            MaxThreadCount = Math::Min(MaxThreadCount, (int)queueFamilyProperties[0].queueCount);
+            for (int i = 0; i < MaxThreadCount - 1; i++)
 			{
-				renderQueuePriorities.Add(1.0f);
-				renderQueuePriorities.Add(1.0f);
 				renderQueuePriorities.Add(1.0f);
 			}
 			//transferQueuePriorities.Add(1.0f);
@@ -442,7 +440,11 @@ namespace VK
 			volkLoadDevice((VkDevice)(State().device));
 
 			State().presentQueue = State().device.getQueue(renderQueueFamilyIndex, 0);
-			State().renderQueue = State().device.getQueue(renderQueueFamilyIndex, 0);
+            State().renderQueues.SetSize(MaxThreadCount);
+            for (int i = 0; i < renderQueuePriorities.Count(); i++)
+            {
+			    State().renderQueues[i] = State().device.getQueue(renderQueueFamilyIndex, i);
+            }
 			State().transferQueue = State().device.getQueue(transferQueueFamilyIndex, renderQueuePriorities.Count() - 1);//TODO: Change the index if changing family
 		
 		}
@@ -454,28 +456,29 @@ namespace VK
 				.setQueueFamilyIndex(State().renderQueueIndex);
 
 			State().swapchainCommandPool = State().device.createCommandPool(commandPoolCreateInfo);
-
-			vk::CommandPoolCreateInfo setupCommandPoolCreateInfo = vk::CommandPoolCreateInfo()
-				.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
-				.setQueueFamilyIndex(State().transferQueueIndex);
-
-			State().transferCommandPool = State().device.createCommandPool(setupCommandPoolCreateInfo);
-
+            
 			//TODO: multiple pools for multiple threads
 			vk::CommandPoolCreateInfo renderCommandPoolCreateInfo = vk::CommandPoolCreateInfo()
 				.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
 				.setQueueFamilyIndex(State().renderQueueIndex);
 
-			State().renderCommandPool = State().device.createCommandPool(renderCommandPoolCreateInfo);
+            State().renderCommandPools.SetSize(MaxThreadCount);
+            for (int i = 0; i < MaxThreadCount; i++)
+			    State().renderCommandPools[i] = State().device.createCommandPool(renderCommandPoolCreateInfo);
 
-			State().transferCommandBufferPool = new List<List<vk::CommandBuffer>>();
-			State().renderCommandBufferPool = new List<List<vk::CommandBuffer>>();
+            State().renderCommandBufferPools.SetSize(MaxThreadCount);
+            for (int i = 0; i < MaxThreadCount; i++)
+                State().renderCommandBufferPools[i] = new List<List<vk::CommandBuffer>>();
 
 		}
 
 		static void CreateDescriptorPoolChain()
 		{
-			State().descriptorPoolChain = new CoreLib::List<DescriptorPoolObject*>();
+            State().descriptorPoolChains.SetSize(MaxThreadCount);
+            for (int i = 0; i < MaxThreadCount; i++)
+            {
+			    State().descriptorPoolChains[i] = new CoreLib::List<DescriptorPoolObject*>();
+            }
 		}
 
 		// This function encapsulates all device-specific initialization
@@ -500,7 +503,7 @@ namespace VK
 		{
 			if (State().initialized)
 				return;
-
+            renderThreadId = 0;
 			State().initialized = true;
             volkInitialize();
 			CreateInstance();
@@ -526,20 +529,22 @@ namespace VK
 
 		static void DestroyCommandPool()
 		{
-			State().device.destroyCommandPool(State().renderCommandPool);
-			State().device.destroyCommandPool(State().transferCommandPool);
+            for (int i = 0; i < MaxThreadCount; i++)
+			    State().device.destroyCommandPool(State().renderCommandPools[i]);
 			State().device.destroyCommandPool(State().swapchainCommandPool);
 
-			State().transferCommandBufferPool = nullptr;
-			State().renderCommandBufferPool = nullptr;
+            for (auto & pool : State().renderCommandBufferPools)
+                pool = nullptr;
 		}
 
 		static void DestroyDescriptorPoolChain()
 		{
-			for (auto& descriptorPool : *State().descriptorPoolChain)
-				delete descriptorPool;
-
-			State().descriptorPoolChain = nullptr;
+            for (auto & chain : State().descriptorPoolChains)
+            {
+			    for (auto& descriptorPool : *chain)
+				    delete descriptorPool;
+                chain = nullptr;
+            }
 		}
 
 		// This function encapsulates all device-specific destruction
@@ -617,15 +622,14 @@ namespace VK
 		static void SetMaxTempBufferVersions(int versionCount)
 		{
 			auto & state = State();
-			state.renderCommandBufferPool->SetSize(versionCount);
-			state.transferCommandBufferPool->SetSize(versionCount);
+            for (int i = 0; i < MaxThreadCount; i++)
+			    state.renderCommandBufferPools[i]->SetSize(versionCount);
 		}
 		static void ResetTempBufferVersion(int version)
 		{
 			auto & state = State();
-			state.currentBufferVersion = version;
-			state.transferCommandBufferAllocPtr = 0;
-			state.renderCommandBufferAllocPtr = 0;
+			state.currentBufferVersions[renderThreadId] = version;
+			state.renderCommandBufferAllocPtrs[renderThreadId] = 0;
 		}
 
 		static const vk::CommandPool& SwapchainCommandPool()
@@ -636,32 +640,32 @@ namespace VK
 
 		static const vk::CommandPool& TransferCommandPool()
 		{
-			return State().transferCommandPool;
+            return RenderCommandPool();
 		}
 
 		static const vk::CommandPool& RenderCommandPool()
 		{
-			return State().renderCommandPool;
+			return State().renderCommandPools[renderThreadId];
 		}
 
 		static vk::CommandBuffer GetTempTransferCommandBuffer()
 		{
-			return GetTempCommandBuffer(State().transferCommandPool, *State().transferCommandBufferPool, State().transferCommandBufferAllocPtr);
+            return GetTempRenderCommandBuffer();
 		}
 
 		static vk::CommandBuffer GetTempRenderCommandBuffer()
 		{
-			return GetTempCommandBuffer(State().renderCommandPool, *State().renderCommandBufferPool, State().renderCommandBufferAllocPtr);
+			return GetTempCommandBuffer(State().renderCommandPools[renderThreadId], *State().renderCommandBufferPools[renderThreadId], State().renderCommandBufferAllocPtrs[renderThreadId]);
 		}
 
 		static const vk::Queue& TransferQueue()
 		{
-			return State().transferQueue;
+			return RenderQueue();
 		}
 
 		static const vk::Queue& RenderQueue()
 		{
-			return State().renderQueue;
+			return State().renderQueues[renderThreadId];
 		}
 
 		static const vk::Queue& PresentQueue()
@@ -676,10 +680,10 @@ namespace VK
 
 		static const vk::DescriptorPool& DescriptorPool()
 		{
-			if (State().descriptorPoolChain->Count() == 0)
-				State().descriptorPoolChain->Add(new DescriptorPoolObject());
+			if (State().descriptorPoolChains[renderThreadId]->Count() == 0)
+				State().descriptorPoolChains[renderThreadId]->Add(new DescriptorPoolObject());
 
-			return State().descriptorPoolChain->Last()->pool;
+			return State().descriptorPoolChains[renderThreadId]->Last()->pool;
 		}
 
 		static std::pair<vk::DescriptorPool, vk::DescriptorSet> AllocateDescriptorSet(vk::DescriptorSetLayout layout, bool canTryAgain = true)
@@ -699,7 +703,7 @@ namespace VK
 			{
 				if (canTryAgain)
 				{
-					RendererState::State().descriptorPoolChain->Add(new DescriptorPoolObject());
+					RendererState::State().descriptorPoolChains[renderThreadId]->Add(new DescriptorPoolObject());
 					return AllocateDescriptorSet(layout, false);
 				}
 				else throw HardwareRendererException("Couldn't allocate descriptor set.");
@@ -1291,7 +1295,6 @@ namespace VK
 		}
 		~Texture()
 		{
-			RendererState::Device().waitIdle();
 			if (memory) RendererState::Device().freeMemory(memory);
 			for (auto view : views) RendererState::Device().destroyImageView(view);
 			if (image) RendererState::Device().destroyImage(image);
@@ -1542,7 +1545,7 @@ namespace VK
 				.setPSignalSemaphores(nullptr);
 
 			RendererState::TransferQueue().submit(transferSubmitInfo, vk::Fence());
-			RendererState::TransferQueue().waitIdle(); //TODO: Remove
+			RendererState::TransferQueue().waitIdle();
 
 			// Destroy staging resources
 			RendererState::Device().freeMemory(stagingMemory);
@@ -1682,7 +1685,7 @@ namespace VK
 				.setPSignalSemaphores(nullptr);
 
 			RendererState::TransferQueue().submit(transferSubmitInfo, vk::Fence());
-			RendererState::TransferQueue().waitIdle(); //TODO: Remove
+			RendererState::TransferQueue().waitIdle();
 			RendererState::DestroyCommandBuffer(RendererState::TransferCommandPool(), transferCommandBuffer);
 
 			// Map memory and copy
@@ -4479,7 +4482,6 @@ namespace VK
 
         void DestroySemaphores()
         {
-            RendererState::Device().waitIdle();
             if (imageAvailableSemaphore) RendererState::Device().destroySemaphore(imageAvailableSemaphore);
 			if (renderFinishedSemaphore) RendererState::Device().destroySemaphore(renderFinishedSemaphore);
         }
@@ -4565,7 +4567,10 @@ namespace VK
 				RendererState::Device().destroySemaphore(sem);
 			RendererState::RemRenderer();
 		}
-
+        virtual void ThreadInit(int threadId) override
+        {
+            renderThreadId = threadId;
+        }
 		virtual void SetMaxTempBufferVersions(int versionCount) override
 		{
 			RendererState::SetMaxTempBufferVersions(versionCount);
@@ -4638,7 +4643,7 @@ namespace VK
 			return vk::Semaphore();
 		}
 
-		virtual void ExecuteNonRenderCommandBuffers(CoreLib::ArrayView<GameEngine::CommandBuffer*> commands) override
+		virtual void ExecuteNonRenderCommandBuffers(CoreLib::ArrayView<GameEngine::CommandBuffer*> commands, GameEngine::Fence* fence) override
 		{
 			// Create command buffer begin info
 			vk::CommandBufferBeginInfo primaryBeginInfo = vk::CommandBufferBeginInfo()
@@ -4673,7 +4678,7 @@ namespace VK
 				submitInfo.setWaitSemaphoreCount(1).setPWaitSemaphores(&waitSemaphore).setPWaitDstStageMask(
 					&waitDstStageMask);
 			}
-			RendererState::RenderQueue().submit(submitInfo, vk::Fence());
+			RendererState::RenderQueue().submit(submitInfo, fence?((VK::Fence*)fence)->assocFence:nullptr);
 		}
 
 		virtual void ExecuteRenderPass(GameEngine::FrameBuffer* frameBuffer, CoreLib::ArrayView<GameEngine::CommandBuffer*> commands, GameEngine::Fence* fence) override

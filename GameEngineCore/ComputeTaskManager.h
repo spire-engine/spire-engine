@@ -4,10 +4,11 @@
 #include "CoreLib/Basic.h"
 #include "HardwareRenderer.h"
 #include "DeviceMemory.h"
+#include "ShaderCompiler.h"
 
 namespace GameEngine
 {
-    class ComputeKernel : public RefObject
+    class ComputeKernel : public CoreLib::RefObject
     {
     public:
 
@@ -24,11 +25,12 @@ namespace GameEngine
         } resourceHandles;
         enum class BindingType
         {
-            Texture, Sampler, StorageBuffer
+            Texture, TextureArray, Sampler, StorageBuffer
         };
         BindingType type;
         int bufferOffset;
         int bufferLength;
+        CoreLib::ArrayView<Texture*> textureArrayBinding;
         ResourceBinding() {}
         ResourceBinding(Texture* texture)
         {
@@ -47,6 +49,11 @@ namespace GameEngine
             bufferOffset = offset;
             bufferLength = size;
         }
+        ResourceBinding(CoreLib::ArrayView<Texture*> texArray)
+        {
+            type = BindingType::TextureArray;
+            textureArrayBinding = texArray;
+        }
     };
 
     class LaunchedComputeTask : public CoreLib::RefObject
@@ -60,20 +67,25 @@ namespace GameEngine
     class ComputeTaskInstance
     {
     private:
+        friend class ComputeTaskManager;
         ComputeTaskManager* manager;
+        ComputeKernel* kernel;
         CoreLib::RefPtr<DescriptorSet> descriptorSet;
-        int uniformBufferOffset, uniformBufferSize;
+        int uniformBufferSize;
+        void* uniformData;
     public:
         void SetUniformData(void * data, int size);
         void SetBinding(CoreLib::ArrayView<ResourceBinding> resources);
-        void Dispatch(CommandBuffer* cmdBuffer, int x, int y, int z, Fence* fence = nullptr);
-        void Run(int x, int y, int z);
+        void Dispatch(CommandBuffer* cmdBuffer, int x, int y, int z);
+        void Run(int x, int y, int z, Fence* fence = nullptr);
+        ~ComputeTaskInstance();
     };
 
     class ComputeTaskManager
     {
         friend class ComputeTaskInstance;
     private:
+        IShaderCompiler * shaderCompiler;
         CoreLib::Dictionary<CoreLib::String, CoreLib::RefPtr<ComputeKernel>> kernels;
         HardwareRenderer* hardwareRenderer;
         CoreLib::RefPtr<CommandBuffer> commandBuffer;
@@ -81,7 +93,7 @@ namespace GameEngine
         DeviceMemory memory;
     public:
         ComputeKernel* LoadKernel(CoreLib::String shaderName, CoreLib::String functionName);
-        ComputeTaskInstance CreateComputeTaskInstance(ComputeKernel* kernel, CoreLib::ArrayView<ResourceBinding> resources,
+        CoreLib::RefPtr<ComputeTaskInstance> CreateComputeTaskInstance(ComputeKernel* kernel, CoreLib::ArrayView<ResourceBinding> resources,
             void * uniformData, int uniformSize);
         CommandBuffer& GetCommandBuffer()
         {
@@ -91,7 +103,7 @@ namespace GameEngine
         {
             return fence.Ptr();
         }
-        ComputeTaskManager(HardwareRenderer * hw);
+        ComputeTaskManager(HardwareRenderer * hw, IShaderCompiler* shaderCompiler);
     };
 }
 

@@ -244,6 +244,8 @@ namespace GameEngine
             videoEncoder->Close();
         if (videoEncodingStream)
             videoEncodingStream->Close();
+        if (levelEditor)
+            levelEditor->OnClose();
 		level = nullptr;
 		fencePool = List<List<RefPtr<Fence>>>();
         mainWindow = nullptr;

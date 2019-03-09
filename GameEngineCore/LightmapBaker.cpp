@@ -575,16 +575,13 @@ namespace GameEngine
     public:
         std::atomic<bool> isCancelled = false;
         std::atomic<bool> started = false;
-        CoreLib::Threading::Thread computeThread, uvThread;
+        CoreLib::Threading::Thread computeThread;
         void StatusChanged(String status)
         {
-            if (!isCancelled)
+            Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
             {
-                Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
-                {
-                   OnStatusChanged(status);
-                });
-            }
+                OnStatusChanged(status);
+            });
         }
         void MeshChanged(Mesh* mesh)
         {
@@ -597,8 +594,7 @@ namespace GameEngine
         {
             Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
             {
-                if (!isCancelled)
-                    OnProgressChanged(e);
+                OnProgressChanged(e);
             });
         }
         void Completed()
@@ -617,6 +613,19 @@ namespace GameEngine
         }
         void ComputeThreadMain()
         {
+            ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
+            StatusChanged("Checking UVs...");
+            CheckUVs();
+            if (isCancelled) goto computeThreadEnd;
+
+            AllocLightmaps();
+            if (isCancelled) goto computeThreadEnd;
+
+
+            Engine::Instance()->GetRenderer()->GetHardwareRenderer()->ThreadInit(1);
+            StatusChanged("Initializing lightmaps...");
+            BakeLightmapGBuffers();
+
             StatusChanged("Building BVH...");
             ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
 
@@ -669,31 +678,9 @@ namespace GameEngine
             started = true;
             isCancelled = false;
 
-            uvThread.Start(new CoreLib::Threading::ThreadProc([this]()
+            computeThread.Start(new CoreLib::Threading::ThreadProc([this]()
             {
-                ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
-                StatusChanged("Checking UVs...");
-                CheckUVs();
-                if (isCancelled) 
-                {
-                    started = false; 
-                    return;
-                }
-                AllocLightmaps();
-                if (isCancelled)
-                {
-                    started = false;
-                    return;
-                }
-                Engine::Instance()->GetMainWindow()->InvokeAsync(Event<>([&]()
-                {
-                    StatusChanged("Initializing lightmaps...");
-                    BakeLightmapGBuffers();
-                    computeThread.Start(new CoreLib::Threading::ThreadProc([this]()
-                    {
-                        ComputeThreadMain();
-                    }));
-                }));
+                ComputeThreadMain();
             }));
         }
         virtual bool IsRunning() override
@@ -710,11 +697,6 @@ namespace GameEngine
         }
         virtual void Wait() override
         {
-            while (started)
-            {
-                Engine::Instance()->DoEvents();
-            }
-            uvThread.Join();
             computeThread.Join();
         }
         virtual void Cancel() override

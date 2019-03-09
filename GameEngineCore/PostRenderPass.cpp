@@ -92,9 +92,9 @@ namespace GameEngine
 		//buffers.Add(cmdBufIn);
 		buffers.Add(cmdBuf);
 		//buffers.Add(cmdBufOut);
-		hwRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(cmdBufIn));
+		hwRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(cmdBufIn), nullptr);
 		hwRenderer->ExecuteRenderPass(frameBuffer.Ptr(), buffers.GetArrayView(), nullptr);
-		hwRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(cmdBufOut));
+		hwRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(cmdBufOut), nullptr);
 
 	}
 

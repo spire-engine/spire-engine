@@ -28,6 +28,7 @@ namespace GameEngine
         DeviceMemory uniformMemory;
         DeviceMemory globalMemory;
         StandardViewUniforms viewUniform;
+        RefPtr<Fence> fence;
     public:
         ~ObjectSpaceGBufferRendererImpl()
         {
@@ -38,6 +39,7 @@ namespace GameEngine
         {
             hwRenderer = hw;
             rendererService = service;
+            fence = hw->CreateFence();
             vsEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "vs_main");
             psEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "ps_main");
             for (auto &pctx : pipeContext)
@@ -110,7 +112,7 @@ namespace GameEngine
             layoutTransferCmdBuffer1->TransferLayout(destTextures.GetArrayView(),
                 TextureLayoutTransfer::UndefinedToRenderAttachment);
             layoutTransferCmdBuffer1->EndRecording();
-            hwRenderer->ExecuteNonRenderCommandBuffers(layoutTransferCmdBuffer1.Ptr());
+            hwRenderer->ExecuteNonRenderCommandBuffers(layoutTransferCmdBuffer1.Ptr(), nullptr);
             
             cmdBuffer->BeginRecording(frameBuffer.Ptr());
             cmdBuffer->SetViewport(0, 0, width, height);
@@ -173,8 +175,9 @@ namespace GameEngine
             layoutTransferCmdBuffer2->TransferLayout(destTextures.GetArrayView(),
                 TextureLayoutTransfer::RenderAttachmentToSample);
             layoutTransferCmdBuffer2->EndRecording();
-            hwRenderer->ExecuteNonRenderCommandBuffers(layoutTransferCmdBuffer2.Ptr());
-            hwRenderer->Wait();
+
+            hwRenderer->ExecuteNonRenderCommandBuffers(layoutTransferCmdBuffer2.Ptr(), fence.Ptr());
+            fence->Wait();
         }
     };
 

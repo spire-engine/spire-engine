@@ -185,8 +185,11 @@ namespace GameEngine
             LightmapBakingSettings settings;
             lightmapBaker->OnCompleted.Bind([this]()
             {
-                lightmapBaker->GetLightmapSet().SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
-                Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
+                if (!lightmapBaker->IsCancelled())
+                {
+                    lightmapBaker->GetLightmapSet().SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
+                    Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
+                }
             });
             lightmapBaker->OnIterationCompleted.Bind([this]()
             {
@@ -267,6 +270,8 @@ namespace GameEngine
 			auto mnLighting = new MenuItem(mainMenu, "&Lighting");
             auto mnPrebakeLighting = new MenuItem(mnLighting, "&Bake Lightmaps");
             mnPrebakeLighting->OnClick.Bind(this, &LevelEditorImpl::mnBakeLightmaps_Clicked);
+            auto mnCancelBaking = new MenuItem(mnLighting, "&Cancel Baking");
+            mnCancelBaking->OnClick.Bind(this, &LevelEditorImpl::mnCancelBaking_Clicked);
             auto mnExportLightmap = new MenuItem(mnLighting, "Ex&port Lightmap...");
             mnExportLightmap->OnClick.Bind(this, &LevelEditorImpl::mnExportLightmap_Clicked);
 			auto mnUpdateLightProbes = new MenuItem(mnLighting, "&Update Light Probes", "F12");
@@ -614,6 +619,11 @@ namespace GameEngine
                 OsApplication::ShowMessage(String("Lightmap for actor '") + selectedActor->Name.GetValue() + "' does not exist.", "Error");
             }
         }
+        void mnCancelBaking_Clicked(UI_Base*)
+        {
+            if (lightmapBaker)
+                lightmapBaker->Cancel();
+        }
         void mnBakeLightmaps_Clicked(UI_Base*)
         {
             BakeLightmaps();
@@ -694,7 +704,7 @@ namespace GameEngine
 			return false;
 		}
     public:
-        ~LevelEditorImpl()
+        virtual void OnClose() override
         {
             if (lightmapBaker)
                 lightmapBaker->Cancel();

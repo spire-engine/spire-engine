@@ -303,6 +303,7 @@ namespace GameEngine
 		}
 		virtual void Resize(int w, int h) override
 		{
+            Wait();
 			mainView->Resize(w, h);
 			Wait();
 		}

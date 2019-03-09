@@ -839,9 +839,10 @@ namespace GameEngine
 	class HardwareRenderer : public CoreLib::RefObject
 	{
 	public:
+        virtual void ThreadInit(int threadId) = 0;
 		virtual void ClearTexture(GameEngine::Texture2D* texture) = 0;
 		virtual void ExecuteRenderPass(FrameBuffer* frameBuffer, CoreLib::ArrayView<CommandBuffer*> commands, Fence* fence) = 0;
-		virtual void ExecuteNonRenderCommandBuffers(CoreLib::ArrayView<CommandBuffer*> commands) = 0;
+		virtual void ExecuteNonRenderCommandBuffers(CoreLib::ArrayView<CommandBuffer*> commands, Fence* fence) = 0;
 		virtual void Present(WindowSurface * surface, Texture2D* srcImage) = 0;
 		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, VectorMath::Vec2i destOffset) = 0;
 		virtual void Wait() = 0;
