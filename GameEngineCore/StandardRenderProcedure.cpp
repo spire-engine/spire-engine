@@ -227,7 +227,6 @@ namespace GameEngine
 			return drawableBuffer.GetArrayView();
 		}
 
-		List<Texture*> textures;
 		
 		virtual void Run(FrameRenderTask & task, const RenderProcedureParameters & params) override
 		{
@@ -332,7 +331,7 @@ namespace GameEngine
 			viewParams.SetUniformData(&viewUniform, (int)sizeof(viewUniform));
 			auto cameraCullFrustum = CullFrustum(params.view.GetFrustum(aspect));
 			
-
+            Array<Texture*, 8> textures;
             customDepthOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
             task.AddImageTransferTask(textures.GetArrayView(), CoreLib::ArrayView<Texture*>());
             customDepthRenderPass->Bind();

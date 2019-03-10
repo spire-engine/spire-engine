@@ -106,35 +106,54 @@ struct StaticMeshTransform : IWorldSpaceTransform
 
 struct SkeletalAnimationTransform : IWorldSpaceTransform
 {
-    uint4 lightmapId;
-    float4x4 boneTransforms[128];
+    //uint4 lightmapId;
+    float4x4 worldMat;
+    float4 boneTransforms[78 * 2]; // dual quaternions
     VertexPositionInfo getWorldSpacePos<TVertAttribs : IVertexAttribs>(VertexPositionInfo input, TVertAttribs vertAttribs)
     {
         VertexPositionInfo result;
         result.vertPos = float3(0.0);
         result.tangentFrame.vertBinormal = float3(0.0);
         result.tangentFrame.vertTangent = float3(0.0);
+        float4 q = float4(0.0);
+        float4 qe = float4(0.0);
         for (int i = 0; i < vertAttribs.getMaxBoneCount(); i++)
         {
             uint boneId = vertAttribs.getBoneId(i);
             if (boneId == 255) break;
             float boneWeight = vertAttribs.getBoneWeight(i);
-            float3 tp = mul(boneTransforms[boneId], float4(input.vertPos, 1.0)).xyz;
-            result.vertPos += tp * boneWeight;
-            tp = mul(float3x3(boneTransforms[boneId]), input.tangentFrame.vertBinormal);
-            result.tangentFrame.vertBinormal += tp * boneWeight;
-            tp = mul(float3x3(boneTransforms[boneId]), input.tangentFrame.vertTangent);
-            result.tangentFrame.vertTangent += tp * boneWeight;
+             // Seek shortest rotation:
+            float4 boneRotQ = boneTransforms[boneId * 2];
+            if (dot(boneRotQ, q) < 0.f)
+                boneWeight = -boneWeight;
+
+            q += boneRotQ * boneWeight;
+            qe += boneTransforms[boneId * 2 + 1] * boneWeight;
         }
-        result.tangentFrame.vertBinormal = normalize(result.tangentFrame.vertBinormal);
-        result.tangentFrame.vertTangent = normalize(result.tangentFrame.vertTangent);
-		result.tangentFrame.vertNormal = cross(result.tangentFrame.vertBinormal, result.tangentFrame.vertTangent);
+        // normalize dual quaternion
+        float norm = length(q);
+        float invNorm = 1.0f / norm;
+        q *= invNorm;
+        qe *= invNorm;
+        float3 v0 = q.xyz;
+        float3 ve = qe.xyz;
+        float3 trans = (ve*q.w - v0*qe.w + cross(v0, ve)) * 2.0f;
+        result.vertPos = QuaternionRotate(q, input.vertPos) + trans;
+        result.tangentFrame.vertBinormal = QuaternionRotate(q, input.tangentFrame.vertBinormal);
+        result.tangentFrame.vertTangent = QuaternionRotate(q, input.tangentFrame.vertTangent);
         result.tangentFrame.binormalSign = input.tangentFrame.binormalSign;
+
+        // apply world transform
+        float3x3 worldRotMat = float3x3(worldMat);
+        result.tangentFrame.vertBinormal = mul(worldRotMat, QuaternionRotate(q, input.tangentFrame.vertBinormal));
+        result.tangentFrame.vertTangent = mul(worldRotMat, QuaternionRotate(q, input.tangentFrame.vertTangent));
+        result.vertPos = mul(worldMat, float4(result.vertPos, 1.0)).xyz;
+		result.tangentFrame.vertNormal = cross(result.tangentFrame.vertBinormal, result.tangentFrame.vertTangent);
         return result;
     }
 	uint getLightmapId()
 	{
-		return lightmapId.x;
+		return 0xFFFFFFFF;//lightmapId.x;
 	}
 };
 
@@ -358,6 +377,8 @@ float Pow4(float x)
 
 struct LightingEnvironment
 {
+    float4 zPlanes[2];
+    float4x4 lightMatrix[8];
     float4 sunLightColor;
     float3 sunLightDir;
     int sunLightEnabled;
@@ -365,8 +386,6 @@ struct LightingEnvironment
     int numCascades;
     int lightCount;
     int lightProbeCount;
-    float4x4 lightMatrix[8];
-    float4 zPlanes[2];
     float4 ambient;
     StructuredBuffer<Light> lights;
     StructuredBuffer<LightProbe> lightProbes;
@@ -485,32 +504,35 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 			if (lightEnv.sunLightEnabled != 0)
 			{
 				float shadow = selfShadow.get(lightEnv.sunLightDir);
-            
-				if (lightEnv.numCascades)
-				{
-					for (int i = 0; i < lightEnv.numCascades; i++)
-					{
-						if (-viewPos.z < lightEnv.zPlanes[i>>2][i&3])
-						{
-							float4 lightSpacePosT = mul(lightEnv.lightMatrix[i], float4(shadingPoint.vertPos, 1.0));
-							float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
-							float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler, 
-								float3(lightSpacePos.xy, i+lightEnv.shadowMapId), lightSpacePos.z);
-							shadow *= val;
-							break;
-						}
-					}
-				}
-            
+                if (lightEnv.numCascades)
+                {
+                    bool terminated = false;
+                    #define CASCADE_LOOP_BODY(i) \
+					    if (!terminated && (-viewPos.z < lightEnv.zPlanes[i>>2][i&3])) \
+					    { \
+						    float4 lightSpacePosT = mul(lightEnv.lightMatrix[i], float4(shadingPoint.vertPos, 1.0));\
+						    shadow *= lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler,  \
+						    	float3(lightSpacePosT.xy / lightSpacePosT.w, i+lightEnv.shadowMapId), lightSpacePosT.z / lightSpacePosT.w);\
+                            terminated = true;\
+					    } \
+                        terminated = terminated || i >= lightEnv.numCascades; 
+                    CASCADE_LOOP_BODY(0)
+                    CASCADE_LOOP_BODY(1)
+                    CASCADE_LOOP_BODY(2)
+                    CASCADE_LOOP_BODY(3)
+                    CASCADE_LOOP_BODY(4)
+                    CASCADE_LOOP_BODY(5)
+                    CASCADE_LOOP_BODY(6)
+                    CASCADE_LOOP_BODY(7)
+                }
 				float NoV = max(dot(lNormal, view), 0.0);
-				float3 fspecularColor = EnvBRDFApprox(specularColor, roughness, NoV);
+				float3 fspecularColor = specularColor;//EnvBRDFApprox(specularColor, roughness, NoV);
 				float3 R = reflect(-view, lNormal);
 				float RoL = max(0, dot(R, lightEnv.sunLightDir));
 				float dotNL = clamp(dot(lNormal, lightEnv.sunLightDir), 0.01, 0.99);
 				color += lightEnv.sunLightColor.xyz * dotNL * 
 						(diffuseColor + fspecularColor * PhongApprox(roughness, RoL)) * shadow;
 			}
-
 			for (int i = 0; i < lightEnv.lightCount; i++)
 			{
 				Light light = lightEnv.lights[i];
@@ -555,7 +577,6 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 		}
 
         // find closest light probe
-        
         int lightProbeId = -1;
         float minDist = 1e10;
         float3 lpTint = float3(1.0, 1.0, 1.0);
@@ -584,7 +605,6 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 				color += diffuseIBL * lpTint;
 			}
         }
-        
         color *= ao;
         return float4(color, opacity);
     }

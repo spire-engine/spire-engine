@@ -181,11 +181,13 @@ namespace GameEngine
         {
             if (lightmapBaker)
                 lightmapBaker->Cancel();
-            lightmapBaker = CreateLightmapBaker();
+            else
+                lightmapBaker = CreateLightmapBaker();
+
             LightmapBakingSettings settings;
-            lightmapBaker->OnCompleted.Bind([this]()
+            lightmapBaker->OnCompleted.Bind([this](bool isCancelled)
             {
-                if (!lightmapBaker->IsCancelled())
+                if (!isCancelled)
                 {
                     lightmapBaker->GetLightmapSet().SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
                     Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
@@ -193,7 +195,8 @@ namespace GameEngine
             });
             lightmapBaker->OnIterationCompleted.Bind([this]()
             {
-                Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
+                if (!lightmapBaker->IsCancelled())
+                    Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
             });
             lightmapBaker->OnProgressChanged.Bind([this](LightmapBakerProgressChangedEventArgs /*e*/)
             {

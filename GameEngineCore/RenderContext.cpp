@@ -73,9 +73,12 @@ namespace GameEngine
     {
         if (lightmapId != lightmapIndex)
         {
-            lightmapId = lightmapIndex;
-            for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
-                transformModule->SetUniformData(&lightmapIndex, sizeof(uint32_t));
+            if (!skeleton)
+            {
+                lightmapId = lightmapIndex;
+                for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
+                    transformModule->SetUniformData(&lightmapIndex, sizeof(uint32_t));
+            }
         }
     }
 
@@ -102,11 +105,18 @@ namespace GameEngine
 
 		List<Matrix4> matrices;
 		pose.GetMatrices(skeleton, matrices, true, retarget);
-		for (int i = 0; i < matrices.Count(); i++)
-		{
-			Matrix4::Multiply(matrices[i], localTransform, matrices[i]);
-		}
-		transformModule->SetUniformData((void*)matrices.Buffer(), sizeof(Matrix4) * matrices.Count(), 16);
+        Array<VectorMath::Vec4, 160> transformData;
+        transformData.SetSize(matrices.Count() * 2 + 4);
+        memcpy(transformData.Buffer(), &localTransform, sizeof(Matrix4));
+        for (int i = 0; i < matrices.Count(); i++)
+        {
+            DualQuaternion dq;
+            dq.FromRotationTranslation(Quaternion::FromMatrix(matrices[i].GetMatrix3()),
+                VectorMath::Vec3::Create(matrices[i].values[12], matrices[i].values[13], matrices[i].values[14]));
+            ((Quaternion*)transformData.Buffer())[4 + i * 2] = dq.q;
+            ((Quaternion*)transformData.Buffer())[4 + i * 2 + 1] = dq.qe;
+        }
+		transformModule->SetUniformData((void*)transformData.Buffer(), sizeof(Vec4) * transformData.Count(), 0);
 	}
     RefPtr<DrawableMesh> SceneResource::CreateDrawableMesh(Mesh * mesh)
     {

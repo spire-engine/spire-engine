@@ -14,13 +14,9 @@
 namespace GameEngine
 {
     using namespace CoreLib;
-    static int pixelCounter = 0;
-    static bool threadCancelled = false;
-    static unsigned int threadRandomSeed = 0;
-    #pragma omp threadprivate(pixelCounter)
-    #pragma omp threadprivate(threadCancelled)
-    #pragma omp threadprivate(threadRandomSeed)
-
+    static thread_local int pixelCounter = 0;
+    static thread_local bool threadCancelled = false;
+    static thread_local unsigned int threadRandomSeed = 0;
     class LightmapBakerImpl : public LightmapBaker
     {
     public:
@@ -601,15 +597,18 @@ namespace GameEngine
         {
             Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
             {
-                OnCompleted();
+                OnCompleted(isCancelled);
             });
         }
         void IterationCompleted()
         {
-            Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
+            if (!isCancelled)
             {
-                OnIterationCompleted();
-            });
+                Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
+                {
+                    OnIterationCompleted();
+                });
+            }
         }
         void ComputeThreadMain()
         {
@@ -638,8 +637,8 @@ namespace GameEngine
             ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
             ComputeLightmaps_Direct();
             CompositeLightmaps();
-            IterationCompleted();
             if (isCancelled) goto computeThreadEnd;
+            IterationCompleted();
 
             for (int i = 0; i < settings.IndirectLightingBounces; i++)
             {
@@ -674,7 +673,8 @@ namespace GameEngine
         {
             settings = pSettings;
             level = pLevel;
-
+            lightmaps = LightmapSet();
+            maps.Clear();
             started = true;
             isCancelled = false;
 

@@ -628,7 +628,7 @@ namespace GameEngine
 
 			attachments[binding] = Attachment(attachment, cubeId, face, level);
 		}
-		void GetTextures(CoreLib::List<Texture*> & textures)
+		void GetTextures(CoreLib::Array<Texture*, 8> & textures)
 		{
 			textures.Clear();
 			for (auto & a : attachments)

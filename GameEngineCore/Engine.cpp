@@ -371,7 +371,7 @@ namespace GameEngine
 			drawCallStatForm->SetNumMaterials(stats.NumMaterials);
 		}
 
-		if (stats.Divisor >= 500)
+		if (stats.Divisor >= 20)
 		{
 			drawCallStatForm->SetFrameRenderTime(aggregateTime / stats.Divisor);
 			drawCallStatForm->SetNumDrawCalls(stats.NumDrawCalls / stats.Divisor);

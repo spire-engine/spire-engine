@@ -226,16 +226,22 @@ namespace GameEngine
         void TryLoadLightmap()
         {
             auto lightmapFile = Engine::Instance()->FindFile(Path::ReplaceExt(level->FileName, "lightmap"), ResourceType::Level);
+            sceneRes->deviceLightmapSet = nullptr;
             if (lightmapFile.Length())
             {
                 LightmapSet lightmapSet;
                 lightmapSet.LoadFromFile(level, lightmapFile);
+                if (lightmapSet.ActorLightmapIds.Count() != lightmapSet.Lightmaps.Count())
+                {
+                    return;
+                }
+                for (auto & lm : lightmapSet.Lightmaps)
+                {
+                    if (lm.Width != lm.Height || (1 << Math::Log2Ceil(lm.Width)) != lm.Width)
+                        return;
+                }
                 sceneRes->deviceLightmapSet = new DeviceLightmapSet();
                 sceneRes->deviceLightmapSet->Init(hardwareRenderer, lightmapSet);
-            }
-            else
-            {
-                sceneRes->deviceLightmapSet = nullptr;
             }
         }
 		virtual void InitializeLevel(Level* pLevel) override

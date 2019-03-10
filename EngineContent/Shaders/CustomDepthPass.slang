@@ -39,9 +39,8 @@ ParameterBlock<SPECIALIZATION_TYPE_2 > gWorldTransform;
 struct VSOutput
 {
 	float4 projPos : SV_POSITION;
-    float3 worldPos;
+    float4 worldPos_binormalSign;
     float3 normal, tangent;
-    float binormalSign;
     SPECIALIZATION_TYPE_3.ColorSet vertColorSet;
     SPECIALIZATION_TYPE_3.UVSet vertUVSet;
     SPECIALIZATION_TYPE_3.BoneWeightSet.PackedType vertBoneWeightSet;
@@ -65,22 +64,21 @@ VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
     VertexPositionInfo worldPos = gWorldTransform.getWorldSpacePos(vin, vattribs);
     rs.normal = worldPos.tangentFrame.vertNormal;
     rs.tangent = worldPos.tangentFrame.vertTangent;
-    rs.binormalSign = worldPos.tangentFrame.binormalSign;
     
     float3 displacement = gMaterial.getDisplacement(worldPos, vattribs, gView);
-    rs.worldPos = worldPos.vertPos + displacement;
-    rs.projPos = mul(gView.viewProjectionTransform, float4(rs.worldPos, 1.0));
+    rs.worldPos_binormalSign = float4(worldPos.vertPos + displacement, worldPos.tangentFrame.binormalSign);
+    rs.projPos = mul(gView.viewProjectionTransform, float4(rs.worldPos_binormalSign.xyz, 1.0));
     return rs;
 }
 
 void ps_main(VSOutput vsOut)
 {
     VertexPositionInfo vin;
-    vin.vertPos = vsOut.worldPos;
+    vin.vertPos = vsOut.worldPos_binormalSign.xyz;
     vin.tangentFrame.vertNormal = normalize(vsOut.normal);
     vin.tangentFrame.vertTangent = normalize(vsOut.tangent);
     vin.tangentFrame.vertBinormal = cross(vin.tangentFrame.vertNormal, vin.tangentFrame.vertTangent);
-    vin.tangentFrame.binormalSign = vsOut.binormalSign;
+    vin.tangentFrame.binormalSign = vsOut.worldPos_binormalSign.w;
     VertexAttribs<SPECIALIZATION_TYPE_3.UVSet, SPECIALIZATION_TYPE_3.ColorSet, SPECIALIZATION_TYPE_3.BoneWeightSet> vattribs;
     vattribs.uvSet = vsOut.vertUVSet;
     vattribs.colorSet = vsOut.vertColorSet;

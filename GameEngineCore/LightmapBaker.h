@@ -38,7 +38,7 @@ namespace GameEngine
         CoreLib::Event<LightmapBakerProgressChangedEventArgs> OnProgressChanged;
         CoreLib::Event<CoreLib::String> OnStatusChanged;
         CoreLib::Event<> OnIterationCompleted;
-        CoreLib::Event<> OnCompleted;
+        CoreLib::Event<bool /*isCancelled*/> OnCompleted;
         CoreLib::Event<Mesh*> OnMeshChanged;
         virtual void Start(const LightmapBakingSettings & settings, Level* pLevel) = 0;
         virtual bool IsRunning() = 0;

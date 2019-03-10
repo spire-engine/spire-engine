@@ -38,7 +38,7 @@ namespace GameEngine
 	protected:
 		ViewResource * viewRes = nullptr;
 		CoreLib::List<PostPassSource> sources;
-		CoreLib::List<Texture*> textures;
+		CoreLib::Array<Texture*, 8> textures;
 	protected:
 		bool clearFrameBuffer = false;
 		CoreLib::RefPtr<RenderOutput> renderOutput;

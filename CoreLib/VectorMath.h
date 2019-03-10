@@ -2022,6 +2022,39 @@ namespace VectorMath
 		static float GetYawAngle(const VectorMath::Quaternion & q);
 	};
 
+    class DualQuaternion
+    {
+    public:
+        Quaternion q, qe;
+        void FromRotationTranslation(Quaternion rot, VectorMath::Vec3 t)
+        {
+            q = rot;
+            qe.w = -0.5f*(t.x * q.x + t.y * q.y + t.z * q.z);
+            qe.x = 0.5f*(t.x * q.w + t.y * q.z - t.z * q.y);
+            qe.y = 0.5f*(-t.x * q.z + t.y * q.w + t.z * q.x);
+            qe.z = 0.5f*(t.x * q.y - t.y * q.x + t.z * q.w);
+        }
+        Matrix4 ToMatrix()
+        {
+            Vec3 t;
+            float norm = q.Length();
+            float invNorm = 1.0f / norm;
+            Matrix3 m = (q * invNorm).ToMatrix3();
+            t.x = 2.f*(-qe.w*q.x + qe.x*q.w - qe.y*q.z + qe.z*q.y) * invNorm;
+            t.y = 2.f*(-qe.w*q.y + qe.x*q.z + qe.y*q.w - qe.z*q.x) * invNorm;
+            t.z = 2.f*(-qe.w*q.z - qe.x*q.y + qe.y*q.x + qe.z*q.w) * invNorm;
+            Matrix4 rs;
+            Matrix4::CreateIdentityMatrix(rs);
+            for (int i = 0; i < 3; i++)
+                for (int j = 0; j < 3; j++)
+                    rs.m[i][j] = m.m[i][j];
+            rs.values[12] = t.x;
+            rs.values[13] = t.y;
+            rs.values[14] = t.z;
+            return rs;
+        }
+    };
+
 	enum class EulerAngleOrder
 	{
 		// order is from right to left
