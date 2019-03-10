@@ -22,21 +22,27 @@ namespace GameEngine
     void ComputeTaskInstance::SetBinding(CoreLib::ArrayView<ResourceBinding> resources)
     {
         descriptorSet->BeginUpdate();
+        int bindingOffset = 0;
+        if (uniformBufferSize)
+        {
+            bindingOffset = 1;
+            descriptorSet->Update(0, manager->memory.GetBuffer(), (int)((char*)uniformData - (char*)manager->memory.BufferPtr()), uniformBufferSize);
+        }
         for (int i = 0; i < resources.Count(); i++)
         {
             switch (resources[i].type)
             {
             case ResourceBinding::BindingType::Texture:
-                descriptorSet->Update(i, resources[i].resourceHandles.textureBinding, TextureAspect::Color);
+                descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.textureBinding, TextureAspect::Color);
                 break;
             case ResourceBinding::BindingType::Sampler:
-                descriptorSet->Update(i, resources[i].resourceHandles.samplerBinding);
+                descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.samplerBinding);
                 break;
             case ResourceBinding::BindingType::StorageBuffer:
-                descriptorSet->Update(i, resources[i].resourceHandles.storageBufferBinding, resources[i].bufferOffset, resources[i].bufferLength);
+                descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.storageBufferBinding, resources[i].bufferOffset, resources[i].bufferLength);
                 break;
             case ResourceBinding::BindingType::TextureArray:
-                descriptorSet->Update(i, resources[i].textureArrayBinding, TextureAspect::Color);
+                descriptorSet->Update(bindingOffset + i, resources[i].textureArrayBinding, TextureAspect::Color);
                 break;
             }
         }
@@ -51,14 +57,12 @@ namespace GameEngine
         cmdBuffer->DispatchCompute(x, y, z);
     }
 
-    void ComputeTaskInstance::Run(int x, int y, int z, Fence * fence)
+    void ComputeTaskInstance::Run(CommandBuffer * cmdBuffer, int x, int y, int z, Fence * fence)
     {
-        if (!fence)
-            fence = manager->fence.Ptr();
-        manager->commandBuffer->BeginRecording();
-        Dispatch(manager->commandBuffer.Ptr(), x, y, z);
-        manager->commandBuffer->EndRecording();
-        manager->hardwareRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(manager->commandBuffer.Ptr()), fence);
+        cmdBuffer->BeginRecording();
+        Dispatch(cmdBuffer, x, y, z);
+        cmdBuffer->EndRecording();
+        manager->hardwareRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(cmdBuffer), fence);
     }
 
     ComputeTaskInstance::~ComputeTaskInstance()
@@ -82,7 +86,7 @@ namespace GameEngine
         {
             throw InvalidOperationException(String("Cannot compile compute shader kernel \')") + shaderName + String("'"));
         }
-        kernel->shader = hardwareRenderer->CreateShader(ShaderType::ComputeShader, (char*)crs.ShaderCode.Buffer(), crs.ShaderCode.Count());
+        kernel->shader = hardwareRenderer->CreateShader(ShaderType::ComputeShader, (char*)crs.ShaderCode[0].Buffer(), crs.ShaderCode[0].Count());
 
         kernel->descriptorSetLayout = hardwareRenderer->CreateDescriptorSetLayout(crs.BindingLayouts[0].Descriptors.GetArrayView());
         RefPtr<PipelineBuilder> pb = hardwareRenderer->CreatePipelineBuilder();
@@ -97,7 +101,7 @@ namespace GameEngine
         RefPtr<ComputeTaskInstance> inst = new ComputeTaskInstance();
         inst->manager = this;
         inst->descriptorSet = hardwareRenderer->CreateDescriptorSet(kernelImpl->descriptorSetLayout.Ptr());
-
+        inst->kernel = kernel;
         inst->uniformBufferSize = uniformSize;
         if (uniformSize)
             inst->uniformData = memory.Alloc(uniformSize);
@@ -111,8 +115,6 @@ namespace GameEngine
     {
         shaderCompiler = compiler;
         hardwareRenderer = hw;
-        commandBuffer = hardwareRenderer->CreateCommandBuffer();
-        fence = hardwareRenderer->CreateFence();
         memory.Init(hw, BufferUsage::UniformBuffer, true, 21, hardwareRenderer->UniformBufferAlignment());
     }
 

@@ -177,39 +177,51 @@ namespace GameEngine
 		}
 
         RefPtr<LightmapBaker> lightmapBaker;
+        bool UpdateLightmap(LightmapSet& lightmapSet)
+        {
+            if (lightmapSet.Lightmaps.Count() == 0)
+                return false;
+            for (auto & lm : lightmapSet.Lightmaps)
+                if (lm.Width == 0 || lm.Height == 0 || lm.GetDataType() != lightmapSet.Lightmaps.First().GetDataType())
+                    return false;
+            Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapSet);
+            return true;
+        }
         void BakeLightmaps()
         {
             if (lightmapBaker)
                 lightmapBaker->Cancel();
             else
+            {
                 lightmapBaker = CreateLightmapBaker();
+                lightmapBaker->OnCompleted.Bind([this](bool isCancelled)
+                {
+                    if (!isCancelled)
+                    {
+                        if (UpdateLightmap(lightmapBaker->GetLightmapSet()))
+                            lightmapBaker->GetLightmapSet().SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
+                    }
+                });
+                lightmapBaker->OnIterationCompleted.Bind([this]()
+                {
+                    if (!lightmapBaker->IsCancelled())
+                        UpdateLightmap(lightmapBaker->GetLightmapSet());
+                });
+                lightmapBaker->OnProgressChanged.Bind([this](LightmapBakerProgressChangedEventArgs /*e*/)
+                {
+                    // todo: update progress bar
+                });
+                lightmapBaker->OnStatusChanged.Bind([this](String txt)
+                {
+                    Engine::Print("Lightmap baker: %s\n", txt.Buffer());
+                });
+                lightmapBaker->OnMeshChanged.Bind([this](Mesh* mesh)
+                {
+                    Engine::Instance()->GetRenderer()->GetSceneResource()->UpdateDrawableMesh(mesh);
+                });
+            }
 
             LightmapBakingSettings settings;
-            lightmapBaker->OnCompleted.Bind([this](bool isCancelled)
-            {
-                if (!isCancelled)
-                {
-                    lightmapBaker->GetLightmapSet().SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
-                    Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
-                }
-            });
-            lightmapBaker->OnIterationCompleted.Bind([this]()
-            {
-                if (!lightmapBaker->IsCancelled())
-                    Engine::Instance()->GetRenderer()->UpdateLightmap(lightmapBaker->GetLightmapSet());
-            });
-            lightmapBaker->OnProgressChanged.Bind([this](LightmapBakerProgressChangedEventArgs /*e*/)
-            {
-                // todo: update progress bar
-            });
-            lightmapBaker->OnStatusChanged.Bind([this](String txt)
-            {
-                Engine::Print("Lightmap baker: %s\n", txt.Buffer());
-            });
-            lightmapBaker->OnMeshChanged.Bind([this](Mesh* mesh) 
-            {
-                Engine::Instance()->GetRenderer()->GetSceneResource()->UpdateDrawableMesh(mesh);
-            });
             lightmapBaker->Start(settings, level);
         }
 		void InitUI()

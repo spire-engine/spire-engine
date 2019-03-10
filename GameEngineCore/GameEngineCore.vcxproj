@@ -345,6 +345,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\EngineContent\Shaders\Atmosphere.slang" />
+    <None Include="..\EngineContent\Shaders\BC6Compression.slang" />
     <None Include="..\EngineContent\Shaders\BoneHighlight.slang" />
     <None Include="..\EngineContent\Shaders\CopyPixel.slang" />
     <None Include="..\EngineContent\Shaders\CustomDepthPass.slang" />

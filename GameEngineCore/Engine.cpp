@@ -160,7 +160,10 @@ namespace GameEngine
 			fencePool.SetSize(DynamicBufferLengthMultiplier);
 			uiSystemInterface = dynamic_cast<UISystemBase*>(OsApplication::CreateUISystemInterface(renderer->GetHardwareRenderer()));
 			Global::Colors = CreateDarkColorTable();
-			
+
+            // compute task manager
+            computeTaskManager = new ComputeTaskManager(renderer->GetHardwareRenderer(), shaderCompiler.Ptr());
+
             // create main window
             mainWindow = OsApplication::CreateSystemWindow(uiSystemInterface.Ptr(), 22);
             mainWindow->GetUIEntry()->BackColor.A = 0;
@@ -251,6 +254,7 @@ namespace GameEngine
         mainWindow = nullptr;
 		uiSystemInterface = nullptr;
         debugGraphics = nullptr;
+        computeTaskManager = nullptr;
 		renderer = nullptr;
         shaderCompiler = nullptr;
 	}

@@ -139,6 +139,7 @@ namespace GameEngine
                     }
                 progress++;
                 ProgressChanged(LightmapBakerProgressChangedEventArgs(progress, lightmaps.ActorLightmapIds.Count()));
+                if (isCancelled) return;
             }
         }
 
@@ -501,7 +502,7 @@ namespace GameEngine
             for (int i = 0; i < maps.Count(); i++)
             {
                 auto & lm = lightmaps.Lightmaps[i];
-                lm.Init(RawObjectSpaceMap::DataType::RGBA16F, maps[i].lightMap.Width, maps[i].lightMap.Height);
+                lm.Init(RawObjectSpaceMap::DataType::RGB32F, maps[i].lightMap.Width, maps[i].lightMap.Height);
                 BlurIndirectLightmap(maps[i].validPixels, maps[i].indirectLightmap);
                 // composite
                 #pragma omp parallel for
@@ -568,6 +569,36 @@ namespace GameEngine
                 }
             }
         }
+        
+        void CompressLightmaps()
+        {
+            auto computeTaskManager = Engine::GetComputeTaskManager();
+            auto kernel = computeTaskManager->LoadKernel(Engine::Instance()->FindFile("BC6Compression.slang", ResourceType::Shader), "cs_main");
+            auto hw = Engine::Instance()->GetRenderer()->GetHardwareRenderer();
+            RefPtr<Fence> fence = hw->CreateFence();
+            RefPtr<CommandBuffer> cmdBuffer = hw->CreateCommandBuffer();
+            fence->Reset();
+            for (auto & lm : lightmaps.Lightmaps)
+            {
+                int inputBufferSize = (int)lm.Width * lm.Height * sizeof(float) * 3;
+                int outputBufferSize = lm.Width * lm.Height;
+                RefPtr<Buffer> inputBuffer = hw->CreateBuffer(BufferUsage::StorageBuffer, inputBufferSize);
+                RefPtr<Buffer> outputBuffer = hw->CreateBuffer(BufferUsage::StorageBuffer, outputBufferSize);
+                int uniformData[2] = { lm.Width >> 2, lm.Height >> 2 };
+                Array<ResourceBinding, 2> resBindings;
+                resBindings.Add(ResourceBinding(inputBuffer.Ptr(), 0, inputBufferSize));
+                resBindings.Add(ResourceBinding(outputBuffer.Ptr(), 0, outputBufferSize));
+                inputBuffer->SetData(lm.GetBuffer(), lm.Width*lm.Height * sizeof(float) * 3);
+                auto instance = computeTaskManager->CreateComputeTaskInstance(kernel, resBindings.GetArrayView(), uniformData, sizeof(uniformData));
+                instance->Run(cmdBuffer.Ptr(), lm.Width >> 2, lm.Height >> 2, 1, fence.Ptr());
+                fence->Wait();
+                fence->Reset();
+                lm.Init(RawObjectSpaceMap::DataType::BC6H, lm.Width, lm.Height);
+                outputBuffer->GetData(lm.GetBuffer(), 0, lm.Width * lm.Height);
+                if (isCancelled)
+                    return;
+            }
+        }
     public:
         std::atomic<bool> isCancelled = false;
         std::atomic<bool> started = false;
@@ -595,9 +626,10 @@ namespace GameEngine
         }
         void Completed()
         {
-            Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
+            bool cancelled = isCancelled;
+            Engine::Instance()->GetMainWindow()->InvokeAsync([this, cancelled]()
             {
-                OnCompleted(isCancelled);
+                OnCompleted(cancelled);
             });
         }
         void IterationCompleted()
@@ -612,6 +644,9 @@ namespace GameEngine
         }
         void ComputeThreadMain()
         {
+            HardwareRenderer* hwRenderer = Engine::Instance()->GetRenderer()->GetHardwareRenderer();
+            hwRenderer->ThreadInit(1);
+
             ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
             StatusChanged("Checking UVs...");
             CheckUVs();
@@ -655,6 +690,9 @@ namespace GameEngine
                 if (isCancelled) goto computeThreadEnd;
                 IterationCompleted();
             }
+
+            StatusChanged("Compressing lightmaps...");
+            CompressLightmaps();
         computeThreadEnd:;
             if (!isCancelled)
             {

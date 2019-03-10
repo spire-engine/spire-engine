@@ -37,10 +37,10 @@ import DefaultMaterial;
 #define SPECIALIZATION_TYPE_4 StandardVertexAttribs<VertexUVSet1, StandardTangentFrame, VertexColorSet0, NoBoneWeightSet>
 #endif
 
-ParameterBlock<SPECIALIZATION_TYPE_0 > gView;
-ParameterBlock<SPECIALIZATION_TYPE_1 > gLighting;
-ParameterBlock<SPECIALIZATION_TYPE_2 > gMaterial;
-ParameterBlock<SPECIALIZATION_TYPE_3 > gWorldTransform;
+ParameterBlock<SPECIALIZATION_TYPE_0> gView;
+ParameterBlock<SPECIALIZATION_TYPE_1> gLighting;
+ParameterBlock<SPECIALIZATION_TYPE_2> gMaterial;
+ParameterBlock<SPECIALIZATION_TYPE_3> gWorldTransform;
 
 struct VSOutput
 {

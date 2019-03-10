@@ -33,13 +33,16 @@ namespace GameEngine
             delete tex;
             tex = nullptr;
         }
+        StorageFormat format = StorageFormat::RGBA_F16;
+        if (lightmapSet.Lightmaps.Count() && lightmapSet.Lightmaps[0].GetDataType() == RawObjectSpaceMap::DataType::BC6H)
+            format = StorageFormat::BC6H;
         textureArrays.SetSize(arraySize);
         for (int i = 0; i < arraySize; i++)
         {
             int size = 1 << i;
             if (imageCounts[i] != 0)
             {
-                textureArrays[i] = hwRenderer->CreateTexture2DArray(TextureUsage::Sampled, size, size, imageCounts[i], 1, StorageFormat::RGBA_F16);
+                textureArrays[i] = hwRenderer->CreateTexture2DArray(TextureUsage::Sampled, size, size, imageCounts[i], 1, format);
             }
             else
                 textureArrays[i] = nullptr;
@@ -52,26 +55,33 @@ namespace GameEngine
             int size = (1 << level);
             auto & srcLightmap = lightmapSet.Lightmaps[i];
             int pixId = 0;
-            if (srcLightmap.GetDataType() != RawObjectSpaceMap::DataType::RGBA16F)
+            if (format == StorageFormat::BC6H)
             {
-                translatedData.SetSize(size * size * 4);
-                for (int y = 0; y < size; y++)
-                {
-                    for (int x = 0; x < size; x++)
-                    {
-                        auto pix = srcLightmap.GetPixel(x, y);
-                        translatedData[pixId * 4] = FloatToHalf(pix.x);
-                        translatedData[pixId * 4 + 1] = FloatToHalf(pix.y);
-                        translatedData[pixId * 4 + 2] = FloatToHalf(pix.z);
-                        translatedData[pixId * 4 + 3] = FloatToHalf(pix.w);
-                        pixId++;
-                    }
-                }
-                textureArrays[level]->SetData(0, 0, 0, id, (1 << level), (1 << level), 1, DataType::Half4, translatedData.Buffer());
+                textureArrays[level]->SetData(0, 0, 0, id, (1 << level), (1 << level), 1, DataType::Byte, srcLightmap.GetBuffer());
+            }
+            else if (srcLightmap.GetDataType() == RawObjectSpaceMap::DataType::RGBA16F)
+            {
+                textureArrays[level]->SetData(0, 0, 0, id, (1 << level), (1 << level), 1, DataType::Half4, srcLightmap.GetBuffer());
             }
             else
             {
-                textureArrays[level]->SetData(0, 0, 0, id, (1 << level), (1 << level), 1, DataType::Half4, srcLightmap.GetBuffer());
+                if (srcLightmap.GetDataType() != RawObjectSpaceMap::DataType::RGBA16F)
+                {
+                    translatedData.SetSize(size * size * 4);
+                    for (int y = 0; y < size; y++)
+                    {
+                        for (int x = 0; x < size; x++)
+                        {
+                            auto pix = srcLightmap.GetPixel(x, y);
+                            translatedData[pixId * 4] = FloatToHalf(pix.x);
+                            translatedData[pixId * 4 + 1] = FloatToHalf(pix.y);
+                            translatedData[pixId * 4 + 2] = FloatToHalf(pix.z);
+                            translatedData[pixId * 4 + 3] = FloatToHalf(pix.w);
+                            pixId++;
+                        }
+                    }
+                    textureArrays[level]->SetData(0, 0, 0, id, (1 << level), (1 << level), 1, DataType::Half4, translatedData.Buffer());
+                }
             }
         }
     }

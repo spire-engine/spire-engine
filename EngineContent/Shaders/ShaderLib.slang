@@ -506,6 +506,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 				float shadow = selfShadow.get(lightEnv.sunLightDir);
                 if (lightEnv.numCascades)
                 {
+#if 1
                     bool terminated = false;
                     #define CASCADE_LOOP_BODY(i) \
 					    if (!terminated && (-viewPos.z < lightEnv.zPlanes[i>>2][i&3])) \
@@ -524,6 +525,18 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
                     CASCADE_LOOP_BODY(5)
                     CASCADE_LOOP_BODY(6)
                     CASCADE_LOOP_BODY(7)
+#else
+                    for (int i = 0; i < lightEnv.numCascades; i++)
+                    {
+                        if (-viewPos.z < lightEnv.zPlanes[i >> 2][i & 3])
+                        {
+                            float4 lightSpacePosT = mul(lightEnv.lightMatrix[i], float4(shadingPoint.vertPos, 1.0));
+                            shadow *= lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler,
+                                float3(lightSpacePosT.xy / lightSpacePosT.w, i + lightEnv.shadowMapId), lightSpacePosT.z / lightSpacePosT.w);
+                            break;
+                        }
+                    }
+#endif
                 }
 				float NoV = max(dot(lNormal, view), 0.0);
 				float3 fspecularColor = specularColor;//EnvBRDFApprox(specularColor, roughness, NoV);

@@ -16,6 +16,7 @@
 #include "VideoEncoder.h"
 #include "ShaderCompiler.h"
 #include "DebugGraphics.h"
+#include "ComputeTaskManager.h"
 
 namespace GameEngine
 {
@@ -88,6 +89,7 @@ namespace GameEngine
         CoreLib::RefPtr<CoreLib::IO::Stream> videoEncodingStream;
         CoreLib::RefPtr<IShaderCompiler> shaderCompiler;
         CoreLib::RefPtr<DebugGraphics> debugGraphics;
+        CoreLib::RefPtr<ComputeTaskManager> computeTaskManager;
 		EngineMode engineMode = EngineMode::Normal;
 		CoreLib::Array<RenderStat, 16> renderStats;
 		GraphicsUI::CommandForm * uiCommandForm = nullptr;
@@ -212,6 +214,10 @@ namespace GameEngine
         static DebugGraphics* GetDebugGraphics()
         {
             return Instance()->debugGraphics.Ptr();
+        }
+        static ComputeTaskManager* GetComputeTaskManager()
+        {
+            return Instance()->computeTaskManager.Ptr();
         }
         static IShaderCompiler* GetShaderCompiler()
         {

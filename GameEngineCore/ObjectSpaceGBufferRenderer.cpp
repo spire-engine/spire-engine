@@ -40,6 +40,7 @@ namespace GameEngine
             hwRenderer = hw;
             rendererService = service;
             fence = hw->CreateFence();
+            fence->Reset();
             vsEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "vs_main");
             psEntryPoint = Engine::GetShaderCompiler()->LoadShaderEntryPoint(shaderFileName, "ps_main");
             for (auto &pctx : pipeContext)
@@ -178,6 +179,7 @@ namespace GameEngine
 
             hwRenderer->ExecuteNonRenderCommandBuffers(layoutTransferCmdBuffer2.Ptr(), fence.Ptr());
             fence->Wait();
+            fence->Reset();
         }
     };
 

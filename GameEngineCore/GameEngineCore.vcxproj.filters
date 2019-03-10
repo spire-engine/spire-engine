@@ -527,6 +527,9 @@
     <None Include="..\EngineContent\Shaders\DebugGraphicsPass.slang">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="..\EngineContent\Shaders\BC6Compression.slang">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="core.natvis" />

@@ -119,7 +119,8 @@ namespace GameEngine
 		RGBA_F16, RGBA_F32,
 		RGBA_Compressed, R11F_G11F_B10F, RGB10_A2,
 		BC1, BC3, BC5,
-		Depth24, Depth32, Depth24Stencil8
+		Depth24, Depth32, Depth24Stencil8,
+        BC6H
 	};
 
 	inline bool isDepthFormat(StorageFormat format)

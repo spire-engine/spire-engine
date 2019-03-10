@@ -91,11 +91,17 @@ namespace GameEngine
         {
             StageFlags stageFlags = sfNone;
             auto req = NewCompileRequest();
+            Dictionary<String, int> addedTUs;
             for (auto ep : entryPoints)
             {
-                int unit = spAddTranslationUnit(req, SLANG_SOURCE_LANGUAGE_SLANG, ep->FileName.Buffer());
+                int unit = 0;
                 auto path = Engine::Instance()->FindFile(ep->FileName, ResourceType::Shader);
-                spAddTranslationUnitSourceFile(req, unit, path.Buffer());
+                if (!addedTUs.TryGetValue(path, unit))
+                {
+                    unit = spAddTranslationUnit(req, SLANG_SOURCE_LANGUAGE_SLANG, ep->FileName.Buffer());
+                    spAddTranslationUnitSourceFile(req, unit, path.Buffer());
+                    addedTUs[path] = unit;
+                }
                 spAddEntryPoint(req, unit, ep->FunctionName.Buffer(), GetSlangStage(ep->Stage));
                 stageFlags = StageFlags(stageFlags | ep->Stage);
             }
@@ -191,10 +197,13 @@ namespace GameEngine
             spAddSearchPath(compileRequest, Engine::Instance()->GetDirectory(false, ResourceType::Shader).Buffer());
             spAddSearchPath(compileRequest, Engine::Instance()->GetDirectory(true, ResourceType::Material).Buffer());
             spAddSearchPath(compileRequest, Engine::Instance()->GetDirectory(false, ResourceType::Material).Buffer());
-            
+
             spAddCodeGenTarget(compileRequest, GetSlangTarget());
             spAddCodeGenTarget(compileRequest, SLANG_GLSL);
-
+            spSetTargetProfile(compileRequest, 0, spFindProfile(session, "sm_5_1"));
+            #if 0
+                spSetDumpIntermediates(compileRequest, 1);
+            #endif
             int shaderLibUnit = spAddTranslationUnit(compileRequest, SLANG_SOURCE_LANGUAGE_SLANG, "ShaderLib");
             auto shaderLibPath = Engine::Instance()->FindFile("ShaderLib.slang", ResourceType::Shader);
             spAddTranslationUnitSourceFile(compileRequest, shaderLibUnit, shaderLibPath.Buffer());

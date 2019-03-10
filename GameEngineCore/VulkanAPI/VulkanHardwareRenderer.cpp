@@ -859,6 +859,7 @@ namespace VK
 		case StorageFormat::BC1: return vk::Format::eBc1RgbUnormBlock;//
 		case StorageFormat::BC3: return vk::Format::eBc3UnormBlock;
 		case StorageFormat::BC5: return vk::Format::eBc5UnormBlock;
+        case StorageFormat::BC6H: return vk::Format::eBc6HUfloatBlock;
 		case StorageFormat::RGBA_Compressed: return vk::Format::eBc7UnormBlock;//
 		case StorageFormat::R11F_G11F_B10F: return vk::Format::eB10G11R11UfloatPack32; // need to swizzle?
 		case StorageFormat::RGB10_A2: return vk::Format::eA2R10G10B10UnormPack32;//
@@ -1415,7 +1416,7 @@ namespace VK
 			
 			// Set up staging buffer and copy data to new image
 			int bufferSize = pwidth * pheight * pdepth * layerCount * dataTypeSize;
-			if (format == StorageFormat::BC1 || format == StorageFormat::BC5 || format == StorageFormat::BC3)
+			if (format == StorageFormat::BC1 || format == StorageFormat::BC5 || format == StorageFormat::BC3 || format == StorageFormat::BC6H)
 			{
 				int blocks = (int)(ceil(pwidth / 4.0f) * ceil(pheight / 4.0f));
 				bufferSize = format == StorageFormat::BC1 ? blocks * 8 : blocks * 16;
@@ -3303,6 +3304,7 @@ namespace VK
 #ifdef _DEBUG
 			result->isGraphics = false;
 #endif
+            result->descSetCount = descSetLayouts.Count();
 			result->pipelineLayout = RendererState::Device().createPipelineLayout(layoutCreateInfo);
 			vk::ComputePipelineCreateInfo createInfo;
 			createInfo.setLayout(result->pipelineLayout)
@@ -3705,6 +3707,13 @@ namespace VK
 
 		virtual void DispatchCompute(int groupCountX, int groupCountY, int groupCountZ) override
 		{
+            buffer.bindDescriptorSets(
+                curPipeline->pipelineBindPoint,
+                curPipeline->pipelineLayout,
+                0,
+                curPipeline->descSetCount,
+                pendingDescSets.Buffer(),
+                0, nullptr);
 			buffer.dispatch(groupCountX, groupCountY, groupCountZ);
 		}
 

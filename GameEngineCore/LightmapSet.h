@@ -13,6 +13,7 @@ namespace GameEngine
     {
         CoreLib::List<RawObjectSpaceMap> Lightmaps;
         CoreLib::Dictionary<Actor*, int> ActorLightmapIds;
+       
         void SaveToFile(Level* level, CoreLib::String fileName);
         void LoadFromFile(Level* level, CoreLib::String fileName);
     };

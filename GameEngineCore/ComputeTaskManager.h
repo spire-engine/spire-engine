@@ -39,12 +39,12 @@ namespace GameEngine
         }
         ResourceBinding(TextureSampler* sampler)
         {
-            type = BindingType::Texture;
+            type = BindingType::Sampler;
             resourceHandles.samplerBinding = sampler;
         }
         ResourceBinding(Buffer* buffer, int offset, int size)
         {
-            type = BindingType::Texture;
+            type = BindingType::StorageBuffer;
             resourceHandles.storageBufferBinding = buffer;
             bufferOffset = offset;
             bufferLength = size;
@@ -77,7 +77,7 @@ namespace GameEngine
         void SetUniformData(void * data, int size);
         void SetBinding(CoreLib::ArrayView<ResourceBinding> resources);
         void Dispatch(CommandBuffer* cmdBuffer, int x, int y, int z);
-        void Run(int x, int y, int z, Fence* fence = nullptr);
+        void Run(CommandBuffer * cmdBuffer, int x, int y, int z, Fence* fence = nullptr);
         ~ComputeTaskInstance();
     };
 
@@ -88,21 +88,11 @@ namespace GameEngine
         IShaderCompiler * shaderCompiler;
         CoreLib::Dictionary<CoreLib::String, CoreLib::RefPtr<ComputeKernel>> kernels;
         HardwareRenderer* hardwareRenderer;
-        CoreLib::RefPtr<CommandBuffer> commandBuffer;
-        CoreLib::RefPtr<Fence> fence;
         DeviceMemory memory;
     public:
         ComputeKernel* LoadKernel(CoreLib::String shaderName, CoreLib::String functionName);
         CoreLib::RefPtr<ComputeTaskInstance> CreateComputeTaskInstance(ComputeKernel* kernel, CoreLib::ArrayView<ResourceBinding> resources,
             void * uniformData, int uniformSize);
-        CommandBuffer& GetCommandBuffer()
-        {
-            return *commandBuffer;
-        }
-        Fence* GetFence()
-        {
-            return fence.Ptr();
-        }
         ComputeTaskManager(HardwareRenderer * hw, IShaderCompiler* shaderCompiler);
     };
 }

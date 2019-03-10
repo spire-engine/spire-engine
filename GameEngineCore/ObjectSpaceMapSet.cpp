@@ -20,6 +20,8 @@ namespace GameEngine
             return 16;
         case RawObjectSpaceMap::DataType::RGBA16F:
             return 8;
+        case RawObjectSpaceMap::DataType::BC6H:
+            return 1;
         }
         return 0;
     }
