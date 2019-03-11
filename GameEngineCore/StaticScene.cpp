@@ -112,6 +112,8 @@ namespace GameEngine
             if (actorType == EngineActorType::Light)
             {
                 auto light = dynamic_cast<LightActor*>(actor.Value.Ptr());
+                if (light->Mobility > 1)
+                    continue;
                 if (light->lightType == LightType::Directional)
                 {
                     auto dirLight = (DirectionalLightActor*)(light);
@@ -124,6 +126,8 @@ namespace GameEngine
                     lightData.Radius = 0.0f;
                     lightData.SpotFadingStartAngle = lightData.SpotFadingEndAngle = 0.0f;
                     lightData.Decay = 0.0f;
+                    lightData.EnableShadows = (light->EnableShadows != 0);
+                    lightData.IncludeDirectLighting = (light->Mobility == 0);
                     scene->lights.Add(lightData);
                 }
                 else if (light->lightType == LightType::Point)
@@ -139,6 +143,8 @@ namespace GameEngine
                     lightData.SpotFadingStartAngle = pointLight->SpotLightStartAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
                     lightData.SpotFadingEndAngle = pointLight->SpotLightEndAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
                     lightData.Decay = 10.0f / (pointLight->DecayDistance90Percent.GetValue() * pointLight->DecayDistance90Percent.GetValue());
+                    lightData.EnableShadows = (light->EnableShadows != 0);
+                    lightData.IncludeDirectLighting = (light->Mobility == 0);
                     scene->lights.Add(lightData);
                 }
                 else if (light->lightType == LightType::Ambient)

@@ -25,15 +25,16 @@ namespace GameEngine
     private:
         struct RawMapSet
         {
-            RawObjectSpaceMap lightMap, indirectLightmap, diffuseMap, normalMap, positionMap;
+            RawObjectSpaceMap lightMap, indirectLightmap, diffuseMap, normalMap, positionMap, dynamicDirectLighting;
             IntSet validPixels;
             void Init(int w, int h)
             {
-                lightMap.Init(RawObjectSpaceMap::DataType::RGB32F, w, h);
+                lightMap.Init(RawObjectSpaceMap::DataType::RGBA16F, w, h);
                 indirectLightmap.Init(RawObjectSpaceMap::DataType::RGB32F, w, h);
                 diffuseMap.Init(RawObjectSpaceMap::DataType::RGBA8, w, h);
                 normalMap.Init(RawObjectSpaceMap::DataType::RGB10_X2_SIGNED, w, h);
                 positionMap.Init(RawObjectSpaceMap::DataType::RGBA32F, w, h);
+                dynamicDirectLighting.Init(RawObjectSpaceMap::DataType::RGBA16F, w, h);
                 validPixels.SetMax(w * h);
             }
         };
@@ -171,12 +172,14 @@ namespace GameEngine
             return VectorMath::Vec3::Create(1.0f, 1.0f, 1.0f);
         }
 
-        VectorMath::Vec3 ComputeDirectLighting(VectorMath::Vec3 pos, VectorMath::Vec3 normal)
+        VectorMath::Vec3 ComputeDirectLighting(VectorMath::Vec3 pos, VectorMath::Vec3 normal, VectorMath::Vec3 & dynamicDirectLighting)
         {
             VectorMath::Vec3 result;
             result.SetZero();
+            dynamicDirectLighting.SetZero();
             for (auto & light : staticScene->lights)
             {
+                VectorMath::Vec3 lighting;
                 switch (light.Type)
                 {
                 case StaticLightType::Directional:
@@ -188,8 +191,8 @@ namespace GameEngine
                     shadowRay.Origin = pos;
                     shadowRay.Dir = l;
                     auto p1 = shadowRay.Origin + shadowRay.Dir * 1000.0f;
-                    auto shadowFactor = TraceShadowRay(shadowRay);
-                    result += light.Intensity * shadowFactor * Math::Max(0.0f, nDotL);
+                    auto shadowFactor = light.EnableShadows ? TraceShadowRay(shadowRay) : VectorMath::Vec3::Create(1.0f);
+                    lighting = light.Intensity * shadowFactor * Math::Max(0.0f, nDotL);
                     break;
                 }
                 case StaticLightType::Point:
@@ -212,12 +215,15 @@ namespace GameEngine
                         shadowRay.tMax = dist;
                         shadowRay.Origin = pos;
                         shadowRay.Dir = l;
-                        auto shadowFactor = TraceShadowRay(shadowRay);
-                        result += light.Intensity * actualDecay * shadowFactor * Math::Max(0.0f, nDotL);
+                        auto shadowFactor = light.EnableShadows ? TraceShadowRay(shadowRay) : VectorMath::Vec3::Create(1.0f);
+                        lighting = light.Intensity * actualDecay * shadowFactor * Math::Max(0.0f, nDotL);
                     }
                     break;
                 }
                 }
+                result += lighting;
+                if (!light.IncludeDirectLighting)
+                    dynamicDirectLighting += lighting;
             }
             return result;
         }
@@ -350,12 +356,15 @@ namespace GameEngine
                         
                         VectorMath::Vec4 lighting;
                         lighting.SetZero();
+                        VectorMath::Vec3 dynamicDirectLighting;
                         auto diffuse = map.diffuseMap.GetPixel(x, y);
                         auto posPixel = map.positionMap.GetPixel(x, y);
                         auto pos = posPixel.xyz();
                         auto normal = map.normalMap.GetPixel(x, y).xyz().Normalize();
-                        lighting = VectorMath::Vec4::Create(ComputeDirectLighting(pos, normal), 1.0f);
+                        
+                        lighting = VectorMath::Vec4::Create(ComputeDirectLighting(pos, normal, dynamicDirectLighting), 1.0f);
                         map.lightMap.SetPixel(x, y, lighting);
+                        map.dynamicDirectLighting.SetPixel(x, y, VectorMath::Vec4::Create(dynamicDirectLighting, 1.0f));
                     }
                 }
             }
@@ -437,8 +446,12 @@ namespace GameEngine
                         {
                             if (validPixels.Contains(y*lightmap.Width + ix))
                             {
-                                value += lightmap.GetPixel(ix, y).xyz() * kernel[x-ix];
-                                sumWeight += kernel[x - ix];
+                                auto otherVal = lightmap.GetPixel(ix, y).xyz();
+                                if (otherVal.x > 1e-3f || otherVal.y > 1e-3f || otherVal.z > 1e-3f)
+                                {
+                                    value += otherVal * kernel[x - ix];
+                                    sumWeight += kernel[x - ix];
+                                }
                             }
                             else
                                 break;
@@ -447,8 +460,12 @@ namespace GameEngine
                         {
                             if (validPixels.Contains(y*lightmap.Width + ix))
                             {
-                                value += lightmap.GetPixel(ix, y).xyz() * kernel[ix - x];
-                                sumWeight += kernel[ix - x];
+                                auto otherVal = lightmap.GetPixel(ix, y).xyz();
+                                if (otherVal.x > 1e-3f || otherVal.y > 1e-3f || otherVal.z > 1e-3f)
+                                {
+                                    value += otherVal * kernel[ix - x];
+                                    sumWeight += kernel[ix - x];
+                                }
                             }
                             else
                                 break;
@@ -473,8 +490,12 @@ namespace GameEngine
                         {
                             if (validPixels.Contains(iy*lightmap.Width + x))
                             {
-                                value += blurTempMap.GetPixel(x, iy).xyz() * kernel[y - iy];
-                                sumWeight += kernel[y - iy];
+                                auto otherVal = blurTempMap.GetPixel(x, iy).xyz();
+                                if (otherVal.x > 1e-3f || otherVal.y > 1e-3f || otherVal.z > 1e-3f)
+                                {
+                                    value += otherVal * kernel[y - iy];
+                                    sumWeight += kernel[y - iy];
+                                }
                             }
                             else
                                 break;
@@ -483,8 +504,12 @@ namespace GameEngine
                         {
                             if (validPixels.Contains(iy*lightmap.Width + x))
                             {
-                                value += blurTempMap.GetPixel(x, iy).xyz() * kernel[iy - y];
-                                sumWeight += kernel[iy - y];
+                                auto otherVal = blurTempMap.GetPixel(x, iy).xyz();
+                                if (otherVal.x > 1e-3f || otherVal.y > 1e-3f || otherVal.z > 1e-3f)
+                                {
+                                    value += otherVal * kernel[iy - y];
+                                    sumWeight += kernel[iy - y];
+                                }
                             }
                             else
                                 break;
@@ -508,19 +533,21 @@ namespace GameEngine
                 #pragma omp parallel for
                 for (int y = 0; y < lm.Height; y++)
                     for (int x = 0; x < lm.Width; x++)
-                        lm.SetPixel(x, y, maps[i].lightMap.GetPixel(x, y) + maps[i].indirectLightmap.GetPixel(x, y));
+                        lm.SetPixel(x, y, maps[i].lightMap.GetPixel(x, y) + maps[i].indirectLightmap.GetPixel(x, y) - maps[i].dynamicDirectLighting.GetPixel(x, y));
 
                 // dilate
                 #pragma omp parallel for
                 for (int y = 0; y < lm.Height; y++)
                     for (int x = 0; x < lm.Width; x++)
                     {
-                        if (!maps[i].validPixels.Contains(y * lm.Width + x))
+                        if (!maps[i].validPixels.Contains(y * lm.Width + x) ||
+                            maps[i].indirectLightmap.GetPixel(x, y).xyz().Length2() < 1e-6f)
                         {
                             for (int iy = Math::Max(y-1, 0); iy <= Math::Min(y + 1, lm.Height-1); iy++)
                                 for (int ix = Math::Max(x - 1, 0); ix <= Math::Min(x + 1, lm.Width - 1); ix++)
                                 {
-                                    if (maps[i].validPixels.Contains(iy * lm.Width + ix))
+                                    if (maps[i].validPixels.Contains(iy * lm.Width + ix) && 
+                                        maps[i].indirectLightmap.GetPixel(ix, iy).xyz().Length2() > 1e-2f)
                                     {
                                         lm.SetPixel(x, y, lm.GetPixel(ix, iy));
                                         goto outContinue;

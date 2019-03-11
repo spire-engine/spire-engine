@@ -98,6 +98,9 @@ namespace GameEngine
 			if (actorType == EngineActorType::Light)
 			{
 				auto light = dynamic_cast<LightActor*>(actor.Value.Ptr());
+                // ignore static lights
+                if (light->Mobility.GetValue() == 0)
+                    continue; 
 				if (light->lightType == LightType::Directional)
 				{
 					auto dirLight = (DirectionalLightActor*)(light);
@@ -111,13 +114,12 @@ namespace GameEngine
 					lightData.startAngle = lightData.endAngle = 0.0f;
 					lightData.shaderMapId = 0xFFFF;
 					lightData.decay = 0.0f;
-					if (dirLight->EnableCascadedShadows && !uniformData.sunLightEnabled)
+					if (dirLight->EnableShadows.GetValue() == 2 && !uniformData.sunLightEnabled)
 					{
 						uniformData.sunLightEnabled = true;
 						sunlight = dirLight;
 						uniformData.lightColor = lightData.color;
 						uniformData.lightDir = dirLight->GetDirection();
-						
 					}
 					else
 					{
@@ -137,7 +139,7 @@ namespace GameEngine
 					lightData.startAngle = pointLight->SpotLightStartAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
 					lightData.endAngle = pointLight->SpotLightEndAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
 					lightData.shaderMapId = 0xFFFF;
-					if (pointLight->EnableShadows.GetValue())
+					if (pointLight->EnableShadows.GetValue() == 2)
 						lightData.shaderMapId = (unsigned short)shadowMapRes.AllocShadowMaps(1);
 					if (lightData.shaderMapId == -1)
 					{

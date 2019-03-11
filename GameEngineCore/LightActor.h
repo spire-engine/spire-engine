@@ -15,6 +15,8 @@ namespace GameEngine
 		virtual Mesh CreateGizmoMesh() = 0;
 	public:
 		LightType lightType;
+        PROPERTY_DEF_ATTRIB(int, Mobility, 0, "enum(Static,Stationary,Dynamic)");
+        PROPERTY_DEF_ATTRIB(int, EnableShadows, 1, "enum(Disabled,Static,Dynamic)");
 		VectorMath::Vec3 GetDirection();
 		virtual EngineActorType GetEngineType() override
 		{

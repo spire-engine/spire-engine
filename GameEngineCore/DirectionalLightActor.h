@@ -8,7 +8,6 @@ namespace GameEngine
 	class DirectionalLightActor : public LightActor
 	{
 	public:
-		PROPERTY_DEF(bool, EnableCascadedShadows, false);
 		PROPERTY_DEF(float, ShadowDistance, 40000.0f);
 		PROPERTY_DEF(int, NumShadowCascades, 4);
 		PROPERTY_DEF(float, TransitionFactor, 0.8f);

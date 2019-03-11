@@ -142,6 +142,16 @@ namespace CoreLib
 					memcpy(buffer.Ptr(), str, length + 1);
 				}
 			}
+            String(const char * str, int len)
+            {
+                if (str)
+                {
+                    length = len;
+                    buffer = new char[length + 1];
+                    memcpy(buffer.Ptr(), str, length);
+                    buffer[length] = 0;
+                }
+            }
 			String(char chr)
 			{
 				if (chr)

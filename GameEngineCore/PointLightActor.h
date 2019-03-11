@@ -11,7 +11,6 @@ namespace GameEngine
 	protected:
 		virtual Mesh CreateGizmoMesh() override;
 	public:
-		PROPERTY_DEF(bool, EnableShadows, false);
 		PROPERTY_DEF(float, Radius, 2000.0f);
 		PROPERTY_DEF(float, DecayDistance90Percent, 1200.0f);
 		PROPERTY_DEF(bool, IsSpotLight, false);

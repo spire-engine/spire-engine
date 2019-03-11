@@ -783,7 +783,7 @@ endOfSkeletonExport:
 		{
 			auto optimizedMesh = meshOut->DeduplicateVertices();
             Mesh lightmappedMesh;
-            GenerateLightmapUV(&lightmappedMesh, &optimizedMesh, 512, 1);
+            GenerateLightmapUV(&lightmappedMesh, &optimizedMesh, 1024, 6);
             lightmappedMesh.SaveToFile(Path::ReplaceExt(outFileName, "mesh"));
 			wprintf(L"mesh converted: elements %d, faces: %d, vertices: %d, skeletal: %s.\n", lightmappedMesh.ElementRanges.Count(), lightmappedMesh.Indices.Count() / 3, lightmappedMesh.GetVertexCount(),
 				hasBones ? L"true" : L"false");
@@ -876,7 +876,7 @@ void ExportObj(ExportArguments & args)
     mesh.ElementRanges.Add(range);
     auto optimizedMesh = mesh;// .DeduplicateVertices();
     Mesh lightmappedMesh;
-    GenerateLightmapUV(&lightmappedMesh, &optimizedMesh, 512, 1);
+    GenerateLightmapUV(&lightmappedMesh, &optimizedMesh, 1024, 6);
     lightmappedMesh.SaveToFile(Path::ReplaceExt(args.FileName, "mesh"));
 }
 
