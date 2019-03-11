@@ -119,6 +119,18 @@ namespace GameEngine
 	{
 		try
 		{
+            gameDir = Path::Normalize(args.GameDirectory);
+            engineDir = Path::Normalize(args.EngineDirectory);
+            Path::CreateDir(Path::Combine(gameDir, "Cache"));
+            Path::CreateDir(Path::Combine(gameDir, "Cache/Shaders"));
+            Path::CreateDir(Path::Combine(gameDir, "Settings"));
+
+            startTime = lastGameLogicTime = lastRenderingTime = Diagnostics::PerformanceCounter::Start();
+
+            GpuId = args.GpuId;
+            RecompileShaders = args.RecompileShaders;
+            params = args.LaunchParams;
+
             if (args.Editor)
                 engineMode = EngineMode::Editor;
 		
@@ -132,18 +144,6 @@ namespace GameEngine
                 videoEncodingStream = new FileStream(args.LaunchParams.Directory, FileMode::Create);
                 videoEncoder->Init(VideoEncodingOptions(args.Width, args.Height), videoEncodingStream.Ptr());
             }
-
-			startTime = lastGameLogicTime = lastRenderingTime = Diagnostics::PerformanceCounter::Start();
-			
-			GpuId = args.GpuId;
-			RecompileShaders = args.RecompileShaders;
-            params = args.LaunchParams;
-
-			gameDir = Path::Normalize(args.GameDirectory);
-			engineDir = Path::Normalize(args.EngineDirectory);
-			Path::CreateDir(Path::Combine(gameDir, "Cache"));
-			Path::CreateDir(Path::Combine(gameDir, "Cache/Shaders"));
-			Path::CreateDir(Path::Combine(gameDir, "Settings"));
 
 			auto graphicsSettingsFile = FindFile("graphics.settings", ResourceType::Settings);
 			if (graphicsSettingsFile.Length())

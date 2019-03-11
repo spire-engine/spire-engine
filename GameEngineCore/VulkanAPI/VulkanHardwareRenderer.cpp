@@ -554,7 +554,7 @@ namespace VK
             if (State().pipelineCacheLocation.Length())
             {
                 const size_t maxPipelineCacheSize = (64 << 20); // limit cache size to 64MB
-                size_t size = maxPipelineCacheSize;
+                size_t size = 0;
                 vkGetPipelineCacheData(State().device, State().PipelineCache(), &size, nullptr);
                 if (size > maxPipelineCacheSize)
                     size = maxPipelineCacheSize;
@@ -3311,7 +3311,7 @@ namespace VK
 				.stage.setModule(reinterpret_cast<VK::Shader*>(shader)->module)
 					  .setStage(vk::ShaderStageFlagBits::eCompute)
 					  .setPName("main");
-			result->pipeline = RendererState::Device().createComputePipeline(vk::PipelineCache(), createInfo);
+			result->pipeline = RendererState::Device().createComputePipeline(RendererState::PipelineCache(), createInfo);
 			return result;
 		}
 	};

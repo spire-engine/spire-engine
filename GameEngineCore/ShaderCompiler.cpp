@@ -2,26 +2,211 @@
 #include "CoreLib/LibIO.h"
 #include "Engine.h"
 #include "ExternalLibs/Slang/slang.h"
+#include "CoreLib/Tokenizer.h"
 
 namespace GameEngine
 {
 	using namespace CoreLib;
 	using namespace CoreLib::IO;
 
+    class ShaderCache
+    {
+    private:
+        String path;
+        TargetShadingLanguage language;
+        EnumerableDictionary<String, int> shaderCodeIndex;
+        EnumerableDictionary<int, RefPtr<List<char>>> codeRepo;
+        EnumerableDictionary<int, List<DescriptorSetInfo>> bindingLayouts;
+        IntSet updatedCodeIndices;
+        String GetCacheIndexFileName()
+        {
+            switch (language)
+            {
+            case TargetShadingLanguage::HLSL:
+                return Path::Combine(path, "index_hlsl.txt");
+            case TargetShadingLanguage::SPIRV:
+                return Path::Combine(path, "index_spv.txt");
+            default:
+                return Path::Combine(path, "index.txt");
+            }
+        }
+        String GetShaderCodeFileName(int shaderIndex)
+        {
+            switch (language)
+            {
+            case TargetShadingLanguage::HLSL:
+                return Path::Combine(path, String("shader_") + String(shaderIndex) + ".hlsl");
+            case TargetShadingLanguage::SPIRV:
+                return Path::Combine(path, String("shader_") + String(shaderIndex) + ".spv");
+            default:
+                return Path::Combine(path, String("shader_") + String(shaderIndex) + ".bin");
+            }
+        }
+        String GetBindingLayoutFileName(int shaderIndex)
+        {
+            return Path::Combine(path, String("shader_") + String(shaderIndex) + ".binding");
+        }
+
+        void ReadBindingLayout(List<DescriptorSetInfo> & layout, String fileName)
+        {
+            layout.Clear();
+            BinaryReader reader(new FileStream(fileName));
+            int count = reader.ReadInt32();
+            layout.SetSize(count);
+            for (int i = 0; i < count; i++)
+            {
+                DescriptorSetInfo& info = layout[i];
+                info.BindingPoint = reader.ReadInt32();
+                info.Name = reader.ReadString();
+                int descCount = reader.ReadInt32();
+                info.Descriptors.SetSize(descCount);
+                for (int j = 0; j < descCount; j++)
+                {
+                    info.Descriptors[j].Name = reader.ReadString();
+                    info.Descriptors[j].Type = (BindingType)reader.ReadInt32();
+                    info.Descriptors[j].Location = reader.ReadInt32();
+                    info.Descriptors[j].ArraySize = reader.ReadInt32();
+                    info.Descriptors[j].Stages = (StageFlags)reader.ReadInt32();
+                }
+            }
+        }
+        void WriteBindingLayout(String fileName, List<DescriptorSetInfo> & layout)
+        {
+            BinaryWriter writer(new FileStream(fileName, FileMode::Create));
+            writer.Write(layout.Count());
+            for (int i = 0; i < layout.Count(); i++)
+            {
+                auto & info = layout[i];
+                writer.Write((int32_t)info.BindingPoint);
+                writer.Write(info.Name);
+                writer.Write(info.Descriptors.Count());
+                for (int j = 0; j < info.Descriptors.Count(); j++)
+                {
+                    writer.Write(info.Descriptors[j].Name);
+                    writer.Write((int32_t)info.Descriptors[j].Type);
+                    writer.Write(info.Descriptors[j].Location);
+                    writer.Write(info.Descriptors[j].ArraySize);
+                    writer.Write((int32_t)info.Descriptors[j].Stages);
+                }
+            }
+        }
+    public:
+        void Load(String cachePath, TargetShadingLanguage lang)
+        {
+            language = lang;
+            path = cachePath;
+            if (File::Exists(GetCacheIndexFileName()))
+            {
+                CoreLib::Text::TokenReader reader(File::ReadAllText(GetCacheIndexFileName()));
+                while (!reader.IsEnd())
+                {
+                    auto key = reader.ReadStringLiteral();
+                    auto value = reader.ReadInt();
+                    shaderCodeIndex[key] = value;
+                }
+            }
+        }
+        void UpdateEntry(String key, List<char> & code, char* glslSrc, List<DescriptorSetInfo>& layouts)
+        {
+            int value = shaderCodeIndex.Count();
+            shaderCodeIndex.TryGetValue(key, value);
+            shaderCodeIndex[key] = value;
+            codeRepo[value] = new List<char>(code);
+            bindingLayouts[value] = layouts;
+            updatedCodeIndices.Add(value);
+            if (glslSrc)
+            {
+                File::WriteAllText(Path::ReplaceExt(GetShaderCodeFileName(value), "glsl"), glslSrc);
+            }
+        }
+        bool TryGetEntry(String key, List<char> & code, List<DescriptorSetInfo>& layouts)
+        {
+            int value = -1;
+            if (shaderCodeIndex.TryGetValue(key, value))
+            {
+                RefPtr<List<char>> srcCode;
+                if (!codeRepo.TryGetValue(value, srcCode))
+                {
+                    auto shaderFile = GetShaderCodeFileName(value);
+                    if (File::Exists(shaderFile))
+                    {
+                        auto bytes = File::ReadAllBytes(shaderFile);
+                        srcCode = new List<char>();
+                        srcCode->AddRange((char*)bytes.Buffer(), bytes.Count());
+                        codeRepo[value] = srcCode;
+                    }
+                    else
+                    {
+                        shaderCodeIndex.Remove(key);
+                        return false;
+                    }
+                }
+                if (!bindingLayouts.TryGetValue(value, layouts))
+                {
+                    auto bindingFile = GetBindingLayoutFileName(value);
+                    if (File::Exists(bindingFile))
+                    {
+                        ReadBindingLayout(layouts, bindingFile);
+                    }
+                    else
+                    {
+                        shaderCodeIndex.Remove(key);
+                        return false;
+                    }
+                }
+                code = *srcCode;
+                return true;
+            }
+            return false;
+        }
+        void Save()
+        {
+            for (auto & code : codeRepo)
+            {
+                if (updatedCodeIndices.Contains(code.Key))
+                {
+                    auto fileName = GetShaderCodeFileName(code.Key);
+                    File::WriteAllBytes(fileName, code.Value->Buffer(), code.Value->Count());
+                }
+            }
+            for (auto & binding : bindingLayouts)
+            {
+                if (updatedCodeIndices.Contains(binding.Key))
+                {
+                    auto fileName = GetBindingLayoutFileName(binding.Key);
+                    WriteBindingLayout(fileName, binding.Value);
+                }
+            }
+            StreamWriter writer(GetCacheIndexFileName());
+            for (auto & idx : shaderCodeIndex)
+            {
+                writer << CoreLib::Text::EscapeStringLiteral(idx.Key) << " " << idx.Value << "\n";
+            }
+        }
+    };
+
     class SlangShaderCompiler : public IShaderCompiler
     {
     public:
+        bool dumpGLSL = true;
+        EnumerableDictionary<String, SlangCompileRequest*> reflectionCompileRequests;
         EnumerableDictionary<String, RefPtr<ShaderEntryPoint>> shaderEntryPoints;
         EnumerableDictionary<String, RefPtr<ShaderTypeSymbol>> shaderTypeSymbols;
-        SlangSession *session;
+        SlangSession *session = nullptr;
         StringBuilder sb;
+        ShaderCache cache;
         SlangShaderCompiler()
         {
-            session = spCreateSession();
+            cache.Load(Engine::Instance()->GetDirectory(false, ResourceType::ShaderCache), Engine::Instance()->GetTargetShadingLanguage());
+            dumpGLSL = dumpGLSL && Engine::Instance()->GetTargetShadingLanguage() == TargetShadingLanguage::SPIRV;
         }
         ~SlangShaderCompiler()
         {
-            spDestroySession(session);
+            cache.Save();
+            for (auto cr : reflectionCompileRequests)
+                spDestroyCompileRequest(cr.Value);
+            if (session)
+                spDestroySession(session);
         }
     public:
         int GetSlangTarget()
@@ -89,101 +274,146 @@ namespace GameEngine
             const CoreLib::ArrayView<ShaderEntryPoint*> entryPoints,
             const ShaderCompilationEnvironment* env = nullptr) override
         {
-            StageFlags stageFlags = sfNone;
-            auto req = NewCompileRequest();
-            Dictionary<String, int> addedTUs;
-            for (auto ep : entryPoints)
-            {
-                int unit = 0;
-                auto path = Engine::Instance()->FindFile(ep->FileName, ResourceType::Shader);
-                if (!addedTUs.TryGetValue(path, unit))
-                {
-                    unit = spAddTranslationUnit(req, SLANG_SOURCE_LANGUAGE_SLANG, ep->FileName.Buffer());
-                    spAddTranslationUnitSourceFile(req, unit, path.Buffer());
-                    addedTUs[path] = unit;
-                }
-                spAddEntryPoint(req, unit, ep->FunctionName.Buffer(), GetSlangStage(ep->Stage));
-                stageFlags = StageFlags(stageFlags | ep->Stage);
-            }
-            if (env)
-            {
-                for (int i = 0; i < env->SpecializationTypes.Count(); i++)
-                {
-                    spAddPreprocessorDefine(req, (String("SPECIALIZATION_TYPE_") + i).Buffer(), env->SpecializationTypes[i]->TypeName.Buffer());
-                    spAddPreprocessorDefine(req, (String("IMPORT_MODULE_") + i).Buffer(), Path::GetFileNameWithoutEXT(env->SpecializationTypes[i]->FileName).Buffer());
-
-                }
-            }
-            int anyErrors = spCompile(req);
-            if (anyErrors)
-            {
-                const char* diagMsg = spGetDiagnosticOutput(req);
-                Print("Error compiling shader.\n%s\n", diagMsg);
-                spDestroyCompileRequest(req);
-                src.Diagnostics = diagMsg;
-                return false;
-            }
+            StringBuilder sbKey;
+            List<String> keys;
             src.ShaderCode.SetSize(entryPoints.Count());
+            List<int> entryPointsToCompile;
             for (int i = 0; i < entryPoints.Count(); i++)
             {
-                size_t size;
-                char * code = (char*)spGetEntryPointCode(req, i, &size);
-                src.ShaderCode[i].SetSize((int)size);
-                memcpy(src.ShaderCode[i].Buffer(), code, size);
-            }
-            // extract reflection data
-            slang::ShaderReflection * reflection = slang::ShaderReflection::get(req);
-            int paramCount = (int)reflection->getParameterCount();
-            for (int i = 0; i < paramCount; i++)
-            {
-                auto param = reflection->getParameterByIndex(i);
-                auto paramName = param->getName();
-                if (param->getType()->getKind() == slang::TypeReflection::Kind::ParameterBlock)
+                auto entryPoint = entryPoints[i];
+                sbKey.Clear();
+                sbKey << entryPoint->FileName << "|" << entryPoint->FunctionName;
+                if (env)
                 {
-                    auto layout = param->getTypeLayout();
-                    DescriptorSetInfo set;
-                    set.BindingPoint = param->getBindingSpace();
-                    set.Name = paramName;
-                    auto resType = layout->getElementVarLayout()->getTypeLayout();
-                    auto reslayout = layout->getElementVarLayout();
-                    int slotOffset = (int)reslayout->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
-                    bool hasUniform = false;
-                    for (auto f = 0u; f < resType->getFieldCount(); f++)
+                    for (auto & t : env->SpecializationTypes)
                     {
-                        auto field = resType->getFieldByIndex(f);
-                        if (field->getCategory() == slang::Uniform || field->getType()->getKind() == slang::TypeReflection::Kind::Struct)
-                        {
-                            if (!hasUniform)
-                            {
-                                DescriptorLayout desc;
-                                desc.Location = 0;
-                                desc.Type = BindingType::UniformBuffer;
-                                desc.Stages = stageFlags;
-                                desc.Name = field->getName();
-                                set.Descriptors.Add(desc);
-                                hasUniform = true;
-                            }
-                            continue;
-                        }
-                        DescriptorLayout desc;
-                        desc.Location = field->getBindingIndex() + slotOffset;
-                        desc.Name = field->getName();
-                        if (field->getType()->getKind() == slang::TypeReflection::Kind::Array)
-                        {
-                            desc.Type = SlangResourceKindToDescriptorType(field->getType()->getElementType()->getKind(), field->getType()->getResourceShape());
-                            desc.ArraySize = (int)field->getType()->getElementCount();
-                        }
-                        else
-                        {
-                            desc.Type = SlangResourceKindToDescriptorType(field->getType()->getKind(), field->getType()->getResourceShape());
-                        }
-                        desc.Stages = stageFlags;
-                        set.Descriptors.Add(desc);
+                        sbKey << "|" << t->TypeName;
                     }
-                    src.BindingLayouts.Add(set);
+                }
+                keys.Add(sbKey.ToString());
+                List<char> code;
+                if (!cache.TryGetEntry(keys.Last(), src.ShaderCode[i], src.BindingLayouts))
+                {
+                    entryPointsToCompile.Add(i);
                 }
             }
-            spDestroyCompileRequest(req);
+            if (entryPointsToCompile.Count())
+            {
+                StageFlags stageFlags = sfNone;
+                auto req = NewCompileRequest();
+                Dictionary<String, int> addedTUs;
+                for (auto eid : entryPointsToCompile)
+                {
+                    auto ep = entryPoints[eid];
+                    int unit = 0;
+                    auto path = Engine::Instance()->FindFile(ep->FileName, ResourceType::Shader);
+                    if (!addedTUs.TryGetValue(path, unit))
+                    {
+                        unit = spAddTranslationUnit(req, SLANG_SOURCE_LANGUAGE_SLANG, ep->FileName.Buffer());
+                        spAddTranslationUnitSourceFile(req, unit, path.Buffer());
+                        addedTUs[path] = unit;
+                    }
+                    spAddEntryPoint(req, unit, ep->FunctionName.Buffer(), GetSlangStage(ep->Stage));
+                    stageFlags = StageFlags(stageFlags | ep->Stage);
+                }
+                if (env)
+                {
+                    for (int i = 0; i < env->SpecializationTypes.Count(); i++)
+                    {
+                        spAddPreprocessorDefine(req, (String("SPECIALIZATION_TYPE_") + i).Buffer(), env->SpecializationTypes[i]->TypeName.Buffer());
+                        spAddPreprocessorDefine(req, (String("IMPORT_MODULE_") + i).Buffer(), Path::GetFileNameWithoutEXT(env->SpecializationTypes[i]->FileName).Buffer());
+                    }
+                }
+                int anyErrors = spCompile(req);
+                if (anyErrors)
+                {
+                    const char* diagMsg = spGetDiagnosticOutput(req);
+                    Print("Error compiling shader.\n%s\n", diagMsg);
+                    spDestroyCompileRequest(req);
+                    src.Diagnostics = diagMsg;
+                    return false;
+                }
+
+                List<char*> glslOutput;
+
+                for (int i = 0; i < entryPointsToCompile.Count(); i++)
+                {
+                    ISlangBlob* outBlob = nullptr;
+                    spGetEntryPointCodeBlob(req, i, 0, &outBlob);
+                    int size = (int)outBlob->getBufferSize();
+                    src.ShaderCode[entryPointsToCompile[i]].SetSize(size);
+                    memcpy(src.ShaderCode[entryPointsToCompile[i]].Buffer(), outBlob->getBufferPointer(), size);
+                    if (dumpGLSL)
+                    {
+                        spGetEntryPointCodeBlob(req, i, 1, &outBlob);
+                        glslOutput.Add((char*)outBlob->getBufferPointer());
+                    }
+                }
+
+                // extract reflection data
+                slang::ShaderReflection * reflection = slang::ShaderReflection::get(req);
+                int paramCount = (int)reflection->getParameterCount();
+                for (int i = 0; i < paramCount; i++)
+                {
+                    auto param = reflection->getParameterByIndex(i);
+                    auto paramName = param->getName();
+                    if (param->getType()->getKind() == slang::TypeReflection::Kind::ParameterBlock)
+                    {
+                        auto layout = param->getTypeLayout();
+                        DescriptorSetInfo set;
+                        set.BindingPoint = param->getBindingSpace();
+                        set.Name = paramName;
+                        auto resType = layout->getElementVarLayout()->getTypeLayout();
+                        auto reslayout = layout->getElementVarLayout();
+                        int slotOffset = (int)reslayout->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+                        bool hasUniform = false;
+                        for (auto f = 0u; f < resType->getFieldCount(); f++)
+                        {
+                            auto field = resType->getFieldByIndex(f);
+                            if (field->getCategory() == slang::Uniform || field->getType()->getKind() == slang::TypeReflection::Kind::Struct)
+                            {
+                                if (!hasUniform)
+                                {
+                                    DescriptorLayout desc;
+                                    desc.Location = 0;
+                                    desc.Type = BindingType::UniformBuffer;
+                                    desc.Stages = stageFlags;
+                                    desc.Name = field->getName();
+                                    set.Descriptors.Add(desc);
+                                    hasUniform = true;
+                                }
+                                continue;
+                            }
+                            DescriptorLayout desc;
+                            desc.Location = field->getBindingIndex() + slotOffset;
+                            desc.Name = field->getName();
+                            if (field->getType()->getKind() == slang::TypeReflection::Kind::Array)
+                            {
+                                desc.Type = SlangResourceKindToDescriptorType(field->getType()->getElementType()->getKind(), field->getType()->getResourceShape());
+                                desc.ArraySize = (int)field->getType()->getElementCount();
+                            }
+                            else
+                            {
+                                desc.Type = SlangResourceKindToDescriptorType(field->getType()->getKind(), field->getType()->getResourceShape());
+                            }
+                            desc.Stages = stageFlags;
+                            set.Descriptors.Add(desc);
+                        }
+                        src.BindingLayouts.Add(set);
+                    }
+                }
+
+                for (int i = 0; i < entryPointsToCompile.Count(); i++)
+                {
+                    auto eid = entryPointsToCompile[i];
+                    char* glsl = nullptr;
+                    if (dumpGLSL)
+                        glsl = glslOutput[i];
+                    cache.UpdateEntry(keys[eid], src.ShaderCode[eid], glsl, src.BindingLayouts);
+                }
+
+                spDestroyCompileRequest(req);
+            }
             return true;
         }
         virtual ShaderTypeSymbol* LoadSystemTypeSymbol(CoreLib::String TypeName) override
@@ -192,6 +422,9 @@ namespace GameEngine
         }
         SlangCompileRequest* NewCompileRequest()
         {
+            if (!session)
+                session = spCreateSession();
+
             auto compileRequest = spCreateCompileRequest(session);
             spAddSearchPath(compileRequest, Engine::Instance()->GetDirectory(true, ResourceType::Shader).Buffer());
             spAddSearchPath(compileRequest, Engine::Instance()->GetDirectory(false, ResourceType::Shader).Buffer());
@@ -199,8 +432,10 @@ namespace GameEngine
             spAddSearchPath(compileRequest, Engine::Instance()->GetDirectory(false, ResourceType::Material).Buffer());
 
             spAddCodeGenTarget(compileRequest, GetSlangTarget());
-            spAddCodeGenTarget(compileRequest, SLANG_GLSL);
             spSetTargetProfile(compileRequest, 0, spFindProfile(session, "sm_5_1"));
+            if (dumpGLSL)
+                spAddCodeGenTarget(compileRequest, SLANG_GLSL);
+
             #if 0
                 spSetDumpIntermediates(compileRequest, 1);
             #endif
@@ -221,20 +456,25 @@ namespace GameEngine
             sym->FileName = fileName;
             sym->TypeId = shaderTypeSymbols.Count();
             sym->TypeName = TypeName;
-            auto compileRequest = NewCompileRequest();
-            if (fileName != "ShaderLib.slang")
+            SlangCompileRequest* compileRequest = nullptr;
+            if (!reflectionCompileRequests.TryGetValue(fileName, compileRequest))
             {
-                auto shaderFile = Engine::Instance()->FindFile(fileName, ResourceType::Shader);
-                int unit = spAddTranslationUnit(compileRequest, SLANG_SOURCE_LANGUAGE_SLANG, fileName.Buffer());
-                spAddTranslationUnitSourceFile(compileRequest, unit, shaderFile.Buffer());
-            }
-            int anyErrors = spCompile(compileRequest);
-            if (anyErrors)
-            {
-                const char* diagMsg = spGetDiagnosticOutput(compileRequest);
-                Print("Error compiling shader %s. Compiler output:\n%s\n", fileName.Buffer(), diagMsg);
-                spDestroyCompileRequest(compileRequest);
-                return nullptr;
+                compileRequest = NewCompileRequest();
+                if (fileName != "ShaderLib.slang")
+                {
+                    auto shaderFile = Engine::Instance()->FindFile(fileName, ResourceType::Shader);
+                    int unit = spAddTranslationUnit(compileRequest, SLANG_SOURCE_LANGUAGE_SLANG, fileName.Buffer());
+                    spAddTranslationUnitSourceFile(compileRequest, unit, shaderFile.Buffer());
+                }
+                int anyErrors = spCompile(compileRequest);
+                if (anyErrors)
+                {
+                    const char* diagMsg = spGetDiagnosticOutput(compileRequest);
+                    Print("Error compiling shader %s. Compiler output:\n%s\n", fileName.Buffer(), diagMsg);
+                    spDestroyCompileRequest(compileRequest);
+                    return nullptr;
+                }
+                reflectionCompileRequests[fileName] = compileRequest;
             }
             slang::ShaderReflection* shaderReflection = slang::ShaderReflection::get(compileRequest);
             auto typeReflection = shaderReflection->findTypeByName(("ParameterBlock<" + TypeName + " >").Buffer());
@@ -252,7 +492,7 @@ namespace GameEngine
                 ShaderVariableLayout varLayout;
                 auto field = typeLayout->getFieldByIndex(i); 
                 varLayout.Name = field->getName();
-                // We currently do not support resource-typed fields in parameter blocks.
+                // We currently do not support resource-typed fields in struct-typed parameter block fields.
                 // Assuming all struct-typed fields as ordinary data
                 if (field->getCategory() == slang::Uniform || field->getType()->getKind() == slang::TypeReflection::Kind::Struct)
                 {
@@ -306,7 +546,6 @@ namespace GameEngine
                 sym->Attributes.Add(sa.Name, sa);
             }
             shaderTypeSymbols[str] = sym;
-            spDestroyCompileRequest(compileRequest);
             return sym.Ptr();
         }
         virtual ShaderEntryPoint* LoadShaderEntryPoint(CoreLib::String fileName, CoreLib::String functionName) override
