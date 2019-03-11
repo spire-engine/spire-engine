@@ -141,14 +141,8 @@ void EncodeP1(inout uint4 block, inout float blockMSLE, float3 texels[16])
     float3 refinedBlockMax = blockMin;
     for (uint i = 0; i < 16; ++i)
     {
-        float3 vmin = texels[i];
-        float3 vmax = texels[i];
-        if (texels[i].x == blockMin.x && texels[i].y == blockMin.y && texels[i].z == blockMin.z)
-            vmin = refinedBlockMin;
-        if (texels[i].x == blockMax.x && texels[i].y == blockMax.y && texels[i].z == blockMax.z)
-            vmax = refinedBlockMax;
-        refinedBlockMin = min(refinedBlockMin, vmin);
-        refinedBlockMax = max(refinedBlockMax, vmax);
+        refinedBlockMin = min(refinedBlockMin, texels[i] == blockMin ? refinedBlockMin : texels[i]);
+        refinedBlockMax = max(refinedBlockMax, texels[i] == blockMax ? refinedBlockMax : texels[i]);
     }
 
     float3 logBlockMax = log2(blockMax + 1.0f);
