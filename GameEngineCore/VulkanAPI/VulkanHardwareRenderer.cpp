@@ -149,10 +149,6 @@ namespace VK
 			CoreLib::Diagnostics::Debug::Write((long long)messageCode);
 			CoreLib::Diagnostics::Debug::Write(" ");
 			CoreLib::Diagnostics::Debug::WriteLine(pMessage);
-#if _DEBUG
-			if (flags & (VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT))
-				printf("break");
-#endif
 			return VK_FALSE;
 		}
 	}

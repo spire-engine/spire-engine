@@ -73,8 +73,6 @@ namespace GameEngine
         hw->BeginJobSubmission();
         hw->QueuePipelineBarrier(ResourceUsage::All, ResourceUsage::RenderAttachmentOutput,
             MakeArrayView(ImagePipelineBarrier(tempEnv.Ptr(), TextureLayout::Undefined, TextureLayout::ColorAttachment)));
-        hw->QueuePipelineBarrier(ResourceUsage::All, ResourceUsage::RenderAttachmentOutput,
-            MakeArrayView(ImagePipelineBarrier(dest, TextureLayout::Undefined, TextureLayout::ColorAttachment, id * 6, 6)));
         hw->EndJobSubmission(nullptr);
         for (int f = 0; f < 6; f++)
 		{

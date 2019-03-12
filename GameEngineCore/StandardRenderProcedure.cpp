@@ -156,7 +156,7 @@ namespace GameEngine
                 viewRes->LoadSharedRenderTarget("customDepthBuffer", DepthBufferFormat));
             preZOutput = viewRes->CreateRenderOutput(
                 customDepthRenderPass->GetRenderTargetLayout(),
-                viewRes->LoadSharedRenderTarget("preZBuffer", DepthBufferFormat));
+                viewRes->LoadSharedRenderTarget("depthBuffer", DepthBufferFormat));
 			
 			atmospherePass = CreateAtmospherePostRenderPass(viewRes);
 			atmospherePass->SetSource(MakeArray(
@@ -414,7 +414,7 @@ namespace GameEngine
             QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), DataDependencyType::RenderTargetToGraphics);
             
 			forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-            QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::UndefinedToRenderTarget);
+            QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::SampledToRenderTarget);
 			forwardRenderPass->Bind();
 			sharedRes->pipelineManager.PushModuleInstance(&viewParams);
 			sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
