@@ -56,7 +56,7 @@ namespace GameEngine
 		bool useEnvMap = true;
 		CoreLib::RefPtr<TextureCubeArray> emptyEnvMapArray;
         CoreLib::RefPtr<Texture2DArray> emptyLightmapArray;
-		void AddShadowPass(FrameRenderTask & tasks, WorldRenderPass * shadowRenderPass, DrawableSink * sink, ShadowMapResource & shadowMapRes, int shadowMapId,
+		void AddShadowPass(HardwareRenderer* hw, WorldRenderPass * shadowRenderPass, DrawableSink * sink, ShadowMapResource & shadowMapRes, int shadowMapId,
 			StandardViewUniforms & shadowMapView, int & shadowMapViewInstancePtr);
 	public:
 		DeviceMemory * uniformMemory;
@@ -73,7 +73,7 @@ namespace GameEngine
 		void* lightBufferPtr, *lightProbeBufferPtr;
 		int lightBufferSize, lightProbeBufferSize;
 		LightingUniform uniformData;
-		void GatherInfo(FrameRenderTask & tasks, DrawableSink * sink, const RenderProcedureParameters & params, int w, int h, StandardViewUniforms & cameraView, WorldRenderPass * shadowPass);
+		void GatherInfo(HardwareRenderer* hw, DrawableSink * sink, const RenderProcedureParameters & params, int w, int h, StandardViewUniforms & cameraView, WorldRenderPass * shadowPass);
 		void Init(RendererSharedResource & sharedRes, DeviceMemory * uniformMemory, bool pUseEnvMap);
 		void UpdateSharedResourceBinding();
         void UpdateSceneResourceBinding(SceneResource* sceneRes);

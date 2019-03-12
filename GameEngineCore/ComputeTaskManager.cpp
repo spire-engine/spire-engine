@@ -62,7 +62,9 @@ namespace GameEngine
         cmdBuffer->BeginRecording();
         Dispatch(cmdBuffer, x, y, z);
         cmdBuffer->EndRecording();
-        manager->hardwareRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(cmdBuffer), fence);
+        manager->hardwareRenderer->BeginJobSubmission();
+        manager->hardwareRenderer->QueueNonRenderCommandBuffers(MakeArrayView(cmdBuffer));
+        manager->hardwareRenderer->EndJobSubmission(fence);
     }
 
     ComputeTaskInstance::~ComputeTaskInstance()

@@ -19,7 +19,7 @@ namespace GameEngine
         {
             return hwRenderer->CreateRenderTargetLayout(MakeArray(
                 AttachmentLayout(TextureUsage::ColorAttachment, StorageFormat::RGBA_F16),
-                AttachmentLayout(TextureUsage::DepthAttachment, DepthBufferFormat)).GetArrayView());
+                AttachmentLayout(TextureUsage::DepthAttachment, DepthBufferFormat)).GetArrayView(), false);
         }
         virtual void SetPipelineStates(FixedFunctionPipelineStates & state)
         {

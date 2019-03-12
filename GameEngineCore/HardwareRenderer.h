@@ -405,6 +405,7 @@ namespace GameEngine
 		Texture() {};
     public:
         virtual void SetCurrentLayout(TextureLayout layout) = 0;
+        virtual bool IsDepthStencilFormat() = 0;
 	};
 
 	class Texture2D : public Texture
@@ -836,14 +837,40 @@ namespace GameEngine
         SPIRV, HLSL
     };
 
+    enum class ResourceUsage
+    {
+        NonFragmentShaderGraphicsAccess = 1, FragmentShaderAccess = 2, GraphicsShaderAccess = 3, ComputeAccess = 4, 
+        RenderAttachmentOutput = 8, RenderAttachmentInput = 16, HostRead = 32, HostWrite = 64,
+        All = 0xFFFF
+    };
+    struct ImagePipelineBarrier
+    {
+        Texture* Image;
+        TextureLayout LayoutBefore, LayoutAfter;
+        int ArrayIndex = 0;
+        int ArrayCount = -1;
+        ImagePipelineBarrier() {}
+        ImagePipelineBarrier(Texture* image, TextureLayout before, TextureLayout after, int arrayIdx = 0, int arrayCount = -1)
+        {
+            Image = image;
+            LayoutBefore = before;
+            LayoutAfter = after;
+            ArrayIndex = arrayIdx;
+            ArrayCount = arrayCount;
+        }
+    };
 
 	class HardwareRenderer : public CoreLib::RefObject
 	{
 	public:
         virtual void ThreadInit(int threadId) = 0;
 		virtual void ClearTexture(GameEngine::Texture2D* texture) = 0;
-		virtual void ExecuteRenderPass(FrameBuffer* frameBuffer, CoreLib::ArrayView<CommandBuffer*> commands, Fence* fence) = 0;
-		virtual void ExecuteNonRenderCommandBuffers(CoreLib::ArrayView<CommandBuffer*> commands, Fence* fence) = 0;
+        virtual void BeginJobSubmission() = 0;
+		virtual void QueueRenderPass(FrameBuffer* frameBuffer, CoreLib::ArrayView<CommandBuffer*> commands) = 0;
+		virtual void QueueNonRenderCommandBuffers(CoreLib::ArrayView<CommandBuffer*> commands) = 0;
+        virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter, CoreLib::ArrayView<ImagePipelineBarrier> barriers) = 0;
+        virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter) = 0;
+        virtual void EndJobSubmission(GameEngine::Fence* fence) = 0;
 		virtual void Present(WindowSurface * surface, Texture2D* srcImage) = 0;
 		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, VectorMath::Vec2i destOffset) = 0;
 		virtual void Wait() = 0;
@@ -864,7 +891,7 @@ namespace GameEngine
 		virtual Texture3D* CreateTexture3D(TextureUsage usage, int width, int height, int depth, int mipLevelCount, StorageFormat format) = 0;
 		virtual TextureSampler* CreateTextureSampler() = 0;
 		virtual Shader* CreateShader(ShaderType stage, const char* data, int size) = 0;
-		virtual RenderTargetLayout* CreateRenderTargetLayout(CoreLib::ArrayView<AttachmentLayout> bindings) = 0;
+		virtual RenderTargetLayout* CreateRenderTargetLayout(CoreLib::ArrayView<AttachmentLayout> bindings, bool ignoreInitialContent) = 0;
 		virtual PipelineBuilder* CreatePipelineBuilder() = 0;
 		virtual DescriptorSetLayout* CreateDescriptorSetLayout(CoreLib::ArrayView<DescriptorLayout> descriptors) = 0;
 		virtual DescriptorSet* CreateDescriptorSet(DescriptorSetLayout* layout) = 0;

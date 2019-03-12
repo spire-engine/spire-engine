@@ -108,7 +108,9 @@ namespace GameEngine
 			renderer->GetHardwareRenderer()->TransferBarrier(DynamicBufferLengthMultiplier);
 			for (auto sysWindow : uiSystemInterface->windowContexts)
 			{
-				uiSystemInterface->ExecuteDrawCommands(sysWindow.Value, nullptr);
+                renderer->GetHardwareRenderer()->BeginJobSubmission();
+				uiSystemInterface->QueueDrawCommands(sysWindow.Value, nullptr);
+                renderer->GetHardwareRenderer()->EndJobSubmission(nullptr);
 				renderer->GetHardwareRenderer()->Present(sysWindow.Value->surface.Ptr(), sysWindow.Value->uiOverlayTexture.Ptr());
 			}
 			renderer->Wait();
@@ -330,7 +332,7 @@ namespace GameEngine
 
 		inDataTransfer = true;
 		
-		renderer->TakeSnapshot();
+		renderer->RenderFrame();
 
         for (auto && sysWindow : uiSystemInterface->windowContexts)
         {
@@ -346,7 +348,6 @@ namespace GameEngine
 
         inDataTransfer = false;
 		renderer->GetHardwareRenderer()->TransferBarrier(frameCounter % DynamicBufferLengthMultiplier);
-		renderer->RenderFrame();
 		
 		stats.CpuTime += CoreLib::Diagnostics::PerformanceCounter::EndSeconds(cpuTimePoint);
 
@@ -362,7 +363,9 @@ namespace GameEngine
 			auto fence = fencePool[version][fenceAlloc].Ptr();
 			fenceAlloc++;
 			fence->Reset();
-			uiSystemInterface->ExecuteDrawCommands(sysWindow.Value, fence);
+            renderer->GetHardwareRenderer()->BeginJobSubmission();
+			uiSystemInterface->QueueDrawCommands(sysWindow.Value, fence);
+            renderer->GetHardwareRenderer()->EndJobSubmission(fence);
 			syncFences[version].Add(fence);
 			aggregateTime += renderingTimeDelta;
             if (sysWindow.Key->GetClientHeight() < 2)

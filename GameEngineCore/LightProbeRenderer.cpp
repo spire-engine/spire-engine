@@ -16,6 +16,9 @@ namespace GameEngine
 		renderProc = pRenderProc;
 		viewRes = pViewRes;
 		tempEnv = prenderer->GetHardwareRenderer()->CreateTextureCube(TextureUsage::SampledColorAttachment, EnvMapSize, Math::Log2Floor(EnvMapSize) + 1, StorageFormat::RGBA_F16);
+        
+        fence = prenderer->GetHardwareRenderer()->CreateFence();
+        fence->Reset();
 	}
 
 	struct PrefilterUniform
@@ -30,14 +33,9 @@ namespace GameEngine
 		HardwareRenderer * hw = renderer->GetHardwareRenderer();
 		int resolution = EnvMapSize;
 		int numLevels = Math::Log2Floor(resolution) + 1;
-		task.NewFrame();
-		RenderStat stat;
-		task.AddImageTransferTask(MakeArrayView(dynamic_cast<Texture*>(tempEnv.Ptr())), ArrayView<Texture*>());
-		task.AddImageTransferTask(MakeArrayView(dynamic_cast<Texture*>(dest)), ArrayView<Texture*>());
-		for (auto & subTask : task.GetTasks())
-			subTask->Execute(hw, stat);
-		task.Clear();
 
+        
+		RenderStat stat;
 		viewRes->Resize(resolution, resolution);
 		RenderProcedureParameters params;
 		params.level = level;
@@ -67,12 +65,18 @@ namespace GameEngine
             Shader* shaders[] = { copyShaderSet.vertexShader.Ptr(), copyShaderSet.fragmentShader.Ptr() };
             pb->SetShaders(ArrayView<Shader*>(shaders, 2));
         }
-		RefPtr<RenderTargetLayout> copyRTLayout = hw->CreateRenderTargetLayout(MakeArrayView(AttachmentLayout(TextureUsage::ColorAttachment, StorageFormat::RGBA_F16)));
+		RefPtr<RenderTargetLayout> copyRTLayout = hw->CreateRenderTargetLayout(MakeArrayView(AttachmentLayout(TextureUsage::ColorAttachment, StorageFormat::RGBA_F16)), true);
 		RefPtr<Pipeline> copyPipeline = pb->ToPipeline(copyRTLayout.Ptr());
 		RefPtr<DescriptorSet> copyDescSet = hw->CreateDescriptorSet(copyPassLayout.Ptr());
 		List<RefPtr<CommandBuffer>> commandBuffers;
 		List<RefPtr<FrameBuffer>> frameBuffers;
-		for (int f = 0; f < 6; f++)
+        hw->BeginJobSubmission();
+        hw->QueuePipelineBarrier(ResourceUsage::All, ResourceUsage::RenderAttachmentOutput,
+            MakeArrayView(ImagePipelineBarrier(tempEnv.Ptr(), TextureLayout::Undefined, TextureLayout::ColorAttachment)));
+        hw->QueuePipelineBarrier(ResourceUsage::All, ResourceUsage::RenderAttachmentOutput,
+            MakeArrayView(ImagePipelineBarrier(dest, TextureLayout::Undefined, TextureLayout::ColorAttachment, id * 6, 6)));
+        hw->EndJobSubmission(nullptr);
+        for (int f = 0; f < 6; f++)
 		{
 			Matrix4 viewMatrix;
 			Matrix4::CreateIdentityMatrix(viewMatrix);
@@ -134,17 +138,14 @@ namespace GameEngine
 			viewMatrix.values[14] = -(viewMatrix.values[2] * position.x + viewMatrix.values[6] * position.y + viewMatrix.values[10] * position.z);
 
 			params.view.Transform = viewMatrix;
-			task.Clear();
-			renderProc->Run(task, params);
+			renderProc->Run(params);
 			copyDescSet->BeginUpdate();
 			copyDescSet->Update(0, renderProc->GetOutput()->Texture.Ptr(), TextureAspect::Color);
 			copyDescSet->Update(1, sharedRes->nearestSampler.Ptr());
 			copyDescSet->EndUpdate();
 			hw->TransferBarrier(DynamicBufferLengthMultiplier);
+            hw->BeginJobSubmission();
 
-			for (auto & pass : task.GetTasks())
-				pass->Execute(hw, sharedRes->renderStats);
-			
 			RefPtr<FrameBuffer> fb0, fb1;
 			// copy to level 0 of tempEnv
 			{
@@ -161,7 +162,7 @@ namespace GameEngine
 				cmdBuffer->Draw(0, 4);
 				cmdBuffer->EndRecording();
 				commandBuffers.Add(cmdBuffer);
-				hw->ExecuteRenderPass(fb0.Ptr(), MakeArrayView(cmdBuffer), nullptr);
+				hw->QueueRenderPass(fb0.Ptr(), MakeArrayView(cmdBuffer));
 			}
 
 			// copy to level 0 of result
@@ -179,16 +180,16 @@ namespace GameEngine
 				cmdBuffer->Draw(0, 4);
 				cmdBuffer->EndRecording();
 				commandBuffers.Add(cmdBuffer);
-				hw->ExecuteRenderPass(fb1.Ptr(), MakeArrayView(cmdBuffer), nullptr);
+				hw->QueueRenderPass(fb1.Ptr(), MakeArrayView(cmdBuffer));
 			}
-			hw->Wait();
+            hw->EndJobSubmission(fence.Ptr());
+            fence->Wait();
+            fence->Reset();
 		}
-
-		task.Clear();
-		task.AddImageTransferTask(ArrayView<Texture*>(), MakeArrayView(dynamic_cast<Texture*>(tempEnv.Ptr())));
-		for (auto & subTask : task.GetTasks())
-			subTask->Execute(hw, stat);
-
+        hw->BeginJobSubmission();
+        hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderAccess, 
+            MakeArrayView(ImagePipelineBarrier(tempEnv.Ptr(), TextureLayout::ColorAttachment, TextureLayout::Sample)));
+        hw->EndJobSubmission(nullptr);
 		// prefilter
 		RefPtr<PipelineBuilder> pb2 = hw->CreatePipelineBuilder();
 		pb2->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
@@ -206,7 +207,7 @@ namespace GameEngine
             Shader* shaderList[] = { prefilterShaderSet.vertexShader.Ptr(), prefilterShaderSet.fragmentShader.Ptr() };
             pb2->SetShaders(ArrayView<Shader*>(shaderList, 2));
         }
-		RefPtr<RenderTargetLayout> prefilterRTLayout = hw->CreateRenderTargetLayout(MakeArrayView(AttachmentLayout(TextureUsage::ColorAttachment, StorageFormat::RGBA_F16)));
+		RefPtr<RenderTargetLayout> prefilterRTLayout = hw->CreateRenderTargetLayout(MakeArrayView(AttachmentLayout(TextureUsage::ColorAttachment, StorageFormat::RGBA_F16)), true);
 		RefPtr<Pipeline> prefilterPipeline = pb2->ToPipeline(prefilterRTLayout.Ptr());
 		RefPtr<DescriptorSet> prefilterDescSet = hw->CreateDescriptorSet(prefilterPassLayout.Ptr());
 		prefilterDescSet->BeginUpdate();
@@ -277,14 +278,19 @@ namespace GameEngine
 				cmdBuffer->Draw(0, 4);
 				cmdBuffer->EndRecording();
 				commandBuffers.Add(cmdBuffer);
-				hw->ExecuteRenderPass(fb.Ptr(), cmdBuffer, nullptr);
-				hw->Wait();
+                hw->BeginJobSubmission();
+				hw->QueueRenderPass(fb.Ptr(), cmdBuffer);
+                hw->EndJobSubmission(fence.Ptr());
+                fence->Wait();
+                fence->Reset();
 			}
 		}
-		task.Clear();
-		task.AddImageTransferTask(ArrayView<Texture*>(), MakeArrayView(dynamic_cast<Texture*>(dest)));
-		for (auto & subTask : task.GetTasks())
-			subTask->Execute(hw, stat);
-		hw->Wait();
+        hw->BeginJobSubmission();
+        ImagePipelineBarrier probeTexBarrier(dynamic_cast<GameEngine::Texture*>(dest), TextureLayout::ColorAttachment, TextureLayout::Sample, id * 6, 6);
+        hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderAccess,
+            MakeArrayView(probeTexBarrier));
+        hw->EndJobSubmission(fence.Ptr());
+        fence->Wait();
+        fence->Reset();
 	}
 }

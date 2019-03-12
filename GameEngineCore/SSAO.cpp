@@ -12,7 +12,7 @@ namespace GameEngine
 		void Resize(int /*w*/, int /*h*/)
 		{
 		}
-		void RegisterWork(FrameRenderTask & /*task*/)
+		void RegisterWork()
 		{
 		}
 		char * GetResultName()
@@ -41,9 +41,9 @@ namespace GameEngine
 		impl->Resize(w, h);
 	}
 
-	void SSAO::RegisterWork(FrameRenderTask & task)
+	void SSAO::RegisterWork()
 	{
-		impl->RegisterWork(task);
+		impl->RegisterWork();
 	}
 
 	char * SSAO::GetResultName()

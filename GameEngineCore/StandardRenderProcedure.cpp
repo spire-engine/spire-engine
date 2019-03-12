@@ -55,10 +55,11 @@ namespace GameEngine
 		RenderOutput * forwardBaseOutput = nullptr;
 		RenderOutput * transparentAtmosphereOutput = nullptr;
         RenderOutput * customDepthOutput = nullptr;
+        RenderOutput * preZOutput = nullptr;
 
 		StandardViewUniforms viewUniform;
 
-		RefPtr<WorldPassRenderTask> forwardBaseInstance, transparentPassInstance, customDepthPassInstance, debugGraphicsPassInstance;
+		RefPtr<WorldPassRenderTask> forwardBaseInstance, transparentPassInstance, customDepthPassInstance, preZPassInstance, debugGraphicsPassInstance;
 
 		DeviceMemory renderPassUniformMemory;
 		SharedModuleInstances sharedModules;
@@ -153,6 +154,9 @@ namespace GameEngine
             customDepthOutput = viewRes->CreateRenderOutput(
                 customDepthRenderPass->GetRenderTargetLayout(),
                 viewRes->LoadSharedRenderTarget("customDepthBuffer", DepthBufferFormat));
+            preZOutput = viewRes->CreateRenderOutput(
+                customDepthRenderPass->GetRenderTargetLayout(),
+                viewRes->LoadSharedRenderTarget("preZBuffer", DepthBufferFormat));
 			
 			atmospherePass = CreateAtmospherePostRenderPass(viewRes);
 			atmospherePass->SetSource(MakeArray(
@@ -227,10 +231,58 @@ namespace GameEngine
 			return drawableBuffer.GetArrayView();
 		}
 
+        enum class DataDependencyType
+        {
+            RenderTargetToGraphics, ComputeToGraphics, RenderTargetToCompute, UndefinedToRenderTarget, SampledToRenderTarget
+        };
+        List<ImagePipelineBarrier> imageBarriers;
+        void QueueImageBarrier(HardwareRenderer* hw, ArrayView<Texture*> texturesToUse, DataDependencyType dep)
+        {
+            imageBarriers.Clear();
+            for (auto img : texturesToUse)
+            {
+                ImagePipelineBarrier ib;
+                ib.Image = img;
+                if (dep == DataDependencyType::UndefinedToRenderTarget || dep == DataDependencyType::SampledToRenderTarget)
+                    ib.LayoutAfter = img->IsDepthStencilFormat() ? TextureLayout::DepthStencilAttachment : TextureLayout::ColorAttachment;
+                else
+                    ib.LayoutAfter = TextureLayout::Sample;
+                if (dep == DataDependencyType::UndefinedToRenderTarget)
+                    ib.LayoutBefore = TextureLayout::Undefined;
+                else
+                {
+                    if (dep == DataDependencyType::RenderTargetToGraphics || dep == DataDependencyType::RenderTargetToCompute)
+                        ib.LayoutBefore = img->IsDepthStencilFormat() ? TextureLayout::DepthStencilAttachment : TextureLayout::ColorAttachment;
+                    else
+                        ib.LayoutBefore = TextureLayout::Sample;
+                }
+                imageBarriers.Add(ib);
+            }
+            switch (dep)
+            {
+            case DataDependencyType::RenderTargetToGraphics:
+                hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderAccess, imageBarriers.GetArrayView());
+                break;
+            case DataDependencyType::ComputeToGraphics:
+                hw->QueuePipelineBarrier(ResourceUsage::ComputeAccess, ResourceUsage::GraphicsShaderAccess, imageBarriers.GetArrayView());
+                break;
+            case DataDependencyType::RenderTargetToCompute:
+                hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::ComputeAccess, imageBarriers.GetArrayView());
+                break;
+            case DataDependencyType::UndefinedToRenderTarget:
+                hw->QueuePipelineBarrier(ResourceUsage::NonFragmentShaderGraphicsAccess, ResourceUsage::All, imageBarriers.GetArrayView());
+                break;
+            case DataDependencyType::SampledToRenderTarget:
+                hw->QueuePipelineBarrier(ResourceUsage::NonFragmentShaderGraphicsAccess, ResourceUsage::All, imageBarriers.GetArrayView());
+                break;
+            }
+        }
 		
-		virtual void Run(FrameRenderTask & task, const RenderProcedureParameters & params) override
+		virtual void Run(const RenderProcedureParameters & params) override
 		{
 			int w = 0, h = 0;
+            auto hardwareRenderer = params.renderer->GetHardwareRenderer();
+            hardwareRenderer->BeginJobSubmission();
 
 			forwardRenderPass->ResetInstancePool();
 			forwardBaseOutput->GetSize(w, h);
@@ -241,6 +293,7 @@ namespace GameEngine
 
             customDepthRenderPass->ResetInstancePool();
             customDepthPassInstance = customDepthRenderPass->CreateInstance(customDepthOutput, true);
+            preZPassInstance = customDepthRenderPass->CreateInstance(preZOutput, true);
 
 			float aspect = w / (float)h;
 			shadowRenderPass->ResetInstancePool();
@@ -326,30 +379,49 @@ namespace GameEngine
                     lastToneMappingParams = toneMappingParameters;
                 }
             }
-			lighting.GatherInfo(task, &sink, params, w, h, viewUniform, shadowRenderPass.Ptr());
+            // collect light data and render shadow maps
+
+            QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), DataDependencyType::UndefinedToRenderTarget);
+
+			lighting.GatherInfo(hardwareRenderer, &sink, params, w, h, viewUniform, shadowRenderPass.Ptr());
 
 			viewParams.SetUniformData(&viewUniform, (int)sizeof(viewUniform));
 			auto cameraCullFrustum = CullFrustum(params.view.GetFrustum(aspect));
 			
+            // custom depth pass
             Array<Texture*, 8> textures;
             customDepthOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-            task.AddImageTransferTask(textures.GetArrayView(), CoreLib::ArrayView<Texture*>());
             customDepthRenderPass->Bind();
             sharedRes->pipelineManager.PushModuleInstance(&viewParams);
             customDepthPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::CustomDepth, cameraCullFrustum, false));
             sharedRes->pipelineManager.PopModuleInstance();
-            task.AddTask(customDepthPassInstance);
-            task.AddImageTransferTask(CoreLib::ArrayView<Texture*>(), textures.GetArrayView());
+            customDepthPassInstance->Execute(hardwareRenderer, *params.renderStats);
+            QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
 
+            // pre-z pass
+            preZOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
+            customDepthRenderPass->Bind();
+            sharedRes->pipelineManager.PushModuleInstance(&viewParams);
+            preZPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
+            sharedRes->pipelineManager.PopModuleInstance();
+            preZPassInstance->Execute(hardwareRenderer, *params.renderStats);
+            QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
+            
+            // build tiled light list
+
+
+            // execute forward lighting pass
+            QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), DataDependencyType::RenderTargetToGraphics);
+            
 			forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-			task.AddImageTransferTask(textures.GetArrayView(), CoreLib::ArrayView<Texture*>());
+            QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::UndefinedToRenderTarget);
 			forwardRenderPass->Bind();
 			sharedRes->pipelineManager.PushModuleInstance(&viewParams);
 			sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
 			forwardBaseInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
 			sharedRes->pipelineManager.PopModuleInstance();
 			sharedRes->pipelineManager.PopModuleInstance();
-			task.AddTask(forwardBaseInstance);
+			forwardBaseInstance->Execute(hardwareRenderer, *params.renderStats);
 
             debugGraphicsRenderPass->Bind();
             sharedRes->pipelineManager.PushModuleInstance(&viewParams);
@@ -357,16 +429,13 @@ namespace GameEngine
                 Engine::GetDebugGraphics()->GetDrawables(Engine::Instance()->GetRenderer()->GetRendererService()));
             sharedRes->pipelineManager.PopModuleInstance();
 
-            task.AddTask(debugGraphicsPassInstance);
-			task.AddImageTransferTask(CoreLib::ArrayView<Texture*>(), textures.GetArrayView());
+            debugGraphicsPassInstance->Execute(hardwareRenderer, *params.renderStats);
+			QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
 
 			if (useAtmosphere)
 			{
-				task.AddTask(atmospherePass->CreateInstance(sharedModules));
+				atmospherePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
 			}
-			task.sharedModuleInstances = sharedModules;
-
-
 			// transparency pass
 			reorderBuffer.Clear();
 			for (auto drawable : GetDrawable(&sink, PassType::Transparent, cameraCullFrustum, false))
@@ -394,24 +463,26 @@ namespace GameEngine
 				transparentPassInstance->SetFixedOrderDrawContent(sharedRes->pipelineManager, reorderBuffer.GetArrayView());
 				sharedRes->pipelineManager.PopModuleInstance();
 				sharedRes->pipelineManager.PopModuleInstance();
-				task.AddImageTransferTask(textures.GetArrayView(), CoreLib::ArrayView<Texture*>());
-				task.AddTask(transparentPassInstance);
-				task.AddImageTransferTask(CoreLib::ArrayView<Texture*>(), textures.GetArrayView());
+				QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::SampledToRenderTarget);
+				transparentPassInstance->Execute(hardwareRenderer, *params.renderStats);
+				QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
 			}
 
 			if (postProcess)
 			{
 				if (useAtmosphere)
 				{
-					task.AddTask(toneMappingFromAtmospherePass->CreateInstance(sharedModules));
+					toneMappingFromAtmospherePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
 				}
 				else
 				{
-					task.AddTask(toneMappingFromLitColorPass->CreateInstance(sharedModules));
+					toneMappingFromLitColorPass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
 				}
                 if (Engine::Instance()->GetEngineMode() == EngineMode::Editor)
-                    task.AddTask(editorOutlinePass->CreateInstance(sharedModules));
+                    editorOutlinePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
 			}
+            
+            hardwareRenderer->EndJobSubmission(nullptr);
 		}
 	};
 

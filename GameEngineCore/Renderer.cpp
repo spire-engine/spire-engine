@@ -102,7 +102,6 @@ namespace GameEngine
 		List<RefPtr<PostRenderPass>> postRenderPasses;
 		HardwareRenderer * hardwareRenderer = nullptr;
 		Level* level = nullptr;
-		FrameRenderTask frameTask;
 		int uniformBufferAlignment = 256;
 		int storageBufferAlignment = 32;
 		int defaultEnvMapId = -1;
@@ -121,8 +120,7 @@ namespace GameEngine
 			else
 				params.view = View();
 			params.rendererService = renderService.Ptr();
-			frameTask.NewFrame();
-			renderProcedure->Run(frameTask, params);
+			renderProcedure->Run(params);
 		}
 	public:
 		RendererImpl(RenderAPI api)
@@ -267,12 +265,7 @@ namespace GameEngine
 		}
 		virtual void TakeSnapshot() override
 		{
-			if (!level)
-				return;
-			static int frameId = 0;
-			frameId++;
-			RunRenderProcedure();
-			sharedRes.renderStats.Divisor++;
+			
 		}
 		virtual RenderStat & GetStats() override
 		{
@@ -291,13 +284,12 @@ namespace GameEngine
 		virtual void RenderFrame() override
 		{
 			if (!level) return;
-
+            static int frameId = 0;
+            frameId++;
+            sharedRes.renderStats.Divisor++;
 			sharedRes.renderStats.NumMaterials = 0;
 			sharedRes.renderStats.NumShaders = 0;
-			for (auto & pass : frameTask.GetTasks())
-			{
-				pass->Execute(hardwareRenderer, sharedRes.renderStats);
-			}
+            RunRenderProcedure();
 		}
 		virtual RendererSharedResource * GetSharedResource() override
 		{

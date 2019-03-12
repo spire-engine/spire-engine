@@ -41,7 +41,7 @@ namespace GameEngine
 		
 		List<AttachmentLayout> renderTargets;
 		SetupPipelineBindingLayout(pipelineBuilder.Ptr(), renderTargets);
-		renderTargetLayout = hwRenderer->CreateRenderTargetLayout(renderTargets.GetArrayView());
+		renderTargetLayout = hwRenderer->CreateRenderTargetLayout(renderTargets.GetArrayView(), true);
 
 		pipeline = pipelineBuilder->ToPipeline(renderTargetLayout.Ptr());
 		
@@ -92,9 +92,9 @@ namespace GameEngine
 		//buffers.Add(cmdBufIn);
 		buffers.Add(cmdBuf);
 		//buffers.Add(cmdBufOut);
-		hwRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(cmdBufIn), nullptr);
-		hwRenderer->ExecuteRenderPass(frameBuffer.Ptr(), buffers.GetArrayView(), nullptr);
-		hwRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(cmdBufOut), nullptr);
+		hwRenderer->QueueNonRenderCommandBuffers(MakeArrayView(cmdBufIn));
+		hwRenderer->QueueRenderPass(frameBuffer.Ptr(), buffers.GetArrayView());
+		hwRenderer->QueueNonRenderCommandBuffers(MakeArrayView(cmdBufOut));
 
 	}
 

@@ -5,7 +5,6 @@
 
 namespace GameEngine
 {
-	struct FrameRenderTask;
 	class SSAOImpl;
 
 	class SSAO
@@ -17,7 +16,7 @@ namespace GameEngine
 		~SSAO();
 		void Init(RendererSharedResource * sharedRes, const char * depthSource);
 		void Resize(int w, int h);
-		void RegisterWork(FrameRenderTask & task);
+		void RegisterWork();
 		char * GetResultName();
 	};
 }

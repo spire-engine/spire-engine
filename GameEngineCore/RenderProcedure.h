@@ -18,50 +18,13 @@ namespace GameEngine
 		bool isEditorMode = false;
 	};
 
-	struct FrameRenderTask
-	{
-	private:
-		int frameId = 0;
-		CoreLib::List<CoreLib::RefPtr<RenderTask>> subTasks[3];
-		ImageLayoutTransferTaskPool imageLayoutTaskPool;
-	public:
-		SharedModuleInstances sharedModuleInstances;
-		void Clear()
-		{
-			subTasks[frameId].Clear();
-		}
-		void NewFrame() 
-		{
-			frameId++;
-			frameId %= 3;
-			subTasks[frameId].Clear();
-			imageLayoutTaskPool.Reset();
-		}
-		void AddTask(const CoreLib::RefPtr<RenderTask>& task)
-		{
-			subTasks[frameId].Add(task);
-		}
-		void AddImageTransferTask(CoreLib::ArrayView<Texture*> renderTargetTextures, CoreLib::ArrayView<Texture*> samplingTextures)
-		{
-			subTasks[frameId].Add(imageLayoutTaskPool.NewImageLayoutTransferTask(renderTargetTextures, samplingTextures));
-            for (auto tex : renderTargetTextures)
-                tex->SetCurrentLayout(TextureLayout::ColorAttachment);
-            for (auto tex : samplingTextures)
-                tex->SetCurrentLayout(TextureLayout::Sample);
-		}
-		CoreLib::List<CoreLib::RefPtr<RenderTask>> & GetTasks()
-		{
-			return subTasks[frameId];
-		}
-	};
-
 	class IRenderProcedure : public CoreLib::RefObject
 	{
 	public:
 		virtual void Init(Renderer * renderer, ViewResource * pViewRes) = 0;
 		virtual void UpdateSharedResourceBinding() = 0;
         virtual void UpdateSceneResourceBinding(SceneResource* sceneRes) = 0;
-		virtual void Run(FrameRenderTask & task, const RenderProcedureParameters & params) = 0;
+		virtual void Run(const RenderProcedureParameters & params) = 0;
 		virtual RenderTarget* GetOutput() = 0;
 	};
 

@@ -291,7 +291,7 @@ namespace GameEngine
             Array<AttachmentLayout, 1> frameBufferLayout;
             frameBufferLayout.Add(AttachmentLayout(TextureUsage::SampledColorAttachment, StorageFormat::RGBA_8));
 
-            renderTargetLayout = rendererApi->CreateRenderTargetLayout(frameBufferLayout.GetArrayView());
+            renderTargetLayout = rendererApi->CreateRenderTargetLayout(frameBufferLayout.GetArrayView(), true);
             pipeBuilder->SetDebugName("ui");
             pipeline = pipeBuilder->ToPipeline(renderTargetLayout.Ptr());
 
@@ -350,10 +350,10 @@ namespace GameEngine
             cmdBuf->DrawIndexed(0, indexCount);
             cmdBuf->EndRecording();
         }
-        void SubmitCommands(UIWindowContext * wndCtx, GameEngine::Fence * fence)
+        void SubmitCommands(UIWindowContext * wndCtx)
         {
             frameId++;
-            rendererApi->ExecuteRenderPass(wndCtx->frameBuffer.Ptr(), MakeArray(wndCtx->blitCmdBuffer->GetBuffer(), wndCtx->cmdBuffer->GetBuffer()).GetArrayView(), fence);
+            rendererApi->QueueRenderPass(wndCtx->frameBuffer.Ptr(), MakeArray(wndCtx->blitCmdBuffer->GetBuffer(), wndCtx->cmdBuffer->GetBuffer()).GetArrayView());
         }
         bool IsBufferFull()
         {
@@ -786,10 +786,10 @@ namespace GameEngine
         uiRenderer->EndUIDrawing(ctx, baseTexture, viewport);
     }
 
-    void UISystemBase::ExecuteDrawCommands(UIWindowContext * ctx, GameEngine::Fence* fence)
+    void UISystemBase::QueueDrawCommands(UIWindowContext * ctx, Fence* frameFence)
     {
-        textBufferFence = fence;
-        uiRenderer->SubmitCommands(ctx, fence);
+        textBufferFence = frameFence;
+        uiRenderer->SubmitCommands(ctx);
     }
 
     GameEngine::FrameBuffer * UISystemBase::CreateFrameBuffer(GameEngine::Texture2D * texture)

@@ -96,7 +96,7 @@ namespace GameEngine
             }
 
             auto destTextures = From(dest).Select([](auto x) {return (Texture*)x; }).ToList();
-            RefPtr<RenderTargetLayout> renderTargetLayout = hwRenderer->CreateRenderTargetLayout(attachments.GetArrayView());
+            RefPtr<RenderTargetLayout> renderTargetLayout = hwRenderer->CreateRenderTargetLayout(attachments.GetArrayView(), true);
             RefPtr<FrameBuffer> frameBuffer = renderTargetLayout->CreateFrameBuffer(renderAttachments);
             
             DrawableSink sink;
@@ -113,7 +113,8 @@ namespace GameEngine
             layoutTransferCmdBuffer1->TransferLayout(destTextures.GetArrayView(),
                 TextureLayoutTransfer::UndefinedToRenderAttachment);
             layoutTransferCmdBuffer1->EndRecording();
-            hwRenderer->ExecuteNonRenderCommandBuffers(layoutTransferCmdBuffer1.Ptr(), nullptr);
+            hwRenderer->BeginJobSubmission();
+            hwRenderer->QueueNonRenderCommandBuffers(layoutTransferCmdBuffer1.Ptr());
             
             cmdBuffer->BeginRecording(frameBuffer.Ptr());
             cmdBuffer->SetViewport(0, 0, width, height);
@@ -171,13 +172,14 @@ namespace GameEngine
             }
 
             cmdBuffer->EndRecording();
-            hwRenderer->ExecuteRenderPass(frameBuffer.Ptr(), MakeArrayView(cmdBuffer.Ptr()), nullptr);
+            hwRenderer->QueueRenderPass(frameBuffer.Ptr(), MakeArrayView(cmdBuffer.Ptr()));
             layoutTransferCmdBuffer2->BeginRecording();
             layoutTransferCmdBuffer2->TransferLayout(destTextures.GetArrayView(),
                 TextureLayoutTransfer::RenderAttachmentToSample);
             layoutTransferCmdBuffer2->EndRecording();
 
-            hwRenderer->ExecuteNonRenderCommandBuffers(layoutTransferCmdBuffer2.Ptr(), fence.Ptr());
+            hwRenderer->QueueNonRenderCommandBuffers(layoutTransferCmdBuffer2.Ptr());
+            hwRenderer->EndJobSubmission(fence.Ptr());
             fence->Wait();
             fence->Reset();
         }

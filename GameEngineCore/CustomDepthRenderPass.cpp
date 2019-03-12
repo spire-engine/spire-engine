@@ -24,7 +24,7 @@ namespace GameEngine
         RenderTargetLayout * CreateRenderTargetLayout() override
         {
             return hwRenderer->CreateRenderTargetLayout(MakeArray(
-                AttachmentLayout(TextureUsage::SampledDepthAttachment, DepthBufferFormat)).GetArrayView());
+                AttachmentLayout(TextureUsage::SampledDepthAttachment, DepthBufferFormat)).GetArrayView(), true);
         }
     };
 

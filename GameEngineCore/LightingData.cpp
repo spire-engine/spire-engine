@@ -42,7 +42,7 @@ namespace GameEngine
 		}
 	}
 
-	void LightingEnvironment::AddShadowPass(FrameRenderTask & tasks, WorldRenderPass * shadowRenderPass, DrawableSink * sink, ShadowMapResource & shadowMapRes, int shadowMapId,
+	void LightingEnvironment::AddShadowPass(HardwareRenderer* hw, WorldRenderPass * shadowRenderPass, DrawableSink * sink, ShadowMapResource & shadowMapRes, int shadowMapId,
 		StandardViewUniforms & shadowMapView, int & shadowMapViewInstancePtr)
 	{
 		auto pass = shadowRenderPass->CreateInstance(shadowMapRes.shadowMapRenderOutputs[shadowMapId].Ptr(), true);
@@ -74,10 +74,11 @@ namespace GameEngine
 		GetDrawable(drawableBuffer, sink, false, cullFrustum);
 		pass->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, drawableBuffer.GetArrayView());
 		sharedRes->pipelineManager.PopModuleInstance();
-		tasks.AddTask(pass);
+        RenderStat stat;
+		pass->Execute(hw, stat);
 	}
 
-	void LightingEnvironment::GatherInfo(FrameRenderTask & tasks, DrawableSink * sink, const RenderProcedureParameters & params, int w, int h, StandardViewUniforms & viewUniform, WorldRenderPass * shadowRenderPass)
+	void LightingEnvironment::GatherInfo(HardwareRenderer* hw, DrawableSink * sink, const RenderProcedureParameters & params, int w, int h, StandardViewUniforms & viewUniform, WorldRenderPass * shadowRenderPass)
 	{
 		auto renderer = params.renderer;
 		auto level = params.level;
@@ -139,13 +140,8 @@ namespace GameEngine
 					lightData.startAngle = pointLight->SpotLightStartAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
 					lightData.endAngle = pointLight->SpotLightEndAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
 					lightData.shaderMapId = 0xFFFF;
-					if (pointLight->EnableShadows.GetValue() == 2)
-						lightData.shaderMapId = (unsigned short)shadowMapRes.AllocShadowMaps(1);
-					if (lightData.shaderMapId == -1)
-					{
-						lightData.shaderMapId = 0xFFFF;
-						Engine::Print("Cannot allocate shadow map for light '%s', out of resource limit!", light->Name.GetValue().Buffer());
-					}
+                    if (pointLight->EnableShadows.GetValue() == 2)
+                        lightData.shaderMapId = 0xFFFE;
 					lightData.decay = 10.0f / (pointLight->DecayDistance90Percent.GetValue() * pointLight->DecayDistance90Percent.GetValue());
 					lights.Add(lightData);
 				}
@@ -178,7 +174,7 @@ namespace GameEngine
 			probe.envMapId = 0;
 			lightProbes.Add(probe);
 		}
-		tasks.AddImageTransferTask(MakeArrayView(dynamic_cast<Texture*>(shadowMapRes.shadowMapArray.Ptr())), ArrayView<Texture*>());
+		//QueuePipelineBarrier(MakeArrayView(dynamic_cast<Texture*>(shadowMapRes.shadowMapArray.Ptr())), ArrayView<Texture*>());
 		float zmin = params.view.ZNear;
 		int shadowMapViewInstancePtr = 0;
 		int shadowMapSize = Engine::Instance()->GetGraphicsSettings().ShadowMapResolution;
@@ -264,13 +260,17 @@ namespace GameEngine
 					viewportMatrix.m[1][1] = 0.5f; viewportMatrix.m[3][1] = 0.5f;
 					viewportMatrix.m[2][2] = 1.0f; viewportMatrix.m[3][2] = 0.0f;
 					Matrix4::Multiply(uniformData.lightMatrix[i], viewportMatrix, shadowMapView.ViewProjectionTransform);
-					AddShadowPass(tasks, shadowRenderPass, sink, shadowMapRes, i + shadowMapStartId, shadowMapView, shadowMapViewInstancePtr);
+					AddShadowPass(hw, shadowRenderPass, sink, shadowMapRes, i + shadowMapStartId, shadowMapView, shadowMapViewInstancePtr);
 				}
 			}
 		}
+        // sort light based on distance
+        lights.Sort([&](const GpuLightData &l1, const GpuLightData & l2) { return (l1.position - viewUniform.CameraPos).Length2() < (l2.position - viewUniform.CameraPos).Length2(); });
 		// generate shadow map passes for spot lights
 		for (auto & light : lights)
 		{
+            if (light.shaderMapId == 0xFFFE)
+                light.shaderMapId = (unsigned short)shadowMapRes.AllocShadowMaps(1);
 			if (light.shaderMapId != 0xFFFF)
 			{
 				Vec3 lightPos = light.position;
@@ -301,10 +301,9 @@ namespace GameEngine
 				viewportMatrix.m[1][1] = 0.5f; viewportMatrix.m[3][1] = 0.5f;
 				viewportMatrix.m[2][2] = 1.0f; viewportMatrix.m[3][2] = 0.0f;
 				Matrix4::Multiply(light.lightMatrix, viewportMatrix, shadowMapView.ViewProjectionTransform);
-				AddShadowPass(tasks, shadowRenderPass, sink, shadowMapRes, light.shaderMapId, shadowMapView, shadowMapViewInstancePtr);
+				AddShadowPass(hw, shadowRenderPass, sink, shadowMapRes, light.shaderMapId, shadowMapView, shadowMapViewInstancePtr);
 			}
 		}
-		tasks.AddImageTransferTask(ArrayView<Texture*>(), MakeArrayView(dynamic_cast<Texture*>(shadowMapRes.shadowMapArray.Ptr())));
 		uniformData.lightCount = lights.Count();
 		uniformData.lightProbeCount = lightProbes.Count();
 

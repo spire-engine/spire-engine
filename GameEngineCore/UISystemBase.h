@@ -97,7 +97,7 @@ namespace GameEngine
         }
         GraphicsUI::IImage * CreateImageObject(const CoreLib::Imaging::Bitmap & bmp);
         void TransferDrawCommands(UIWindowContext * ctx, Texture2D* baseTexture, WindowBounds viewport, CoreLib::List<GraphicsUI::DrawCommand> & commands);
-        void ExecuteDrawCommands(UIWindowContext * ctx, Fence* fence);
+        void QueueDrawCommands(UIWindowContext * ctx, Fence* fence);
         FrameBuffer * CreateFrameBuffer(Texture2D * texture);
         CoreLib::RefPtr<UIWindowContext> CreateWindowContext(SystemWindow* handle, int w, int h, int log2BufferSize);
         void UnregisterWindowContext(UIWindowContext * ctx);

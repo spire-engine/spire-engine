@@ -237,7 +237,7 @@ namespace GameEngine
             return VectorMath::Vec3::Create(x, r1, z);
         }
 
-        VectorMath::Vec3 ComputeIndirectLighting(Random & random, VectorMath::Vec3 pos, VectorMath::Vec3 normal, int sampleCount)
+        VectorMath::Vec3 ComputeIndirectLighting(Random & random, VectorMath::Vec3 pos, VectorMath::Vec3 normal, int sampleCount, float minValidDistance, bool & isInvalidRegion)
         {
             VectorMath::Vec3 result;
             result.SetZero();
@@ -266,6 +266,8 @@ namespace GameEngine
                         color *= r1;
                         result += color;
                     }
+                    else if (inter.T < minValidDistance)
+                        isInvalidRegion = true;
                 }
                 else
                 {
@@ -300,7 +302,7 @@ namespace GameEngine
                     {
                         auto posPixel = map.positionMap.GetPixel(x, y);
                         auto pos = posPixel.xyz();
-                        auto bias = posPixel.w * 0.6f;
+                        auto bias = posPixel.w * 0.8f;
                         auto normal = map.normalMap.GetPixel(x, y).xyz().Normalize();
                         // shoot random rays and find if the ray hits the back of some nearby face,
                         // if so, shift pos to the front of that face to avoid shadow leaking
@@ -322,7 +324,7 @@ namespace GameEngine
                                 if (inter.T < minT)
                                 {
                                     minT = inter.T;
-                                    biasedPos = testRay.Origin + testRay.Dir * inter.T + inter.Normal * settings.ShadowBias;
+                                    biasedPos = testRay.Origin + testRay.Dir * inter.T + inter.Normal * (bias);
                                 }
                             }
                         }
@@ -398,7 +400,10 @@ namespace GameEngine
                         auto pos = posPixel.xyz();
                         auto normal = map.normalMap.GetPixel(x, y).xyz().Normalize();
                         Random threadRandom(threadRandomSeed);
-                        lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(threadRandom, pos, normal, sampleCount), 1.0f);
+                        bool isInvalidRegion = false;
+                        lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(threadRandom, pos, normal, sampleCount, posPixel.w*2.0f, isInvalidRegion), 1.0f);
+                        if (sampleCount >= 16 && isInvalidRegion)
+                            map.validPixels.Remove(pixelIdx);
                         threadRandomSeed = threadRandom.GetSeed();
                         resultMap.SetPixel(x, y, lighting);
                     }
@@ -536,18 +541,21 @@ namespace GameEngine
                         lm.SetPixel(x, y, maps[i].lightMap.GetPixel(x, y) + maps[i].indirectLightmap.GetPixel(x, y) - maps[i].dynamicDirectLighting.GetPixel(x, y));
 
                 // dilate
+                
                 #pragma omp parallel for
                 for (int y = 0; y < lm.Height; y++)
                     for (int x = 0; x < lm.Width; x++)
                     {
-                        if (!maps[i].validPixels.Contains(y * lm.Width + x) ||
-                            maps[i].indirectLightmap.GetPixel(x, y).xyz().Length2() < 1e-6f)
+                        if (!maps[i].validPixels.Contains(y * lm.Width + x) 
+                            || maps[i].indirectLightmap.GetPixel(x, y).xyz().Length2() < 1e-6f
+                            )
                         {
                             for (int iy = Math::Max(y-1, 0); iy <= Math::Min(y + 1, lm.Height-1); iy++)
                                 for (int ix = Math::Max(x - 1, 0); ix <= Math::Min(x + 1, lm.Width - 1); ix++)
                                 {
-                                    if (maps[i].validPixels.Contains(iy * lm.Width + ix) && 
-                                        maps[i].indirectLightmap.GetPixel(ix, iy).xyz().Length2() > 1e-2f)
+                                    if (maps[i].validPixels.Contains(iy * lm.Width + ix) 
+                                        && maps[i].indirectLightmap.GetPixel(ix, iy).xyz().Length2() > 1e-4f
+                                        )
                                     {
                                         lm.SetPixel(x, y, lm.GetPixel(ix, iy));
                                         goto outContinue;
@@ -556,6 +564,7 @@ namespace GameEngine
                         outContinue:;
                         }
                     }
+                
             }
         }
         void CheckUVs()

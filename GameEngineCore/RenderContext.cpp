@@ -421,7 +421,7 @@ namespace GameEngine
 		shadowMapArrayFreeBits.Clear();
 		shadowMapArraySize = graphicsSettings.ShadowMapArraySize;
 
-		shadowMapRenderTargetLayout = hwRenderer->CreateRenderTargetLayout(MakeArrayView(AttachmentLayout(TextureUsage::SampledDepthAttachment, StorageFormat::Depth32)));
+		shadowMapRenderTargetLayout = hwRenderer->CreateRenderTargetLayout(MakeArrayView(AttachmentLayout(TextureUsage::SampledDepthAttachment, StorageFormat::Depth32)), true);
 		shadowMapRenderOutputs.SetSize(shadowMapArraySize);
 
 		shadowView = new ViewResource(hwRenderer);
@@ -820,7 +820,7 @@ namespace GameEngine
 		stats.NumMaterials += numMaterials;
 		stats.NumShaders += numShaders;
 		
-		hwRenderer->ExecuteRenderPass(renderOutput->GetFrameBuffer(), MakeArrayView<CommandBuffer*>(apiCommandBuffers.Buffer(), apiCommandBuffers.Count()), nullptr);
+		hwRenderer->QueueRenderPass(renderOutput->GetFrameBuffer(), MakeArrayView<CommandBuffer*>(apiCommandBuffers.Buffer(), apiCommandBuffers.Count()));
 	}
 	GeneralRenderTask::GeneralRenderTask(AsyncCommandBuffer * cmdBuffer)
 	{
@@ -828,7 +828,7 @@ namespace GameEngine
 	}
 	void GeneralRenderTask::Execute(HardwareRenderer * hwRenderer, RenderStat & /*stats*/)
 	{
-		hwRenderer->ExecuteNonRenderCommandBuffers(MakeArrayView(commandBuffer->GetBuffer()), nullptr);
+		hwRenderer->QueueNonRenderCommandBuffers(MakeArrayView(commandBuffer->GetBuffer()));
 	}
 }
 
