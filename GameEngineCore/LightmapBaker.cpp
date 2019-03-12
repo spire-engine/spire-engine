@@ -421,7 +421,7 @@ namespace GameEngine
                 return rs->GetArrayView();
             List<float> kernel;
             kernel.SetSize(size);
-            float sigma = 0.4f;
+            float sigma = 0.6f;
             float invTwoSigmaSquare = 1.0f / (2.0f * sigma * sigma);
             for (int i = 0; i < size; i++)
             {
@@ -432,9 +432,8 @@ namespace GameEngine
             blurKernels[size] = kernel;
             return blurKernels[size]().GetArrayView();
         }
-        void BlurIndirectLightmap(IntSet& validPixels, RawObjectSpaceMap & lightmap)
+        void BlurLightmap(IntSet& validPixels, int blurRadius, RawObjectSpaceMap & lightmap)
         {
-            int blurRadius = Math::Clamp(lightmap.Width / 100, 1, 20);
             blurTempMap.Init(lightmap.GetDataType(), lightmap.Width, lightmap.Height);
             ArrayView<float> kernel = GetBlurKernel(blurRadius);
             #pragma omp parallel for
@@ -452,11 +451,8 @@ namespace GameEngine
                             if (validPixels.Contains(y*lightmap.Width + ix))
                             {
                                 auto otherVal = lightmap.GetPixel(ix, y).xyz();
-                                if (otherVal.x > 1e-3f || otherVal.y > 1e-3f || otherVal.z > 1e-3f)
-                                {
-                                    value += otherVal * kernel[x - ix];
-                                    sumWeight += kernel[x - ix];
-                                }
+                                value += otherVal * kernel[x - ix];
+                                sumWeight += kernel[x - ix];
                             }
                             else
                                 break;
@@ -466,11 +462,8 @@ namespace GameEngine
                             if (validPixels.Contains(y*lightmap.Width + ix))
                             {
                                 auto otherVal = lightmap.GetPixel(ix, y).xyz();
-                                if (otherVal.x > 1e-3f || otherVal.y > 1e-3f || otherVal.z > 1e-3f)
-                                {
-                                    value += otherVal * kernel[ix - x];
-                                    sumWeight += kernel[ix - x];
-                                }
+                                value += otherVal * kernel[ix - x];
+                                sumWeight += kernel[ix - x];
                             }
                             else
                                 break;
@@ -496,11 +489,8 @@ namespace GameEngine
                             if (validPixels.Contains(iy*lightmap.Width + x))
                             {
                                 auto otherVal = blurTempMap.GetPixel(x, iy).xyz();
-                                if (otherVal.x > 1e-3f || otherVal.y > 1e-3f || otherVal.z > 1e-3f)
-                                {
-                                    value += otherVal * kernel[y - iy];
-                                    sumWeight += kernel[y - iy];
-                                }
+                                value += otherVal * kernel[y - iy];
+                                sumWeight += kernel[y - iy];
                             }
                             else
                                 break;
@@ -510,11 +500,8 @@ namespace GameEngine
                             if (validPixels.Contains(iy*lightmap.Width + x))
                             {
                                 auto otherVal = blurTempMap.GetPixel(x, iy).xyz();
-                                if (otherVal.x > 1e-3f || otherVal.y > 1e-3f || otherVal.z > 1e-3f)
-                                {
-                                    value += otherVal * kernel[iy - y];
-                                    sumWeight += kernel[iy - y];
-                                }
+                                value += otherVal * kernel[iy - y];
+                                sumWeight += kernel[iy - y];
                             }
                             else
                                 break;
@@ -533,15 +520,24 @@ namespace GameEngine
             {
                 auto & lm = lightmaps.Lightmaps[i];
                 lm.Init(RawObjectSpaceMap::DataType::RGB32F, maps[i].lightMap.Width, maps[i].lightMap.Height);
-                BlurIndirectLightmap(maps[i].validPixels, maps[i].indirectLightmap);
-                // composite
+                int indirectBlurRadius = Math::Clamp(maps[i].indirectLightmap.Width / 100, 1, 20);
+
+                // get direct lighting
                 #pragma omp parallel for
                 for (int y = 0; y < lm.Height; y++)
                     for (int x = 0; x < lm.Width; x++)
-                        lm.SetPixel(x, y, maps[i].lightMap.GetPixel(x, y) + maps[i].indirectLightmap.GetPixel(x, y) - maps[i].dynamicDirectLighting.GetPixel(x, y));
+                        lm.SetPixel(x, y, maps[i].lightMap.GetPixel(x, y) - maps[i].dynamicDirectLighting.GetPixel(x, y));
+
+                // blur direct lighting in final lightmap
+                BlurLightmap(maps[i].validPixels, 2, lm);
+                // composite indirect lighting
+                BlurLightmap(maps[i].validPixels, indirectBlurRadius, maps[i].indirectLightmap);
+                #pragma omp parallel for
+                for (int y = 0; y < lm.Height; y++)
+                    for (int x = 0; x < lm.Width; x++)
+                        lm.SetPixel(x, y, lm.GetPixel(x, y) + maps[i].indirectLightmap.GetPixel(x, y));
 
                 // dilate
-                
                 #pragma omp parallel for
                 for (int y = 0; y < lm.Height; y++)
                     for (int x = 0; x < lm.Width; x++)
