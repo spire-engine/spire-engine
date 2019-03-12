@@ -17,6 +17,7 @@
 #include "WorldRenderPass.h"
 #include "PostRenderPass.h"
 #include "RenderProcedure.h"
+#include "ComputeTaskManager.h"
 
 using namespace CoreLib;
 using namespace VectorMath;
@@ -51,10 +52,12 @@ namespace GameEngine
 				rs->material = material;
 				return rs;
 			}
+
 		public:
 			RendererServiceImpl(RendererImpl * pRenderer)
 				: renderer(pRenderer)
-			{}
+			{
+            }
 			void CreateTransformModuleInstance(ModuleInstance & rs, const char * name, int uniformBufferSize)
 			{
 				auto sceneResources = renderer->sceneRes.Ptr();
@@ -123,6 +126,8 @@ namespace GameEngine
 			renderProcedure->Run(params);
 		}
 	public:
+        CoreLib::RefPtr<ComputeTaskManager> computeTaskManager;
+
 		RendererImpl(RenderAPI api)
 			: sharedRes(api)
 		{
@@ -134,6 +139,8 @@ namespace GameEngine
 				break;
 			}
 			hardwareRenderer->SetMaxTempBufferVersions(DynamicBufferLengthMultiplier);
+            
+            computeTaskManager = new ComputeTaskManager(hardwareRenderer, Engine::GetShaderCompiler());
 
 			sharedRes.Init(hardwareRenderer);
 
@@ -167,6 +174,11 @@ namespace GameEngine
 		{
 			hardwareRenderer->Wait();
 		}
+
+        virtual ComputeTaskManager* GetComputeTaskManager() override
+        {
+            return computeTaskManager.Ptr();
+        }
 
 		virtual int RegisterWorldRenderPass(uint32_t shaderId) override
 		{

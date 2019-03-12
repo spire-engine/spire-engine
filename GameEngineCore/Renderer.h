@@ -17,6 +17,7 @@ namespace GameEngine
 	class Level;
 	class RenderStat;
     class RendererService;
+    class ComputeTaskManager;
     struct LightmapSet;
 	class Renderer : public CoreLib::Object
 	{
@@ -30,6 +31,7 @@ namespace GameEngine
 		virtual void RenderFrame() = 0;
 		virtual void Resize(int w, int h) = 0;
 		virtual void Wait() = 0;
+        virtual ComputeTaskManager* GetComputeTaskManager() = 0;
 		virtual SceneResource * GetSceneResource() = 0;
 		virtual RendererSharedResource * GetSharedResource() = 0;
 		virtual Texture2D * GetRenderedImage() = 0;

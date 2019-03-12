@@ -89,7 +89,6 @@ namespace GameEngine
         CoreLib::RefPtr<CoreLib::IO::Stream> videoEncodingStream;
         CoreLib::RefPtr<IShaderCompiler> shaderCompiler;
         CoreLib::RefPtr<DebugGraphics> debugGraphics;
-        CoreLib::RefPtr<ComputeTaskManager> computeTaskManager;
 		EngineMode engineMode = EngineMode::Normal;
 		CoreLib::Array<RenderStat, 16> renderStats;
 		GraphicsUI::CommandForm * uiCommandForm = nullptr;
@@ -217,7 +216,7 @@ namespace GameEngine
         }
         static ComputeTaskManager* GetComputeTaskManager()
         {
-            return Instance()->computeTaskManager.Ptr();
+            return Instance()->renderer->GetComputeTaskManager();
         }
         static IShaderCompiler* GetShaderCompiler()
         {
