@@ -96,7 +96,7 @@ void cs_BuildTiledLightList(ParameterBlock<ClassifyLightTilesParam> params, uint
 	int numTilesX = (params.width + TILE_RES_X - 1) / TILE_RES_X;
 	for (int i = localThreadIndex; i < min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1); i+= THREAD_GROUP_SIZE)
 		params.tiles[groupId.y * numTilesX + groupId.x + i] = lightList[i];
-	if (localThreadId == 0)
+	if (localThreadIndex == 0)
 	{
         params.tiles[groupId.y * numTilesX + groupId.x + min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1)] = 0xFFFFFFFF;
 	}
