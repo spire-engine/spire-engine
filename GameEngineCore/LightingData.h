@@ -69,7 +69,7 @@ namespace GameEngine
 		CoreLib::RefPtr<Buffer> lightBuffer, lightProbeBuffer;
 		CoreLib::List<ModuleInstance> shadowViewInstances;
 		CoreLib::List<Drawable*> drawableBuffer, reorderBuffer;
-        RefPtr<Buffer> tiledLightListBufffer;
+        CoreLib::RefPtr<Buffer> tiledLightListBufffer;
         int tiledLightListBufferSize = 0;
         DeviceLightmapSet * deviceLightmapSet = nullptr;
 		RendererSharedResource * sharedRes;

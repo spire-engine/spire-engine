@@ -59,9 +59,9 @@ namespace GameEngine
 
     void ComputeTaskInstance::Queue(int x, int y, int z)
     {
-        if (!cmdBuffer) cmdBuffer = manager->hardwareRenderer->CreateCommandBuffer();
-        Dispatch(cmdBuffer.Ptr(), x, y, z);
-        manager->hardwareRenderer->QueueNonRenderCommandBuffers(cmdBuffer.Ptr());
+        if (!commandBuffer) commandBuffer = manager->hardwareRenderer->CreateCommandBuffer();
+        Dispatch(commandBuffer.Ptr(), x, y, z);
+        manager->hardwareRenderer->QueueNonRenderCommandBuffers(commandBuffer.Ptr());
     }
 
 

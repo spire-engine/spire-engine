@@ -71,7 +71,7 @@ namespace GameEngine
         ComputeTaskManager* manager;
         ComputeKernel* kernel;
         CoreLib::RefPtr<DescriptorSet> descriptorSet;
-        CoreLib::RefPtr<CommandBuffer> cmdBuffer;
+        CoreLib::RefPtr<CommandBuffer> commandBuffer;
         int uniformBufferSize;
         void* uniformData;
     public:
