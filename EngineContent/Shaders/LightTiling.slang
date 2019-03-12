@@ -28,7 +28,6 @@ void cs_BuildTiledLightList(ParameterBlock<ClassifyLightTilesParam> params, uint
     if (localThreadIndex == 0)
     {
         lightIndexPtr = 0;
-		sharedZMin = 1.0;
 		sharedZMax = 0.0;
     }
 
@@ -39,10 +38,10 @@ void cs_BuildTiledLightList(ParameterBlock<ClassifyLightTilesParam> params, uint
     uint tx1 = TILE_RES_X * (groupId.x + 1);
     uint ty1 = TILE_RES_Y * (groupId.y + 1);
 
-	float4 corner0 = mul(params.invProjMatrix, float4(float2(tx0/(float)width, ty0/(float)height) * 2.0f - 1.0f, 1.0f, 1.0f));
-	float4 corner1 = mul(params.invProjMatrix, float4(float2(tx1/(float)width, ty0/(float)height) * 2.0f - 1.0f, 1.0f, 1.0f));
-	float4 corner2 = mul(params.invProjMatrix, float4(float2(tx1/(float)width, ty1/(float)height) * 2.0f - 1.0f, 1.0f, 1.0f));
-	float4 corner3 = mul(params.invProjMatrix, float4(float2(tx0/(float)width, ty1/(float)height) * 2.0f - 1.0f, 1.0f, 1.0f));
+	float4 corner0 = mul(params.invProjMatrix, float4(float2(tx0/(float)params.width, ty0/(float)params.height) * 2.0f - 1.0f, 1.0f, 1.0f));
+	float4 corner1 = mul(params.invProjMatrix, float4(float2(tx1/(float)params.width, ty0/(float)params.height) * 2.0f - 1.0f, 1.0f, 1.0f));
+	float4 corner2 = mul(params.invProjMatrix, float4(float2(tx1/(float)params.width, ty1/(float)params.height) * 2.0f - 1.0f, 1.0f, 1.0f));
+	float4 corner3 = mul(params.invProjMatrix, float4(float2(tx0/(float)params.width, ty1/(float)params.height) * 2.0f - 1.0f, 1.0f, 1.0f));
 
 	corner0 = float4(corner0.xyz/corner0.w, 1.0);
 	corner1 = float4(corner1.xyz/corner1.w, 1.0);
@@ -67,11 +66,11 @@ void cs_BuildTiledLightList(ParameterBlock<ClassifyLightTilesParam> params, uint
     GroupMemoryBarrierWithGroupSync();
 
 	// step 3: classify lights
-	float zMax = 1.0f / (sharedZMax * params.invProjMatrix._34 + params.invProjMatrix._44);
+	float zMax = 1.0f / (sharedZMax * params.invProjMatrix[3][4] + params.invProjMatrix[4][4]);
 	for (uint i = localThreadIndex; i < params.lightCount; i += THREAD_GROUP_SIZE)
 	{
-		float radius = lights[i].radius;
-		float3 viewSpaceLightPos = mul(params.viewMatrix, float4(lights[i].position, 1.0f)).xyz;
+		float radius = params.lights[i].radius;
+		float3 viewSpaceLightPos = mul(params.viewMatrix, float4(params.lights[i].position, 1.0f)).xyz;
 		bool intersect = true;
 		intersect = intersect && dot(plane0, viewSpaceLightPos) >= -radius;
 		intersect = intersect && dot(plane1, viewSpaceLightPos) >= -radius;
@@ -93,10 +92,10 @@ void cs_BuildTiledLightList(ParameterBlock<ClassifyLightTilesParam> params, uint
 
 	// step 4: write to output buffer
 	int numTilesX = (params.width + TILE_RES_X - 1) / TILE_RES_X;
-	for (int i = localThreadId; i < min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1); i+= THREAD_GROUP_SIZE)
-		tiles[groupId.y * NumTilesX + groupId.x + i] = lightList[i];
+	for (int i = localThreadIndex; i < min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1); i+= THREAD_GROUP_SIZE)
+		params.tiles[groupId.y * numTilesX + groupId.x + i] = lightList[i];
 	if (localThreadId == 0)
 	{
-		tiles[groupId.y * NumTilesX + groupId.x + min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1)] = 0xFFFFFFFF; 
+        params.tiles[groupId.y * numTilesX + groupId.x + min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1)] = 0xFFFFFFFF;
 	}
 }

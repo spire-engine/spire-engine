@@ -15,25 +15,25 @@ using namespace VectorMath;
 
 namespace GameEngine
 {
-	class LightUniforms
-	{
-	public:
-		VectorMath::Vec3 lightDir; float pad0 = 0.0f;
-		VectorMath::Vec3 lightColor; 
-		float ambient = 0.2f;
-		int shadowMapId = -1;
-		int numCascades = 0;
-		int padding2 = 0, pad3 = 0;
-		VectorMath::Matrix4 lightMatrix[MaxShadowCascades];
-		float zPlanes[MaxShadowCascades];
-		LightUniforms()
-		{
-			lightDir.SetZero();
-			lightColor.SetZero();
-			for (int i = 0; i < MaxShadowCascades; i++)
-				zPlanes[i] = 0.0f;
-		}
-	};
+    class LightUniforms
+    {
+    public:
+        VectorMath::Vec3 lightDir; float pad0 = 0.0f;
+        VectorMath::Vec3 lightColor;
+        float ambient = 0.2f;
+        int shadowMapId = -1;
+        int numCascades = 0;
+        int padding2 = 0, pad3 = 0;
+        VectorMath::Matrix4 lightMatrix[MaxShadowCascades];
+        float zPlanes[MaxShadowCascades];
+        LightUniforms()
+        {
+            lightDir.SetZero();
+            lightColor.SetZero();
+            for (int i = 0; i < MaxShadowCascades; i++)
+                zPlanes[i] = 0.0f;
+        }
+    };
 
     struct BuildTiledLightListUniforms
     {
@@ -44,105 +44,105 @@ namespace GameEngine
     };
 
     class StandardRenderProcedure : public IRenderProcedure
-	{
-	private:
-		RendererSharedResource * sharedRes = nullptr;
-		ViewResource * viewRes = nullptr;
+    {
+    private:
+        RendererSharedResource * sharedRes = nullptr;
+        ViewResource * viewRes = nullptr;
 
-		RefPtr<WorldRenderPass> shadowRenderPass;
-		RefPtr<WorldRenderPass> forwardRenderPass;
+        RefPtr<WorldRenderPass> shadowRenderPass;
+        RefPtr<WorldRenderPass> forwardRenderPass;
         RefPtr<WorldRenderPass> customDepthRenderPass;
         RefPtr<WorldRenderPass> debugGraphicsRenderPass;
 
-		RefPtr<PostRenderPass> atmospherePass;
-		RefPtr<PostRenderPass> toneMappingFromAtmospherePass;
-		RefPtr<PostRenderPass> toneMappingFromLitColorPass;
+        RefPtr<PostRenderPass> atmospherePass;
+        RefPtr<PostRenderPass> toneMappingFromAtmospherePass;
+        RefPtr<PostRenderPass> toneMappingFromLitColorPass;
         RefPtr<PostRenderPass> editorOutlinePass;
 
-		RenderOutput * forwardBaseOutput = nullptr;
-		RenderOutput * transparentAtmosphereOutput = nullptr;
+        RenderOutput * forwardBaseOutput = nullptr;
+        RenderOutput * transparentAtmosphereOutput = nullptr;
         RenderOutput * customDepthOutput = nullptr;
         RenderOutput * preZOutput = nullptr;
 
-		StandardViewUniforms viewUniform;
+        StandardViewUniforms viewUniform;
 
-		RefPtr<WorldPassRenderTask> forwardBaseInstance, transparentPassInstance, customDepthPassInstance, preZPassInstance, debugGraphicsPassInstance;
+        RefPtr<WorldPassRenderTask> forwardBaseInstance, transparentPassInstance, customDepthPassInstance, preZPassInstance, debugGraphicsPassInstance;
         RefPtr<ComputeKernel> lightListBuildingComputeKernel;
         RefPtr<ComputeTaskInstance> lightListBuildingComputeTaskInstance;
 
-		DeviceMemory renderPassUniformMemory;
-		SharedModuleInstances sharedModules;
-		ModuleInstance viewParams;
-		CoreLib::List<ModuleInstance> shadowViewInstances;
+        DeviceMemory renderPassUniformMemory;
+        SharedModuleInstances sharedModules;
+        ModuleInstance viewParams;
+        CoreLib::List<ModuleInstance> shadowViewInstances;
 
-		DrawableSink sink;
+        DrawableSink sink;
 
-		List<Drawable*> reorderBuffer, drawableBuffer;
-		LightingEnvironment lighting;
-		AtmosphereParameters lastAtmosphereParams;
-		ToneMappingParameters lastToneMappingParams;
+        List<Drawable*> reorderBuffer, drawableBuffer;
+        LightingEnvironment lighting;
+        AtmosphereParameters lastAtmosphereParams;
+        ToneMappingParameters lastToneMappingParams;
 
-		bool useAtmosphere = false;
-		bool postProcess = false;
-		bool useEnvMap = false;
-	public:
-		StandardRenderProcedure(bool pPostProcess, bool pUseEnvMap)
-		{
+        bool useAtmosphere = false;
+        bool postProcess = false;
+        bool useEnvMap = false;
+    public:
+        StandardRenderProcedure(bool pPostProcess, bool pUseEnvMap)
+        {
             postProcess = pPostProcess;
-			useEnvMap = pUseEnvMap;
-		}
-		~StandardRenderProcedure()
-		{
+            useEnvMap = pUseEnvMap;
+        }
+        ~StandardRenderProcedure()
+        {
             if (customDepthOutput)
                 viewRes->DestroyRenderOutput(customDepthOutput);
-			if (forwardBaseOutput)
-				viewRes->DestroyRenderOutput(forwardBaseOutput);
-			if (transparentAtmosphereOutput)
-				viewRes->DestroyRenderOutput(transparentAtmosphereOutput);
+            if (forwardBaseOutput)
+                viewRes->DestroyRenderOutput(forwardBaseOutput);
+            if (transparentAtmosphereOutput)
+                viewRes->DestroyRenderOutput(transparentAtmosphereOutput);
 
-		}
-		virtual RenderTarget* GetOutput() override
-		{
-			if (postProcess)
-			{
+        }
+        virtual RenderTarget* GetOutput() override
+        {
+            if (postProcess)
+            {
                 if (Engine::Instance()->GetEngineMode() == EngineMode::Editor)
                     return viewRes->LoadSharedRenderTarget("editorColor", StorageFormat::RGBA_8).Ptr();
                 else
-				    return viewRes->LoadSharedRenderTarget("toneColor", StorageFormat::RGBA_8).Ptr();
-			}
-			else
-			{
-				if (useAtmosphere)
-					return viewRes->LoadSharedRenderTarget("litAtmosphereColor", StorageFormat::RGBA_F16).Ptr();
-				else
-					return viewRes->LoadSharedRenderTarget("litColor", StorageFormat::RGBA_F16).Ptr();
-			}
-		}
+                    return viewRes->LoadSharedRenderTarget("toneColor", StorageFormat::RGBA_8).Ptr();
+            }
+            else
+            {
+                if (useAtmosphere)
+                    return viewRes->LoadSharedRenderTarget("litAtmosphereColor", StorageFormat::RGBA_F16).Ptr();
+                else
+                    return viewRes->LoadSharedRenderTarget("litColor", StorageFormat::RGBA_F16).Ptr();
+            }
+        }
         virtual void UpdateSceneResourceBinding(SceneResource* sceneRes) override
         {
             lighting.UpdateSceneResourceBinding(sceneRes);
         }
 
-		virtual void UpdateSharedResourceBinding() override
-		{
-			for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
-			{
-				auto descSet = viewParams.GetDescriptorSet(i);
-				descSet->BeginUpdate();
-				descSet->Update(1, sharedRes->textureSampler.Ptr());
-				descSet->EndUpdate();
-			}
-			lighting.UpdateSharedResourceBinding();
-		}
-		virtual void Init(Renderer * renderer, ViewResource * pViewRes) override
-		{
-			viewRes = pViewRes;
-			sharedRes = renderer->GetSharedResource();
-			shadowRenderPass = CreateShadowRenderPass();
-			shadowRenderPass->Init(renderer);
-			
-			forwardRenderPass = CreateForwardBaseRenderPass();
-			forwardRenderPass->Init(renderer);
+        virtual void UpdateSharedResourceBinding() override
+        {
+            for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
+            {
+                auto descSet = viewParams.GetDescriptorSet(i);
+                descSet->BeginUpdate();
+                descSet->Update(1, sharedRes->textureSampler.Ptr());
+                descSet->EndUpdate();
+            }
+            lighting.UpdateSharedResourceBinding();
+        }
+        virtual void Init(Renderer * renderer, ViewResource * pViewRes) override
+        {
+            viewRes = pViewRes;
+            sharedRes = renderer->GetSharedResource();
+            shadowRenderPass = CreateShadowRenderPass();
+            shadowRenderPass->Init(renderer);
+
+            forwardRenderPass = CreateForwardBaseRenderPass();
+            forwardRenderPass->Init(renderer);
 
             debugGraphicsRenderPass = CreateDebugGraphicsRenderPass();
             debugGraphicsRenderPass->Init(renderer);
@@ -150,46 +150,46 @@ namespace GameEngine
             customDepthRenderPass = CreateCustomDepthRenderPass();
             customDepthRenderPass->Init(renderer);
 
-			forwardBaseOutput = viewRes->CreateRenderOutput(
-				forwardRenderPass->GetRenderTargetLayout(),
-				viewRes->LoadSharedRenderTarget("litColor", StorageFormat::RGBA_F16),
-				viewRes->LoadSharedRenderTarget("depthBuffer", DepthBufferFormat)
-			);
-			transparentAtmosphereOutput = viewRes->CreateRenderOutput(
-				forwardRenderPass->GetRenderTargetLayout(),
-				viewRes->LoadSharedRenderTarget("litAtmosphereColor", StorageFormat::RGBA_F16),
-				viewRes->LoadSharedRenderTarget("depthBuffer", DepthBufferFormat)
-			);
+            forwardBaseOutput = viewRes->CreateRenderOutput(
+                forwardRenderPass->GetRenderTargetLayout(),
+                viewRes->LoadSharedRenderTarget("litColor", StorageFormat::RGBA_F16),
+                viewRes->LoadSharedRenderTarget("depthBuffer", DepthBufferFormat)
+            );
+            transparentAtmosphereOutput = viewRes->CreateRenderOutput(
+                forwardRenderPass->GetRenderTargetLayout(),
+                viewRes->LoadSharedRenderTarget("litAtmosphereColor", StorageFormat::RGBA_F16),
+                viewRes->LoadSharedRenderTarget("depthBuffer", DepthBufferFormat)
+            );
             customDepthOutput = viewRes->CreateRenderOutput(
                 customDepthRenderPass->GetRenderTargetLayout(),
                 viewRes->LoadSharedRenderTarget("customDepthBuffer", DepthBufferFormat));
             preZOutput = viewRes->CreateRenderOutput(
                 customDepthRenderPass->GetRenderTargetLayout(),
                 viewRes->LoadSharedRenderTarget("depthBuffer", DepthBufferFormat));
-			
-			atmospherePass = CreateAtmospherePostRenderPass(viewRes);
-			atmospherePass->SetSource(MakeArray(
-				PostPassSource("litColor", StorageFormat::RGBA_F16),
-				PostPassSource("depthBuffer", DepthBufferFormat),
-				PostPassSource("litAtmosphereColor", StorageFormat::RGBA_F16)
-			).GetArrayView());
-			atmospherePass->Init(renderer);
+
+            atmospherePass = CreateAtmospherePostRenderPass(viewRes);
+            atmospherePass->SetSource(MakeArray(
+                PostPassSource("litColor", StorageFormat::RGBA_F16),
+                PostPassSource("depthBuffer", DepthBufferFormat),
+                PostPassSource("litAtmosphereColor", StorageFormat::RGBA_F16)
+            ).GetArrayView());
+            atmospherePass->Init(renderer);
 
 
-			if (postProcess)
-			{
-			    toneMappingFromAtmospherePass = CreateToneMappingPostRenderPass(viewRes);
-			    toneMappingFromAtmospherePass->SetSource(MakeArray(
-				    PostPassSource("litAtmosphereColor", StorageFormat::RGBA_F16),
-				    PostPassSource("toneColor", StorageFormat::RGBA_8)
-			    ).GetArrayView());
-			    toneMappingFromAtmospherePass->Init(renderer);
-				toneMappingFromLitColorPass = CreateToneMappingPostRenderPass(viewRes);
-				toneMappingFromLitColorPass->SetSource(MakeArray(
-					PostPassSource("litColor", StorageFormat::RGBA_F16),
-					PostPassSource("toneColor", StorageFormat::RGBA_8)
-				).GetArrayView());
-				toneMappingFromLitColorPass->Init(renderer);
+            if (postProcess)
+            {
+                toneMappingFromAtmospherePass = CreateToneMappingPostRenderPass(viewRes);
+                toneMappingFromAtmospherePass->SetSource(MakeArray(
+                    PostPassSource("litAtmosphereColor", StorageFormat::RGBA_F16),
+                    PostPassSource("toneColor", StorageFormat::RGBA_8)
+                ).GetArrayView());
+                toneMappingFromAtmospherePass->Init(renderer);
+                toneMappingFromLitColorPass = CreateToneMappingPostRenderPass(viewRes);
+                toneMappingFromLitColorPass->SetSource(MakeArray(
+                    PostPassSource("litColor", StorageFormat::RGBA_F16),
+                    PostPassSource("toneColor", StorageFormat::RGBA_8)
+                ).GetArrayView());
+                toneMappingFromLitColorPass->Init(renderer);
                 if (Engine::Instance()->GetEngineMode() == EngineMode::Editor)
                 {
                     editorOutlinePass = CreateOutlinePostRenderPass(viewRes);
@@ -200,38 +200,38 @@ namespace GameEngine
                     ).GetArrayView());
                     editorOutlinePass->Init(renderer);
                 }
-			}
-			// initialize forwardBasePassModule and lightingModule
-			renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
-			sharedRes->CreateModuleInstance(viewParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), &renderPassUniformMemory);
-			lighting.Init(*sharedRes, &renderPassUniformMemory, useEnvMap);
-			UpdateSharedResourceBinding();
-			sharedModules.View = &viewParams;
-			shadowViewInstances.Reserve(1024);
+            }
+            // initialize forwardBasePassModule and lightingModule
+            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
+            sharedRes->CreateModuleInstance(viewParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), &renderPassUniformMemory);
+            lighting.Init(*sharedRes, &renderPassUniformMemory, useEnvMap);
+            UpdateSharedResourceBinding();
+            sharedModules.View = &viewParams;
+            shadowViewInstances.Reserve(1024);
 
             BuildTiledLightListUniforms buildLightListUniforms;
-            lightListBuildingComputeKernel = Engine::GetComputeTaskManager()->LoadKernel("LightTiling.slang", "cs_BuildTiledLightList");
-            lightListBuildingComputeTaskInstance = Engine::GetComputeTaskManager()->CreateComputeTaskInstance(lightListBuildingComputeKernel.Ptr(),
+            lightListBuildingComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("LightTiling.slang", "cs_BuildTiledLightList");
+            lightListBuildingComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(lightListBuildingComputeKernel.Ptr(),
                 ArrayView<ResourceBinding>(), &buildLightListUniforms, sizeof(buildLightListUniforms));
-		}
+        }
         enum class PassType
         {
             Shadow, CustomDepth, Main, Transparent
         };
 
-		ArrayView<Drawable*> GetDrawable(DrawableSink * objSink, PassType pass, CullFrustum cf, bool append)
-		{
-			if (!append)
-				drawableBuffer.Clear();
-			for (auto obj : objSink->GetDrawables(pass == PassType::Transparent))
-			{
-				if (pass == PassType::Shadow && !obj->CastShadow)
-					continue;
+        ArrayView<Drawable*> GetDrawable(DrawableSink * objSink, PassType pass, CullFrustum cf, bool append)
+        {
+            if (!append)
+                drawableBuffer.Clear();
+            for (auto obj : objSink->GetDrawables(pass == PassType::Transparent))
+            {
+                if (pass == PassType::Shadow && !obj->CastShadow)
+                    continue;
                 if (pass == PassType::CustomDepth && !obj->RenderCustomDepth)
                     continue;
-				if (cf.IsBoxInFrustum(obj->Bounds))
-					drawableBuffer.Add(obj);
-			}
+                if (cf.IsBoxInFrustum(obj->Bounds))
+                    drawableBuffer.Add(obj);
+            }
             if (pass == PassType::CustomDepth)
             {
                 for (auto obj : objSink->GetDrawables(true))
@@ -242,8 +242,8 @@ namespace GameEngine
                         drawableBuffer.Add(obj);
                 }
             }
-			return drawableBuffer.GetArrayView();
-		}
+            return drawableBuffer.GetArrayView();
+        }
 
         enum class DataDependencyType
         {
@@ -291,16 +291,16 @@ namespace GameEngine
                 break;
             }
         }
-		
-		virtual void Run(const RenderProcedureParameters & params) override
-		{
-			int w = 0, h = 0;
+
+        virtual void Run(const RenderProcedureParameters & params) override
+        {
+            int w = 0, h = 0;
             auto hardwareRenderer = params.renderer->GetHardwareRenderer();
             hardwareRenderer->BeginJobSubmission();
 
-			forwardRenderPass->ResetInstancePool();
-			forwardBaseOutput->GetSize(w, h);
-			forwardBaseInstance = forwardRenderPass->CreateInstance(forwardBaseOutput, true);
+            forwardRenderPass->ResetInstancePool();
+            forwardBaseOutput->GetSize(w, h);
+            forwardBaseInstance = forwardRenderPass->CreateInstance(forwardBaseOutput, true);
 
             debugGraphicsRenderPass->ResetInstancePool();
             debugGraphicsPassInstance = debugGraphicsRenderPass->CreateInstance(forwardBaseOutput, false);
@@ -309,47 +309,47 @@ namespace GameEngine
             customDepthPassInstance = customDepthRenderPass->CreateInstance(customDepthOutput, true);
             preZPassInstance = customDepthRenderPass->CreateInstance(preZOutput, true);
 
-			float aspect = w / (float)h;
-			shadowRenderPass->ResetInstancePool();
-			
-			GetDrawablesParameter getDrawableParam;
-			viewUniform.CameraPos = params.view.Position;
-			viewUniform.ViewTransform = params.view.Transform;
-			getDrawableParam.CameraDir = params.view.GetDirection();
-			getDrawableParam.IsEditorMode = params.isEditorMode;
-			Matrix4 mainProjMatrix;
-			Matrix4::CreatePerspectiveMatrixFromViewAngle(mainProjMatrix,
-				params.view.FOV, w / (float)h,
-				params.view.ZNear, params.view.ZFar, ClipSpaceType::ZeroToOne);
+            float aspect = w / (float)h;
+            shadowRenderPass->ResetInstancePool();
+
+            GetDrawablesParameter getDrawableParam;
+            viewUniform.CameraPos = params.view.Position;
+            viewUniform.ViewTransform = params.view.Transform;
+            getDrawableParam.CameraDir = params.view.GetDirection();
+            getDrawableParam.IsEditorMode = params.isEditorMode;
+            Matrix4 mainProjMatrix;
+            Matrix4::CreatePerspectiveMatrixFromViewAngle(mainProjMatrix,
+                params.view.FOV, w / (float)h,
+                params.view.ZNear, params.view.ZFar, ClipSpaceType::ZeroToOne);
             Matrix4 invProjMatrix;
             mainProjMatrix.Inverse(invProjMatrix);
-			Matrix4::Multiply(viewUniform.ViewProjectionTransform, mainProjMatrix, viewUniform.ViewTransform);
-			
-			viewUniform.ViewTransform.Inverse(viewUniform.InvViewTransform);
-			viewUniform.ViewProjectionTransform.Inverse(viewUniform.InvViewProjTransform);
-			viewUniform.Time = Engine::Instance()->GetTime();
+            Matrix4::Multiply(viewUniform.ViewProjectionTransform, mainProjMatrix, viewUniform.ViewTransform);
 
-			getDrawableParam.CameraPos = viewUniform.CameraPos;
-			getDrawableParam.rendererService = params.rendererService;
-			getDrawableParam.sink = &sink;
-			
-			useAtmosphere = false;
-			sink.Clear();
-						
-			CoreLib::Graphics::BBox levelBounds;
-			// initialize bounds to a small extent to prevent error
-			levelBounds.Min = Vec3::Create(-10.0f);
-			levelBounds.Max = Vec3::Create(10.0f);
+            viewUniform.ViewTransform.Inverse(viewUniform.InvViewTransform);
+            viewUniform.ViewProjectionTransform.Inverse(viewUniform.InvViewProjTransform);
+            viewUniform.Time = Engine::Instance()->GetTime();
+
+            getDrawableParam.CameraPos = viewUniform.CameraPos;
+            getDrawableParam.rendererService = params.rendererService;
+            getDrawableParam.sink = &sink;
+
+            useAtmosphere = false;
+            sink.Clear();
+
+            CoreLib::Graphics::BBox levelBounds;
+            // initialize bounds to a small extent to prevent error
+            levelBounds.Min = Vec3::Create(-10.0f);
+            levelBounds.Max = Vec3::Create(10.0f);
             ToneMappingParameters toneMappingParameters;
-			for (auto & actor : params.level->Actors)
-			{
-				levelBounds.Union(actor.Value->Bounds);
+            for (auto & actor : params.level->Actors)
+            {
+                levelBounds.Union(actor.Value->Bounds);
                 int lastTransparentDrawableCount = sink.GetDrawables(true).Count();
                 int lastOpaqueDrawableCount = sink.GetDrawables(false).Count();
-				
+
                 // obtain drawables from actor
                 actor.Value->GetDrawables(getDrawableParam);
-                
+
                 // if a LightmapSet is available, update drawable's lightmapIndex uniform parameter (do a CPU--GPU memory transfer if needed)
                 if (lighting.deviceLightmapSet)
                 {
@@ -366,26 +366,26 @@ namespace GameEngine
                     }
                 }
 
-				auto actorType = actor.Value->GetEngineType();
-				if (actorType == EngineActorType::Atmosphere)
-				{
-					useAtmosphere = true;
-					auto atmosphere = dynamic_cast<AtmosphereActor*>(actor.Value.Ptr());
-					auto newParams = atmosphere->GetParameters();
-					if (!(lastAtmosphereParams == newParams))
-					{
-						atmosphere->SunDir = atmosphere->SunDir.GetValue().Normalize();
-						newParams = atmosphere->GetParameters();
-						atmospherePass->SetParameters(&newParams, sizeof(newParams));
-						lastAtmosphereParams = newParams;
-					}
-				}
-				else if (postProcess && actorType == EngineActorType::ToneMapping)
-				{
-					auto toneMappingActor = dynamic_cast<ToneMappingActor*>(actor.Value.Ptr());
+                auto actorType = actor.Value->GetEngineType();
+                if (actorType == EngineActorType::Atmosphere)
+                {
+                    useAtmosphere = true;
+                    auto atmosphere = dynamic_cast<AtmosphereActor*>(actor.Value.Ptr());
+                    auto newParams = atmosphere->GetParameters();
+                    if (!(lastAtmosphereParams == newParams))
+                    {
+                        atmosphere->SunDir = atmosphere->SunDir.GetValue().Normalize();
+                        newParams = atmosphere->GetParameters();
+                        atmospherePass->SetParameters(&newParams, sizeof(newParams));
+                        lastAtmosphereParams = newParams;
+                    }
+                }
+                else if (postProcess && actorType == EngineActorType::ToneMapping)
+                {
+                    auto toneMappingActor = dynamic_cast<ToneMappingActor*>(actor.Value.Ptr());
                     toneMappingParameters = toneMappingActor->Parameters;
-				}
-			}
+                }
+            }
             if (postProcess)
             {
                 if (!(lastToneMappingParams == toneMappingParameters))
@@ -399,11 +399,11 @@ namespace GameEngine
 
             QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), DataDependencyType::UndefinedToRenderTarget);
 
-			lighting.GatherInfo(hardwareRenderer, &sink, params, w, h, viewUniform, shadowRenderPass.Ptr());
+            lighting.GatherInfo(hardwareRenderer, &sink, params, w, h, viewUniform, shadowRenderPass.Ptr());
 
-			viewParams.SetUniformData(&viewUniform, (int)sizeof(viewUniform));
-			auto cameraCullFrustum = CullFrustum(params.view.GetFrustum(aspect));
-			
+            viewParams.SetUniformData(&viewUniform, (int)sizeof(viewUniform));
+            auto cameraCullFrustum = CullFrustum(params.view.GetFrustum(aspect));
+
             // custom depth pass
             Array<Texture*, 8> textures;
             customDepthOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
@@ -444,16 +444,16 @@ namespace GameEngine
 
             // execute forward lighting pass
             QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), DataDependencyType::RenderTargetToGraphics);
-            
-			forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
+
+            forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
             QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::SampledToRenderTarget);
-			forwardRenderPass->Bind();
-			sharedRes->pipelineManager.PushModuleInstance(&viewParams);
-			sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
-			forwardBaseInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
-			sharedRes->pipelineManager.PopModuleInstance();
-			sharedRes->pipelineManager.PopModuleInstance();
-			forwardBaseInstance->Execute(hardwareRenderer, *params.renderStats);
+            forwardRenderPass->Bind();
+            sharedRes->pipelineManager.PushModuleInstance(&viewParams);
+            sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
+            forwardBaseInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
+            sharedRes->pipelineManager.PopModuleInstance();
+            sharedRes->pipelineManager.PopModuleInstance();
+            forwardBaseInstance->Execute(hardwareRenderer, *params.renderStats);
 
             debugGraphicsRenderPass->Bind();
             sharedRes->pipelineManager.PushModuleInstance(&viewParams);
@@ -462,64 +462,64 @@ namespace GameEngine
             sharedRes->pipelineManager.PopModuleInstance();
 
             debugGraphicsPassInstance->Execute(hardwareRenderer, *params.renderStats);
-			QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
+            QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
 
-			if (useAtmosphere)
-			{
-				atmospherePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
-			}
-			// transparency pass
-			reorderBuffer.Clear();
-			for (auto drawable : GetDrawable(&sink, PassType::Transparent, cameraCullFrustum, false))
-			{
-				reorderBuffer.Add(drawable);
-			}
-			if (reorderBuffer.Count())
-			{
-				reorderBuffer.Sort([=](Drawable* d1, Drawable* d2) { return d1->Bounds.Distance(params.view.Position) > d2->Bounds.Distance(params.view.Position); });
-				if (useAtmosphere)
-				{
-					transparentPassInstance = forwardRenderPass->CreateInstance(transparentAtmosphereOutput, false);
-					transparentAtmosphereOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-				}
-				else
-				{
-					transparentPassInstance = forwardRenderPass->CreateInstance(forwardBaseOutput, false);
-					forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-				}
+            if (useAtmosphere)
+            {
+                atmospherePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
+            }
+            // transparency pass
+            reorderBuffer.Clear();
+            for (auto drawable : GetDrawable(&sink, PassType::Transparent, cameraCullFrustum, false))
+            {
+                reorderBuffer.Add(drawable);
+            }
+            if (reorderBuffer.Count())
+            {
+                reorderBuffer.Sort([=](Drawable* d1, Drawable* d2) { return d1->Bounds.Distance(params.view.Position) > d2->Bounds.Distance(params.view.Position); });
+                if (useAtmosphere)
+                {
+                    transparentPassInstance = forwardRenderPass->CreateInstance(transparentAtmosphereOutput, false);
+                    transparentAtmosphereOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
+                }
+                else
+                {
+                    transparentPassInstance = forwardRenderPass->CreateInstance(forwardBaseOutput, false);
+                    forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
+                }
 
-				forwardRenderPass->Bind();
-				sharedRes->pipelineManager.PushModuleInstance(&viewParams);
-				sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
+                forwardRenderPass->Bind();
+                sharedRes->pipelineManager.PushModuleInstance(&viewParams);
+                sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
 
-				transparentPassInstance->SetFixedOrderDrawContent(sharedRes->pipelineManager, reorderBuffer.GetArrayView());
-				sharedRes->pipelineManager.PopModuleInstance();
-				sharedRes->pipelineManager.PopModuleInstance();
-				QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::SampledToRenderTarget);
-				transparentPassInstance->Execute(hardwareRenderer, *params.renderStats);
-				QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
-			}
+                transparentPassInstance->SetFixedOrderDrawContent(sharedRes->pipelineManager, reorderBuffer.GetArrayView());
+                sharedRes->pipelineManager.PopModuleInstance();
+                sharedRes->pipelineManager.PopModuleInstance();
+                QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::SampledToRenderTarget);
+                transparentPassInstance->Execute(hardwareRenderer, *params.renderStats);
+                QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
+            }
 
-			if (postProcess)
-			{
-				if (useAtmosphere)
-				{
-					toneMappingFromAtmospherePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
-				}
-				else
-				{
-					toneMappingFromLitColorPass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
-				}
+            if (postProcess)
+            {
+                if (useAtmosphere)
+                {
+                    toneMappingFromAtmospherePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
+                }
+                else
+                {
+                    toneMappingFromLitColorPass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
+                }
                 if (Engine::Instance()->GetEngineMode() == EngineMode::Editor)
                     editorOutlinePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
-			}
-            
-            hardwareRenderer->EndJobSubmission(nullptr);
-		}
-	};
+            }
 
-	IRenderProcedure * CreateStandardRenderProcedure(bool toneMapping, bool useEnvMap)
-	{
-		return new StandardRenderProcedure(toneMapping, useEnvMap);
-	}
+            hardwareRenderer->EndJobSubmission(nullptr);
+        }
+    };
+
+    IRenderProcedure * CreateStandardRenderProcedure(bool toneMapping, bool useEnvMap)
+    {
+        return new StandardRenderProcedure(toneMapping, useEnvMap);
+    }
 }
