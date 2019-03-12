@@ -19,7 +19,7 @@ struct ClassifyLightTilesParam
 
 groupshared int lightIndexPtr;
 groupshared uint lightList[LIGHT_LIST_MAX_SIZE];
-groupshared float sharedZMax;
+groupshared uint sharedZMax;
 
 [numthreads(TILE_RES_X, TILE_RES_Y, 1)]
 void cs_BuildTiledLightList(ParameterBlock<ClassifyLightTilesParam> params, uint3 globalId : SV_DispatchThreadID, uint3 localId : SV_GroupThreadID, uint3 groupId : SV_GroupID)
@@ -57,16 +57,18 @@ void cs_BuildTiledLightList(ParameterBlock<ClassifyLightTilesParam> params, uint
 
 	// step 2: read depth buffer for zMin and zMax
 	
-	float curZ = params.depthTexture.Load(globalId.xy);
+	float curZ = params.depthTexture.Load(globalId);
 	if (curZ != 0.0f)
 	{
-		float originalZ;
-		InterlockedMax(sharedZMax, curZ, originalZ);
+		uint originalZ;
+		InterlockedMax(sharedZMax, asuint(curZ), originalZ);
 	}
     GroupMemoryBarrierWithGroupSync();
 
 	// step 3: classify lights
-	float zMax = 1.0f / (sharedZMax * params.invProjMatrix[3][4] + params.invProjMatrix[4][4]);
+    
+    float zMax = asfloat(sharedZMax);
+	zMax = 1.0f / (zMax * params.invProjMatrix[3][4] + params.invProjMatrix[4][4]);
 	for (uint i = localThreadIndex; i < params.lightCount; i += THREAD_GROUP_SIZE)
 	{
 		float radius = params.lights[i].radius;
