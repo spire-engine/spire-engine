@@ -325,7 +325,7 @@ namespace GameEngine
             {
                 auto descSet = moduleInstance.GetDescriptorSet(i);
                 descSet->BeginUpdate();
-                descSet->Update(7, tiledLightListBufffer.Ptr());
+                descSet->Update(8, tiledLightListBufffer.Ptr());
                 descSet->EndUpdate();
             }
         }

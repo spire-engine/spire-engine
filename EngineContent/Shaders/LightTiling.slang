@@ -21,8 +21,10 @@ groupshared int lightIndexPtr;
 groupshared uint lightList[LIGHT_LIST_MAX_SIZE];
 groupshared uint sharedZMax;
 
+ParameterBlock<ClassifyLightTilesParam> params;
+
 [numthreads(TILE_RES_X, TILE_RES_Y, 1)]
-void cs_BuildTiledLightList(ParameterBlock<ClassifyLightTilesParam> params, uint3 globalId : SV_DispatchThreadID, uint3 localId : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId : SV_GroupThreadID, uint3 groupId : SV_GroupID)
 {
 	uint localThreadIndex = localId.y * TILE_RES_X + localId.x;
     if (localThreadIndex == 0)
@@ -68,7 +70,7 @@ void cs_BuildTiledLightList(ParameterBlock<ClassifyLightTilesParam> params, uint
 	// step 3: classify lights
     
     float zMax = asfloat(sharedZMax);
-	zMax = 1.0f / (zMax * params.invProjMatrix[3][4] + params.invProjMatrix[4][4]);
+	zMax = 1.0f / (zMax * params.invProjMatrix[2][3] + params.invProjMatrix[3][3]);
 	for (uint i = localThreadIndex; i < params.lightCount; i += THREAD_GROUP_SIZE)
 	{
 		float radius = params.lights[i].radius;

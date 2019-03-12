@@ -5,6 +5,7 @@
 #include "HardwareRenderer.h"
 #include "DeviceMemory.h"
 #include "ShaderCompiler.h"
+#include "EngineLimits.h"
 
 namespace GameEngine
 {
@@ -70,13 +71,15 @@ namespace GameEngine
         friend class ComputeTaskManager;
         ComputeTaskManager* manager;
         ComputeKernel* kernel;
-        CoreLib::RefPtr<DescriptorSet> descriptorSet;
-        CoreLib::RefPtr<CommandBuffer> commandBuffer;
+        CoreLib::RefPtr<DescriptorSet> descriptorSets[DynamicBufferLengthMultiplier];
         int uniformBufferSize;
         void* uniformData;
+        int version = 0;
+        bool isVersioned = false;
     public:
         void SetUniformData(void * data, int size);
         void SetBinding(CoreLib::ArrayView<ResourceBinding> resources);
+        void UpdateVersionedParameters(void * data, int size, CoreLib::ArrayView<ResourceBinding> resources);
         void Dispatch(CommandBuffer* cmdBuffer, int x, int y, int z);
         void Queue(int x, int y, int z);
         void Run(CommandBuffer * cmdBuffer, int x, int y, int z, Fence* fence = nullptr);
@@ -93,8 +96,7 @@ namespace GameEngine
         DeviceMemory memory;
     public:
         ComputeKernel* LoadKernel(CoreLib::String shaderName, CoreLib::String functionName);
-        CoreLib::RefPtr<ComputeTaskInstance> CreateComputeTaskInstance(ComputeKernel* kernel, CoreLib::ArrayView<ResourceBinding> resources,
-            void * uniformData, int uniformSize);
+        CoreLib::RefPtr<ComputeTaskInstance> CreateComputeTaskInstance(ComputeKernel* kernel, int uniformSize, bool isVersioned = false);
         ComputeTaskManager(HardwareRenderer * hw, IShaderCompiler* shaderCompiler);
     };
 }

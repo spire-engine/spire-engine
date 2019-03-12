@@ -4708,6 +4708,16 @@ namespace VK
             RendererState::RenderQueue().submit(submitInfo, fence ? ((VK::Fence*)fence)->assocFence : nullptr);
         }
 
+        virtual void QueueComputeTask(GameEngine::Pipeline* computePipeline, GameEngine::DescriptorSet* descriptorSet, int x, int y, int z) override
+        {
+            auto primaryBuffer = jobSubmissionBuffers[renderThreadId];
+            auto pipeline = dynamic_cast<VK::Pipeline*>(computePipeline);
+            auto descSet = dynamic_cast<VK::DescriptorSet*>(descriptorSet);
+            primaryBuffer.bindPipeline(pipeline->pipelineBindPoint, pipeline->pipeline);
+            primaryBuffer.bindDescriptorSets(pipeline->pipelineBindPoint, pipeline->pipelineLayout, 0, 1, &descSet->descriptorSet, 0, nullptr);
+            primaryBuffer.dispatch(x, y, z);
+        }
+
 	    List<vk::CommandBuffer> buffers[MaxRenderThreads];
 		virtual void QueueNonRenderCommandBuffers(CoreLib::ArrayView<GameEngine::CommandBuffer*> commands) override
 		{
@@ -4898,15 +4908,35 @@ namespace VK
             vk::PipelineStageFlags srcMask = ResourceUsageToPipelineStage(usageBefore, true);
             vk::PipelineStageFlags dstMask = ResourceUsageToPipelineStage(usageAfter, true);
             vk::MemoryBarrier memBar;
-            memBar.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite |
-                vk::AccessFlagBits::eShaderWrite)
-                .setDstAccessMask(vk::AccessFlagBits::eShaderRead);
+            switch (usageBefore)
+            {
+            case ResourceUsage::ComputeAccess:
+            case ResourceUsage::FragmentShaderAccess:
+            case ResourceUsage::NonFragmentShaderGraphicsAccess:
+            case ResourceUsage::GraphicsShaderAccess:
+                memBar.setSrcAccessMask(vk::AccessFlagBits::eShaderWrite);
+                break;
+            case ResourceUsage::RenderAttachmentOutput:
+                memBar.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+                break;
+            }
+            switch (usageAfter)
+            {
+            case ResourceUsage::ComputeAccess:
+            case ResourceUsage::FragmentShaderAccess:
+            case ResourceUsage::NonFragmentShaderGraphicsAccess:
+            case ResourceUsage::GraphicsShaderAccess:
+                memBar.setSrcAccessMask(vk::AccessFlagBits::eShaderRead);
+                break;
+            case ResourceUsage::RenderAttachmentInput:
+                memBar.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentRead);
+                break;
+            }
             primaryBuffer.pipelineBarrier(srcMask, dstMask, vk::DependencyFlags(),
                 vk::ArrayProxy<const vk::MemoryBarrier>(1, &memBar),
                 vk::ArrayProxy<const vk::BufferMemoryBarrier>(0, nullptr),
                 vk::ArrayProxy<const vk::ImageMemoryBarrier>(0, nullptr));
         }
-
 
 		virtual void QueueRenderPass(GameEngine::FrameBuffer* frameBuffer, CoreLib::ArrayView<GameEngine::CommandBuffer*> commands) override
 		{

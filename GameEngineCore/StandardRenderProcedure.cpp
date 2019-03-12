@@ -209,10 +209,9 @@ namespace GameEngine
             sharedModules.View = &viewParams;
             shadowViewInstances.Reserve(1024);
 
-            BuildTiledLightListUniforms buildLightListUniforms;
             lightListBuildingComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("LightTiling.slang", "cs_BuildTiledLightList");
             lightListBuildingComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(lightListBuildingComputeKernel.Ptr(),
-                ArrayView<ResourceBinding>(), &buildLightListUniforms, sizeof(buildLightListUniforms));
+                sizeof(BuildTiledLightListUniforms), true);
         }
         enum class PassType
         {
@@ -432,13 +431,12 @@ namespace GameEngine
             buildLightListUniforms.lightProbeCount = lighting.lightProbes.Count();
             buildLightListUniforms.viewMatrix = viewUniform.ViewTransform;
             buildLightListUniforms.invProjMatrix = invProjMatrix;
-            lightListBuildingComputeTaskInstance->SetUniformData(&buildLightListUniforms, sizeof(buildLightListUniforms));
             Array<ResourceBinding, 4> buildLightListBindings;
             buildLightListBindings.Add(ResourceBinding(preZDepthTexture));
             buildLightListBindings.Add(ResourceBinding(lighting.lightBuffer.Ptr(), 0, lighting.lightBufferSize));
             buildLightListBindings.Add(ResourceBinding(lighting.lightProbeBuffer.Ptr(), 0, lighting.lightProbeBufferSize));
             buildLightListBindings.Add(ResourceBinding(lighting.tiledLightListBufffer.Ptr(), 0, lighting.tiledLightListBufferSize));
-            lightListBuildingComputeTaskInstance->SetBinding(buildLightListBindings.GetArrayView());
+            lightListBuildingComputeTaskInstance->UpdateVersionedParameters(&buildLightListUniforms, sizeof(buildLightListUniforms), buildLightListBindings.GetArrayView());
             lightListBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
             hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeAccess, ResourceUsage::FragmentShaderAccess);
 

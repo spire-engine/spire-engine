@@ -13,20 +13,32 @@ namespace GameEngine
         RefPtr<DescriptorSetLayout> descriptorSetLayout;
     };
 
+    void ComputeTaskInstance::UpdateVersionedParameters(void * data, int size, ArrayView<ResourceBinding> resources)
+    {
+        if (isVersioned)
+        {
+            version++;
+            version = version % DynamicBufferLengthMultiplier;
+        }
+        SetUniformData(data, size);
+        SetBinding(resources);
+    }
+
     void ComputeTaskInstance::SetUniformData(void * data, int size)
     {
-        CoreLib::Diagnostics::DynamicAssert("uniform size mismatch.", size == uniformBufferSize);
-        memcpy(uniformData, data, size);
+        CoreLib::Diagnostics::DynamicAssert("uniform size mismatch.", size <= uniformBufferSize);
+        manager->memory.SetDataAsync(uniformBufferSize * version, data, size);
     }
 
     void ComputeTaskInstance::SetBinding(CoreLib::ArrayView<ResourceBinding> resources)
     {
+        auto descriptorSet = descriptorSets[version].Ptr();
         descriptorSet->BeginUpdate();
         int bindingOffset = 0;
         if (uniformBufferSize)
         {
             bindingOffset = 1;
-            descriptorSet->Update(0, manager->memory.GetBuffer(), (int)((char*)uniformData - (char*)manager->memory.BufferPtr()), uniformBufferSize);
+            descriptorSet->Update(0, manager->memory.GetBuffer(), uniformBufferSize * version, uniformBufferSize);
         }
         for (int i = 0; i < resources.Count(); i++)
         {
@@ -53,17 +65,15 @@ namespace GameEngine
     {
         auto kernelImpl = (ComputeKernelImpl*)kernel;
         cmdBuffer->BindPipeline(kernelImpl->pipeline.Ptr());
-        cmdBuffer->BindDescriptorSet(0, descriptorSet.Ptr());
+        cmdBuffer->BindDescriptorSet(0, descriptorSets[version].Ptr());
         cmdBuffer->DispatchCompute(x, y, z);
     }
 
     void ComputeTaskInstance::Queue(int x, int y, int z)
     {
-        if (!commandBuffer) commandBuffer = manager->hardwareRenderer->CreateCommandBuffer();
-        Dispatch(commandBuffer.Ptr(), x, y, z);
-        manager->hardwareRenderer->QueueNonRenderCommandBuffers(commandBuffer.Ptr());
+        auto kernelImpl = (ComputeKernelImpl*)kernel;
+        manager->hardwareRenderer->QueueComputeTask(kernelImpl->pipeline.Ptr(), descriptorSets[version].Ptr(), x, y, z);
     }
-
 
     void ComputeTaskInstance::Run(CommandBuffer * cmdBuffer, int x, int y, int z, Fence * fence)
     {
@@ -105,19 +115,24 @@ namespace GameEngine
         return kernel.Ptr();
     }
 
-    RefPtr<ComputeTaskInstance> ComputeTaskManager::CreateComputeTaskInstance(ComputeKernel * kernel, CoreLib::ArrayView<ResourceBinding> resources, void * uniformData, int uniformSize)
+    RefPtr<ComputeTaskInstance> ComputeTaskManager::CreateComputeTaskInstance(ComputeKernel * kernel, int uniformSize, bool isVersioned)
     {
         ComputeKernelImpl* kernelImpl = (ComputeKernelImpl*)kernel;
         RefPtr<ComputeTaskInstance> inst = new ComputeTaskInstance();
         inst->manager = this;
-        inst->descriptorSet = hardwareRenderer->CreateDescriptorSet(kernelImpl->descriptorSetLayout.Ptr());
+
+        int align = hardwareRenderer->UniformBufferAlignment();
+        uniformSize = ((uniformSize + align - 1) / align) * align;
+
+        inst->descriptorSets[0] = hardwareRenderer->CreateDescriptorSet(kernelImpl->descriptorSetLayout.Ptr());
+        for (int i = 1; i < DynamicBufferLengthMultiplier; i++)
+            inst->descriptorSets[i] = hardwareRenderer->CreateDescriptorSet(kernelImpl->descriptorSetLayout.Ptr());
+
         inst->kernel = kernel;
+        inst->isVersioned = isVersioned;
         inst->uniformBufferSize = uniformSize;
         if (uniformSize)
-            inst->uniformData = memory.Alloc(uniformSize);
-        if (uniformData)
-            inst->SetUniformData(uniformData, uniformSize);
-        inst->SetBinding(resources);
+            inst->uniformData = memory.Alloc(uniformSize * (isVersioned ? DynamicBufferLengthMultiplier : 1));
         return inst;
     }
 

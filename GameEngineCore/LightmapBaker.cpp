@@ -621,7 +621,9 @@ namespace GameEngine
                 resBindings.Add(ResourceBinding(inputBuffer.Ptr(), 0, inputBufferSize));
                 resBindings.Add(ResourceBinding(outputBuffer.Ptr(), 0, outputBufferSize));
                 inputBuffer->SetData(lm.GetBuffer(), lm.Width*lm.Height * sizeof(float) * 3);
-                auto instance = computeTaskManager->CreateComputeTaskInstance(kernel, resBindings.GetArrayView(), uniformData, sizeof(uniformData));
+                auto instance = computeTaskManager->CreateComputeTaskInstance(kernel, sizeof(uniformData), false);
+                instance->SetBinding(resBindings.GetArrayView());
+                instance->SetUniformData(&uniformData, sizeof(uniformData));
                 instance->Run(cmdBuffer.Ptr(), lm.Width >> 2, lm.Height >> 2, 1, fence.Ptr());
                 fence->Wait();
                 fence->Reset();

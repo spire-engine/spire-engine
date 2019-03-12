@@ -868,6 +868,7 @@ namespace GameEngine
         virtual void BeginJobSubmission() = 0;
 		virtual void QueueRenderPass(FrameBuffer* frameBuffer, CoreLib::ArrayView<CommandBuffer*> commands) = 0;
 		virtual void QueueNonRenderCommandBuffers(CoreLib::ArrayView<CommandBuffer*> commands) = 0;
+        virtual void QueueComputeTask(Pipeline* computePipeline, DescriptorSet* descriptorSet, int x, int y, int z) = 0;
         virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter, CoreLib::ArrayView<ImagePipelineBarrier> barriers) = 0;
         virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter) = 0;
         virtual void EndJobSubmission(GameEngine::Fence* fence) = 0;
