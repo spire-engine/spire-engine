@@ -57,6 +57,14 @@ namespace GameEngine
         cmdBuffer->DispatchCompute(x, y, z);
     }
 
+    void ComputeTaskInstance::Queue(int x, int y, int z)
+    {
+        if (!cmdBuffer) cmdBuffer = manager->hardwareRenderer->CreateCommandBuffer();
+        Dispatch(cmdBuffer.Ptr(), x, y, z);
+        manager->hardwareRenderer->QueueNonRenderCommandBuffers(cmdBuffer.Ptr());
+    }
+
+
     void ComputeTaskInstance::Run(CommandBuffer * cmdBuffer, int x, int y, int z, Fence * fence)
     {
         cmdBuffer->BeginRecording();

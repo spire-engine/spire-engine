@@ -306,12 +306,29 @@ namespace GameEngine
 		}
 		uniformData.lightCount = lights.Count();
 		uniformData.lightProbeCount = lightProbes.Count();
-
+        uniformData.lightListSizePerTile = MaxLightsPerTile;
+        uniformData.lightListTilesX = (w + 15) / 16;
+        uniformData.lightListTilesY = (h + 15) / 16;
 		moduleInstance.SetUniformData(&uniformData, sizeof(uniformData));
 		auto lightPtr = (GpuLightData*)((char*)lightBufferPtr + moduleInstance.GetCurrentVersion() * lightBufferSize);
 		memcpy(lightPtr, lights.Buffer(), lights.Count() * sizeof(GpuLightData));
 		auto lightProbePtr = (GpuLightProbeData*)((char*)lightProbeBufferPtr + moduleInstance.GetCurrentVersion() * lightProbeBufferSize);
 		memcpy(lightProbePtr, lightProbes.Buffer(), Math::Min(MaxEnvMapCount, lightProbes.Count()) * sizeof(GpuLightProbeData));
+
+        int requiredLightListBufferSize = (int)(((w + 15) / 16) * ((h + 15) / 16) * MaxLightsPerTile * sizeof(uint32_t));
+        if (tiledLightListBufferSize < requiredLightListBufferSize)
+        {
+            hw->Wait();
+            tiledLightListBufffer = hw->CreateBuffer(BufferUsage::StorageBuffer, requiredLightListBufferSize);
+            tiledLightListBufferSize = requiredLightListBufferSize;
+            for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
+            {
+                auto descSet = moduleInstance.GetDescriptorSet(i);
+                descSet->BeginUpdate();
+                descSet->Update(7, tiledLightListBufffer.Ptr());
+                descSet->EndUpdate();
+            }
+        }
 	}
 
 

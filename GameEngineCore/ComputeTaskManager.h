@@ -71,12 +71,14 @@ namespace GameEngine
         ComputeTaskManager* manager;
         ComputeKernel* kernel;
         CoreLib::RefPtr<DescriptorSet> descriptorSet;
+        CoreLib::RefPtr<CommandBuffer> cmdBuffer;
         int uniformBufferSize;
         void* uniformData;
     public:
         void SetUniformData(void * data, int size);
         void SetBinding(CoreLib::ArrayView<ResourceBinding> resources);
         void Dispatch(CommandBuffer* cmdBuffer, int x, int y, int z);
+        void Queue(int x, int y, int z);
         void Run(CommandBuffer * cmdBuffer, int x, int y, int z, Fence* fence = nullptr);
         ~ComputeTaskInstance();
     };

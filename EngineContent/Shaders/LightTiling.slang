@@ -5,9 +5,10 @@ struct ClassifyLightTilesParam
 	float4x4 invProjMatrix;
 	float4x4 viewMatrix;
 	int width, height;
-	int lightCount;
+	int lightCount, lightProbeCount;
 	Texture2D<float> depthTexture;
 	StructuredBuffer<Light> lights;
+    StructuredBuffer<LightProbe> lightProbes;
 	RWStructuredBuffer<uint> tiles;
 };
 
@@ -18,10 +19,10 @@ struct ClassifyLightTilesParam
 
 groupshared int lightIndexPtr;
 groupshared uint lightList[LIGHT_LIST_MAX_SIZE];
-groupshared float sharedZMin, sharedZMax;
+groupshared float sharedZMax;
 
 [numthreads(TILE_RES_X, TILE_RES_Y, 1)]
-void cs_ClassifyLightTiles(ParameterBlock<ClassifyLightTilesParam> params, uint3 globalId : SV_DispatchThreadID, uint3 localId : SV_GroupThreadID, uint3 groupId : SV_GroupID)
+void cs_BuildTiledLightList(ParameterBlock<ClassifyLightTilesParam> params, uint3 globalId : SV_DispatchThreadID, uint3 localId : SV_GroupThreadID, uint3 groupId : SV_GroupID)
 {
 	uint localThreadIndex = localId.y * TILE_RES_X + localId.x;
     if (localThreadIndex == 0)
@@ -61,13 +62,11 @@ void cs_ClassifyLightTiles(ParameterBlock<ClassifyLightTilesParam> params, uint3
 	if (curZ != 0.0f)
 	{
 		float originalZ;
-		InterlockedMin(sharedZMin, curZ, originalZ);
 		InterlockedMax(sharedZMax, curZ, originalZ);
 	}
     GroupMemoryBarrierWithGroupSync();
 
 	// step 3: classify lights
-	float zMin = 1.0f / (sharedZMin * params.invProjMatrix._34 + params.invProjMatrix._44);
 	float zMax = 1.0f / (sharedZMax * params.invProjMatrix._34 + params.invProjMatrix._44);
 	for (uint i = localThreadIndex; i < params.lightCount; i += THREAD_GROUP_SIZE)
 	{
@@ -80,7 +79,7 @@ void cs_ClassifyLightTiles(ParameterBlock<ClassifyLightTilesParam> params, uint3
 		intersect = intersect && dot(plane3, viewSpaceLightPos) >= -radius;
 		if (intersect)
 		{
-			if (viewSpaceLightPos.z + radius >= zMin && viewSpaceLightPos.z - radius <= zMax)
+			if (viewSpaceLightPos.z - radius <= zMax)
 			{
 				int ptr = 0;
 				InterlockedAdd(lightIndexPtr, 1, ptr);

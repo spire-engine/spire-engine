@@ -387,6 +387,7 @@ struct LightingEnvironment
     int lightCount;
     int lightProbeCount;
     float4 ambient;
+    int lightListTilesX, lightListTilesY, lightListSizePerTile;
     StructuredBuffer<Light> lights;
     StructuredBuffer<LightProbe> lightProbes;
     SamplerState envMapSampler;
@@ -394,6 +395,7 @@ struct LightingEnvironment
     SamplerComparisonState shadowMapSampler;
     TextureCubeArray envMap;
 	Texture2DArray lightmapArrays[12];
+    StructuredBuffer<uint> tiledLightList;
 };
 
 interface IMaterialPattern

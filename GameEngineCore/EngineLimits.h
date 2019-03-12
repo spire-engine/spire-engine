@@ -3,6 +3,8 @@
 
 namespace GameEngine
 {
+    const int MaxLightsPerTile = 128;
+    const int LightTileSize = 16;
 	const int MaxWorldRenderPasses = 8;
 	const int MaxPostRenderPasses = 32;
 	const int MaxShadowCascades = 8;

@@ -355,6 +355,7 @@
     <None Include="..\EngineContent\Shaders\ForwardBasePass.slang" />
     <None Include="..\EngineContent\Shaders\Gizmo.slang" />
     <None Include="..\EngineContent\Shaders\LightProbePrefilter.slang" />
+    <None Include="..\EngineContent\Shaders\LightTiling.slang" />
     <None Include="..\EngineContent\Shaders\Outline.slang" />
     <None Include="..\EngineContent\Shaders\ShaderLib.slang" />
     <None Include="..\EngineContent\Shaders\ShadowPass.slang" />

@@ -48,6 +48,7 @@ namespace GameEngine
 		int lightCount = 0, lightProbeCount = 0;
 		VectorMath::Vec3 ambient = VectorMath::Vec3::Create(0.2f);
         float padding1;
+        int lightListTilesX, lightListTilesY, lightListSizePerTile;
 	};
 
 	class LightingEnvironment
@@ -68,6 +69,8 @@ namespace GameEngine
 		CoreLib::RefPtr<Buffer> lightBuffer, lightProbeBuffer;
 		CoreLib::List<ModuleInstance> shadowViewInstances;
 		CoreLib::List<Drawable*> drawableBuffer, reorderBuffer;
+        RefPtr<Buffer> tiledLightListBufffer;
+        int tiledLightListBufferSize = 0;
         DeviceLightmapSet * deviceLightmapSet = nullptr;
 		RendererSharedResource * sharedRes;
 		void* lightBufferPtr, *lightProbeBufferPtr;

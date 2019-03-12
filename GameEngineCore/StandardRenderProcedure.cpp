@@ -35,7 +35,15 @@ namespace GameEngine
 		}
 	};
 
-	class StandardRenderProcedure : public IRenderProcedure
+    struct BuildTiledLightListUniforms
+    {
+        VectorMath::Matrix4 invProjMatrix;
+        VectorMath::Matrix4 viewMatrix;
+        int width, height;
+        int lightCount, lightProbeCount;
+    };
+
+    class StandardRenderProcedure : public IRenderProcedure
 	{
 	private:
 		RendererSharedResource * sharedRes = nullptr;
@@ -51,7 +59,6 @@ namespace GameEngine
 		RefPtr<PostRenderPass> toneMappingFromLitColorPass;
         RefPtr<PostRenderPass> editorOutlinePass;
 
-
 		RenderOutput * forwardBaseOutput = nullptr;
 		RenderOutput * transparentAtmosphereOutput = nullptr;
         RenderOutput * customDepthOutput = nullptr;
@@ -60,6 +67,8 @@ namespace GameEngine
 		StandardViewUniforms viewUniform;
 
 		RefPtr<WorldPassRenderTask> forwardBaseInstance, transparentPassInstance, customDepthPassInstance, preZPassInstance, debugGraphicsPassInstance;
+        RefPtr<ComputeKernel> lightListBuildingComputeKernel;
+        RefPtr<ComputeTaskInstance> lightListBuildingComputeTaskInstance;
 
 		DeviceMemory renderPassUniformMemory;
 		SharedModuleInstances sharedModules;
@@ -199,6 +208,11 @@ namespace GameEngine
 			UpdateSharedResourceBinding();
 			sharedModules.View = &viewParams;
 			shadowViewInstances.Reserve(1024);
+
+            BuildTiledLightListUniforms buildLightListUniforms;
+            lightListBuildingComputeKernel = Engine::GetComputeTaskManager()->LoadKernel("LightTiling.slang", "cs_BuildTiledLightList");
+            lightListBuildingComputeTaskInstance = Engine::GetComputeTaskManager()->CreateComputeTaskInstance(lightListBuildingComputeKernel.Ptr(),
+                ArrayView<ResourceBinding>(), &buildLightListUniforms, sizeof(buildLightListUniforms));
 		}
         enum class PassType
         {
@@ -307,6 +321,8 @@ namespace GameEngine
 			Matrix4::CreatePerspectiveMatrixFromViewAngle(mainProjMatrix,
 				params.view.FOV, w / (float)h,
 				params.view.ZNear, params.view.ZFar, ClipSpaceType::ZeroToOne);
+            Matrix4 invProjMatrix;
+            mainProjMatrix.Inverse(invProjMatrix);
 			Matrix4::Multiply(viewUniform.ViewProjectionTransform, mainProjMatrix, viewUniform.ViewTransform);
 			
 			viewUniform.ViewTransform.Inverse(viewUniform.InvViewTransform);
@@ -406,9 +422,25 @@ namespace GameEngine
             sharedRes->pipelineManager.PopModuleInstance();
             preZPassInstance->Execute(hardwareRenderer, *params.renderStats);
             QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
-            
-            // build tiled light list
+            auto preZDepthTexture = textures[0];
 
+            // build tiled light list
+            BuildTiledLightListUniforms buildLightListUniforms;
+            buildLightListUniforms.width = w;
+            buildLightListUniforms.height = h;
+            buildLightListUniforms.lightCount = lighting.lights.Count();
+            buildLightListUniforms.lightProbeCount = lighting.lightProbes.Count();
+            buildLightListUniforms.viewMatrix = viewUniform.ViewTransform;
+            buildLightListUniforms.invProjMatrix = invProjMatrix;
+            lightListBuildingComputeTaskInstance->SetUniformData(&buildLightListUniforms, sizeof(buildLightListUniforms));
+            Array<ResourceBinding, 4> buildLightListBindings;
+            buildLightListBindings.Add(ResourceBinding(preZDepthTexture));
+            buildLightListBindings.Add(ResourceBinding(lighting.lightBuffer.Ptr(), 0, lighting.lightBufferSize));
+            buildLightListBindings.Add(ResourceBinding(lighting.lightProbeBuffer.Ptr(), 0, lighting.lightProbeBufferSize));
+            buildLightListBindings.Add(ResourceBinding(lighting.tiledLightListBufffer.Ptr(), 0, lighting.tiledLightListBufferSize));
+            lightListBuildingComputeTaskInstance->SetBinding(buildLightListBindings.GetArrayView());
+            lightListBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
+            hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeAccess, ResourceUsage::FragmentShaderAccess);
 
             // execute forward lighting pass
             QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), DataDependencyType::RenderTargetToGraphics);
