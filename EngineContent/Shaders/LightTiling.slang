@@ -59,7 +59,7 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
 
 	// step 2: read depth buffer for zMin and zMax
 	
-	float curZ = params.depthTexture.Load(globalId);
+    float curZ = params.depthTexture.Load(globalId);
 	if (curZ != 0.0f)
 	{
 		uint originalZ;
@@ -70,26 +70,31 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
 	// step 3: classify lights
     
     float zMax = asfloat(sharedZMax);
-	zMax = 1.0f / (zMax * params.invProjMatrix[2][3] + params.invProjMatrix[3][3]);
+    zMax = (params.invProjMatrix[2][2]*zMax + params.invProjMatrix[2][3]) / (params.invProjMatrix[3][2] * zMax + params.invProjMatrix[3][3]);
+    float zMin = 0.0f;
+    zMin = (params.invProjMatrix[2][2] * zMin + params.invProjMatrix[2][3]) / (params.invProjMatrix[3][2] * zMin + params.invProjMatrix[3][3]);
 	for (uint i = localThreadIndex; i < params.lightCount; i += THREAD_GROUP_SIZE)
 	{
-		float radius = params.lights[i].radius;
 		float3 viewSpaceLightPos = mul(params.viewMatrix, float4(params.lights[i].position, 1.0f)).xyz;
-		bool intersect = true;
-		intersect = intersect && dot(plane0, viewSpaceLightPos) >= -radius;
-		intersect = intersect && dot(plane1, viewSpaceLightPos) >= -radius;
-		intersect = intersect && dot(plane2, viewSpaceLightPos) >= -radius;
-		intersect = intersect && dot(plane3, viewSpaceLightPos) >= -radius;
-		if (intersect)
-		{
-			if (viewSpaceLightPos.z - radius <= zMax)
-			{
-				int ptr = 0;
-				InterlockedAdd(lightIndexPtr, 1, ptr);
-				if (ptr < LIGHT_LIST_MAX_SIZE - 1)
-					lightList[ptr] = i;
-			}
-		}
+        uint lightType = params.lights[i].lightType_shadowMapId & 65535;
+        float radius = params.lights[i].radius;
+        bool intersect = true;
+        if (radius > 0.0f)
+        {
+            intersect = intersect && dot(plane0, viewSpaceLightPos) >= -radius;
+            intersect = intersect && dot(plane1, viewSpaceLightPos) >= -radius;
+            intersect = intersect && dot(plane2, viewSpaceLightPos) >= -radius;
+            intersect = intersect && dot(plane3, viewSpaceLightPos) >= -radius;
+            intersect = intersect && (viewSpaceLightPos.z >= zMax - radius && viewSpaceLightPos.z <= zMin + radius);
+        }
+        if (intersect)
+        {
+            int ptr = 0;
+            InterlockedAdd(lightIndexPtr, 1, ptr);
+            if (ptr < LIGHT_LIST_MAX_SIZE - 1)
+                lightList[ptr] = i;
+        }
+        
 	}
 
     GroupMemoryBarrierWithGroupSync();
@@ -97,9 +102,9 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
 	// step 4: write to output buffer
 	int numTilesX = (params.width + TILE_RES_X - 1) / TILE_RES_X;
 	for (int i = localThreadIndex; i < min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1); i+= THREAD_GROUP_SIZE)
-		params.tiles[groupId.y * numTilesX + groupId.x + i] = lightList[i];
+		params.tiles[(groupId.y * numTilesX + groupId.x)*LIGHT_LIST_MAX_SIZE + i] = lightList[i];
 	if (localThreadIndex == 0)
 	{
-        params.tiles[groupId.y * numTilesX + groupId.x + min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1)] = 0xFFFFFFFF;
+        params.tiles[(groupId.y * numTilesX + groupId.x)*LIGHT_LIST_MAX_SIZE + min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1)] = 0xFFFFFFFF;
 	}
 }

@@ -20,12 +20,12 @@ namespace GameEngine
 		unsigned short lightType;
 		unsigned short shaderMapId;
 		float radius;
-		float decay;
 		float startAngle;
-		VectorMath::Vec3 position;
 		float endAngle;
-		VectorMath::Vec3 color;
+		VectorMath::Vec3 position;
 		unsigned int direction;
+		VectorMath::Vec3 color;
+        float padding;
 		VectorMath::Matrix4 lightMatrix;
 	};
 

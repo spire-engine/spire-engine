@@ -111,10 +111,9 @@ namespace GameEngine
 					lightData.direction = PackDirection(dirLight->GetDirection());
 					auto localTransform = dirLight->GetLocalTransform();
 					lightData.position = Vec3::Create(localTransform.values[12], localTransform.values[13], localTransform.values[14]);
-					lightData.radius = 0.0f;
+					lightData.radius = dirLight->Radius.GetValue();
 					lightData.startAngle = lightData.endAngle = 0.0f;
 					lightData.shaderMapId = 0xFFFF;
-					lightData.decay = 0.0f;
 					if (dirLight->EnableShadows.GetValue() == 2 && !uniformData.sunLightEnabled)
 					{
 						uniformData.sunLightEnabled = true;
@@ -142,7 +141,6 @@ namespace GameEngine
 					lightData.shaderMapId = 0xFFFF;
                     if (pointLight->EnableShadows.GetValue() == 2)
                         lightData.shaderMapId = 0xFFFE;
-					lightData.decay = 10.0f / (pointLight->DecayDistance90Percent.GetValue() * pointLight->DecayDistance90Percent.GetValue());
 					lights.Add(lightData);
 				}
                 else if (light->lightType == LightType::Ambient)

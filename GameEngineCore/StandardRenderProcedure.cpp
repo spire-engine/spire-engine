@@ -81,7 +81,6 @@ namespace GameEngine
         LightingEnvironment lighting;
         AtmosphereParameters lastAtmosphereParams;
         ToneMappingParameters lastToneMappingParams;
-
         bool useAtmosphere = false;
         bool postProcess = false;
         bool useEnvMap = false;
@@ -274,19 +273,19 @@ namespace GameEngine
             switch (dep)
             {
             case DataDependencyType::RenderTargetToGraphics:
-                hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderAccess, imageBarriers.GetArrayView());
+                hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderRead, imageBarriers.GetArrayView());
                 break;
             case DataDependencyType::ComputeToGraphics:
-                hw->QueuePipelineBarrier(ResourceUsage::ComputeAccess, ResourceUsage::GraphicsShaderAccess, imageBarriers.GetArrayView());
+                hw->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::FragmentShaderRead, imageBarriers.GetArrayView());
                 break;
             case DataDependencyType::RenderTargetToCompute:
-                hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::ComputeAccess, imageBarriers.GetArrayView());
+                hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::ComputeRead, imageBarriers.GetArrayView());
                 break;
             case DataDependencyType::UndefinedToRenderTarget:
-                hw->QueuePipelineBarrier(ResourceUsage::NonFragmentShaderGraphicsAccess, ResourceUsage::All, imageBarriers.GetArrayView());
+                hw->QueuePipelineBarrier(ResourceUsage::FragmentShaderRead, ResourceUsage::All, imageBarriers.GetArrayView());
                 break;
             case DataDependencyType::SampledToRenderTarget:
-                hw->QueuePipelineBarrier(ResourceUsage::NonFragmentShaderGraphicsAccess, ResourceUsage::All, imageBarriers.GetArrayView());
+                hw->QueuePipelineBarrier(ResourceUsage::FragmentShaderRead, ResourceUsage::All, imageBarriers.GetArrayView());
                 break;
             }
         }
@@ -420,7 +419,7 @@ namespace GameEngine
             preZPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
             sharedRes->pipelineManager.PopModuleInstance();
             preZPassInstance->Execute(hardwareRenderer, *params.renderStats);
-            QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
+            QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToCompute);
             auto preZDepthTexture = textures[0];
 
             // build tiled light list
@@ -433,12 +432,12 @@ namespace GameEngine
             buildLightListUniforms.invProjMatrix = invProjMatrix;
             Array<ResourceBinding, 4> buildLightListBindings;
             buildLightListBindings.Add(ResourceBinding(preZDepthTexture));
-            buildLightListBindings.Add(ResourceBinding(lighting.lightBuffer.Ptr(), 0, lighting.lightBufferSize));
-            buildLightListBindings.Add(ResourceBinding(lighting.lightProbeBuffer.Ptr(), 0, lighting.lightProbeBufferSize));
+            buildLightListBindings.Add(ResourceBinding(lighting.lightBuffer.Ptr(), lighting.moduleInstance.GetCurrentVersion()*lighting.lightBufferSize, lighting.lightBufferSize));
+            buildLightListBindings.Add(ResourceBinding(lighting.lightProbeBuffer.Ptr(), lighting.moduleInstance.GetCurrentVersion()*lighting.lightProbeBufferSize, lighting.lightProbeBufferSize));
             buildLightListBindings.Add(ResourceBinding(lighting.tiledLightListBufffer.Ptr(), 0, lighting.tiledLightListBufferSize));
             lightListBuildingComputeTaskInstance->UpdateVersionedParameters(&buildLightListUniforms, sizeof(buildLightListUniforms), buildLightListBindings.GetArrayView());
             lightListBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
-            hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeAccess, ResourceUsage::FragmentShaderAccess);
+            hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::FragmentShaderRead, lighting.tiledLightListBufffer.Ptr());
 
             // execute forward lighting pass
             QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), DataDependencyType::RenderTargetToGraphics);
@@ -511,7 +510,6 @@ namespace GameEngine
                 if (Engine::Instance()->GetEngineMode() == EngineMode::Editor)
                     editorOutlinePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
             }
-
             hardwareRenderer->EndJobSubmission(nullptr);
         }
     };

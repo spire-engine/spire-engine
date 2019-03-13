@@ -28,7 +28,7 @@ namespace GameEngine
     {
         StaticLightType Type;
         VectorMath::Vec3 Position, Direction, Intensity;
-        float SpotFadingStartAngle, SpotFadingEndAngle, Decay, Radius;
+        float SpotFadingStartAngle, SpotFadingEndAngle, Radius;
         bool IncludeDirectLighting;
         bool EnableShadows;
     };

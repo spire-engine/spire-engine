@@ -1,3 +1,5 @@
+static const int MaxLightsPerTile = 128;
+
 struct ViewParams
 {
     float4x4 viewTransform;
@@ -344,12 +346,11 @@ struct Light
 {
     uint lightType_shadowMapId;
     float radius;
-    float decay;
     float startAngle;
-    float3 position;
     float endAngle;
-    float3 color;
+    float3 position;
     uint direction;
+    float3 color;
     float4x4 lightMatrix;
 };
 
@@ -404,7 +405,8 @@ interface IMaterialPattern
 		VertexPositionInfo shadingPoint,
 		ViewParams viewParams,
 		uint lightmapId,
-		float2 lightmapUV);
+		float2 lightmapUV,
+        float4 pixelLocation);
     bool alphaTest();
     float4 getDiffuse();
     [mutating]
@@ -473,7 +475,8 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 		VertexPositionInfo shadingPoint,
 		ViewParams viewParams,
 		uint lightmapId,
-		float2 lightmapUV)
+		float2 lightmapUV,
+        float4 pixelLocation)
 	{
 		float3 color = 0;
 		float3 wnormal = shadingPoint.tangentFrame.TangentSpaceToWorldSpace(normal);
@@ -547,48 +550,68 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 			color += lightEnv.sunLightColor.xyz * dotNL * 
 					(diffuseColor + fspecularColor * PhongApprox(roughness, RoL)) * shadow;
 		}
-		for (int i = 0; i < lightEnv.lightCount; i++)
-		{
-			Light light = lightEnv.lights[i];
-			uint lightType = light.lightType_shadowMapId & 65535;
-			uint shadowMapId = light.lightType_shadowMapId >> 16;
-			float3 lightDir = float3(0.0);
-			float actualDecay = 1.0;
-			if (lightType == 0 || lightType == 2) //point light
-			{
-				float3 path = light.position - shadingPoint.vertPos;
-				float dist = dot(path, path);
-				lightDir = normalize(path);
-				actualDecay = 1.0 / max(1.0, dist * light.decay);
-				if (lightType == 2)
-				{
-					float ang = acos(dot(lightDir, UnpackDir(light.direction)));
-					actualDecay *= lerp(1.0, 0.0, clamp((ang-light.startAngle) / (light.endAngle-light.startAngle), 0.0, 1.0));
-				}
-			}
-			else if (lightType == 1) // directional light
-			{
-				lightDir = UnpackDir(light.direction);
-			}
-			float shadow = selfShadow.get(lightDir);
-            
-			if (shadowMapId != 65535)
-			{
-				float4 lightSpacePosT = mul(light.lightMatrix, float4(shadingPoint.vertPos, 1.0));
-				float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
-				float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler, 
-					float3(lightSpacePos.xy, shadowMapId), lightSpacePos.z);
-				shadow *= val;
-			}
-            
-			float dotNL = clamp(dot(lNormal, lightDir), 0.01, 0.99);
-			float NoV = max(dot(lNormal, view), 0.0);
-			float3 fspecularColor = EnvBRDFApprox(specularColor, roughness, NoV);
-            
-			float RoL = max(0, dot(R, lightDir));
-			color += light.color * (diffuseColor * dotNL + fspecularColor * PhongApprox(roughness, RoL)) * (shadow * actualDecay);
-		}
 
+        int tileX = int(pixelLocation.x / 16);
+        int tileY = int(pixelLocation.y / 16);
+        int lightListOffset = (tileY * lightEnv.lightListTilesX + tileX) * MaxLightsPerTile;
+        int lightCount = 0;
+		for (int i = 0; i < MaxLightsPerTile; i++)
+		{
+            uint bufferContent = lightEnv.tiledLightList[lightListOffset + i];
+            uint lightId = bufferContent & 0xFFFF;
+            if (lightId == 0xFFFF)
+                break;
+            lightCount++;
+			Light light = lightEnv.lights[lightId];
+			float3 path = light.position - shadingPoint.vertPos;
+            float distSquared = dot(path, path);
+            if (light.radius == 0.0f || distSquared < light.radius * light.radius)
+            {
+                uint lightType = light.lightType_shadowMapId & 65535;
+                uint shadowMapId = light.lightType_shadowMapId >> 16;
+                float3 lightDir = float3(0.0);
+                float actualDecay = 1.0;
+                if (light.radius > 0.0f)
+                    actualDecay = lerp(1.0, 0.0, sqrt(sqrt(distSquared / (light.radius * light.radius))));
+                if (lightType == 0 || lightType == 2) //point light
+                {
+                    lightDir = normalize(path);
+                    if (lightType == 2)
+                    {
+                        float ang = acos(dot(lightDir, UnpackDir(light.direction)));
+                        actualDecay *= lerp(1.0, 0.0, clamp((ang - light.startAngle) / (light.endAngle - light.startAngle), 0.0, 1.0));
+                    }
+                }
+                else if (lightType == 1) // directional light
+                {
+                    lightDir = UnpackDir(light.direction);
+                }
+                float shadow = selfShadow.get(lightDir);
+                if (shadowMapId != 65535)
+                {
+                    float4 lightSpacePosT = mul(light.lightMatrix, float4(shadingPoint.vertPos, 1.0));
+                    float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
+                    float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler,
+                        float3(lightSpacePos.xy, shadowMapId), lightSpacePos.z);
+                    shadow *= val;
+                }
+
+                float dotNL = clamp(dot(lNormal, lightDir), 0.01, 0.99);
+                float NoV = max(dot(lNormal, view), 0.0);
+                float3 fspecularColor = EnvBRDFApprox(specularColor, roughness, NoV);
+
+                float RoL = max(0, dot(R, lightDir));
+                color += light.color * (diffuseColor * dotNL + fspecularColor * PhongApprox(roughness, RoL)) * (shadow * actualDecay);
+            }
+		}
+#if 0
+        if (lightCount == 1)
+            color = lerp(color, float3(0.0, 1.0, 0.0), 0.6);
+        else if (lightCount == 2)
+            color = lerp(color, float3(1.0, 1.0, 0.0), 0.6);
+        else if (lightCount == 3)
+            color = lerp(color, float3(1.0, 0.0, 0.0), 0.6);
+#endif
         // find closest light probe
         int lightProbeId = -1;
         float minDist = 1e10;

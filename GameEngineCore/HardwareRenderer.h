@@ -839,7 +839,8 @@ namespace GameEngine
 
     enum class ResourceUsage
     {
-        NonFragmentShaderGraphicsAccess = 1, FragmentShaderAccess = 2, GraphicsShaderAccess = 3, ComputeAccess = 4, 
+        FragmentShaderRead = 1, FragmentShaderWrite = 2, GraphicsShaderRead = 3, GraphicsShaderWrite = 4,
+        ComputeRead = 5, ComputeWrite = 6, 
         RenderAttachmentOutput = 8, RenderAttachmentInput = 16, HostRead = 32, HostWrite = 64,
         All = 0xFFFF
     };
@@ -870,7 +871,7 @@ namespace GameEngine
 		virtual void QueueNonRenderCommandBuffers(CoreLib::ArrayView<CommandBuffer*> commands) = 0;
         virtual void QueueComputeTask(Pipeline* computePipeline, DescriptorSet* descriptorSet, int x, int y, int z) = 0;
         virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter, CoreLib::ArrayView<ImagePipelineBarrier> barriers) = 0;
-        virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter) = 0;
+        virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter, CoreLib::ArrayView<Buffer*> buffers) = 0;
         virtual void EndJobSubmission(GameEngine::Fence* fence) = 0;
 		virtual void Present(WindowSurface * surface, Texture2D* srcImage) = 0;
 		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, VectorMath::Vec2i destOffset) = 0;

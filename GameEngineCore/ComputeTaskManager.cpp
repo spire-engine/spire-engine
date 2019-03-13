@@ -88,7 +88,7 @@ namespace GameEngine
     ComputeTaskInstance::~ComputeTaskInstance()
     {
         if (uniformBufferSize)
-            manager->memory.Free(uniformData, uniformBufferSize);
+            manager->memory.Free(uniformData, uniformBufferSize * (isVersioned?DynamicBufferLengthMultiplier:1));
     }
 
     ComputeKernel * ComputeTaskManager::LoadKernel(CoreLib::String shaderName, CoreLib::String functionName)

@@ -17,6 +17,7 @@ namespace GameEngine
 		LightType lightType;
         PROPERTY_DEF_ATTRIB(int, Mobility, 0, "enum(Static,Stationary,Dynamic)");
         PROPERTY_DEF_ATTRIB(int, EnableShadows, 1, "enum(Disabled,Static,Dynamic)");
+        PROPERTY_DEF(float, Radius, 0.0f);
 		VectorMath::Vec3 GetDirection();
 		virtual EngineActorType GetEngineType() override
 		{

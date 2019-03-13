@@ -123,9 +123,8 @@ namespace GameEngine
                     lightData.Direction = dirLight->GetDirection();
                     auto localTransform = dirLight->GetLocalTransform();
                     lightData.Position = Vec3::Create(localTransform.values[12], localTransform.values[13], localTransform.values[14]);
-                    lightData.Radius = 0.0f;
+                    lightData.Radius = dirLight->Radius.GetValue();
                     lightData.SpotFadingStartAngle = lightData.SpotFadingEndAngle = 0.0f;
-                    lightData.Decay = 0.0f;
                     lightData.EnableShadows = (light->EnableShadows != 0);
                     lightData.IncludeDirectLighting = (light->Mobility == 0);
                     scene->lights.Add(lightData);
@@ -142,7 +141,6 @@ namespace GameEngine
                     lightData.Radius = pointLight->Radius.GetValue();
                     lightData.SpotFadingStartAngle = pointLight->SpotLightStartAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
                     lightData.SpotFadingEndAngle = pointLight->SpotLightEndAngle.GetValue() * (Math::Pi / 180.0f * 0.5f);
-                    lightData.Decay = 10.0f / (pointLight->DecayDistance90Percent.GetValue() * pointLight->DecayDistance90Percent.GetValue());
                     lightData.EnableShadows = (light->EnableShadows != 0);
                     lightData.IncludeDirectLighting = (light->Mobility == 0);
                     scene->lights.Add(lightData);

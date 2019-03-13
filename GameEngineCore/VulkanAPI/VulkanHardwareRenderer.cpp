@@ -4740,16 +4740,16 @@ namespace VK
             case ResourceUsage::All:
                 result = vk::PipelineStageFlagBits::eAllCommands;
                 break;
-            case ResourceUsage::ComputeAccess:
+            case ResourceUsage::ComputeRead:
+            case ResourceUsage::ComputeWrite:
                 result = vk::PipelineStageFlagBits::eComputeShader;
                 break;
-            case ResourceUsage::FragmentShaderAccess:
+            case ResourceUsage::FragmentShaderRead:
+            case ResourceUsage::FragmentShaderWrite:
                 result = vk::PipelineStageFlagBits::eFragmentShader;
                 break;
-            case ResourceUsage::NonFragmentShaderGraphicsAccess:
-                result = vk::PipelineStageFlagBits::eAllGraphics;
-                break;
-            case ResourceUsage::GraphicsShaderAccess:
+            case ResourceUsage::GraphicsShaderRead:
+            case ResourceUsage::GraphicsShaderWrite:
                 result = vk::PipelineStageFlagBits::eAllGraphics;
                 break;
             case ResourceUsage::HostRead:
@@ -4780,18 +4780,15 @@ namespace VK
             case ResourceUsage::All:
                 result = frameBufferAttachmentWriteBit | vk::AccessFlagBits::eShaderWrite;
                 break;
-            case ResourceUsage::ComputeAccess:
+            case ResourceUsage::ComputeRead:
+            case ResourceUsage::FragmentShaderRead:
+            case ResourceUsage::GraphicsShaderRead:
+                result = vk::AccessFlagBits::eShaderRead;
+                break;
+            case ResourceUsage::ComputeWrite:
+            case ResourceUsage::FragmentShaderWrite:
+            case ResourceUsage::GraphicsShaderWrite:
                 result = vk::AccessFlagBits::eShaderWrite;
-                break;
-            case ResourceUsage::FragmentShaderAccess:
-                result = vk::AccessFlagBits::eShaderWrite;
-                break;
-            case ResourceUsage::NonFragmentShaderGraphicsAccess:
-                
-                result = vk::AccessFlagBits::eShaderWrite | frameBufferAttachmentWriteBit;
-                break;
-            case ResourceUsage::GraphicsShaderAccess:
-                result = vk::AccessFlagBits::eShaderWrite | frameBufferAttachmentWriteBit;
                 break;
             case ResourceUsage::HostRead:
                 result = vk::AccessFlagBits::eHostRead;
@@ -4821,18 +4818,15 @@ namespace VK
             case ResourceUsage::All:
                 result = frameBufferAttachmentReadBit | vk::AccessFlagBits::eShaderRead;
                 break;
-            case ResourceUsage::ComputeAccess:
+            case ResourceUsage::ComputeRead:
+            case ResourceUsage::FragmentShaderRead:
+            case ResourceUsage::GraphicsShaderRead:
                 result = vk::AccessFlagBits::eShaderRead;
                 break;
-            case ResourceUsage::FragmentShaderAccess:
-                result = vk::AccessFlagBits::eShaderRead;
-                break;
-            case ResourceUsage::NonFragmentShaderGraphicsAccess:
-
-                result = vk::AccessFlagBits::eShaderRead | frameBufferAttachmentReadBit;
-                break;
-            case ResourceUsage::GraphicsShaderAccess:
-                result = vk::AccessFlagBits::eShaderRead | frameBufferAttachmentReadBit;
+            case ResourceUsage::ComputeWrite:
+            case ResourceUsage::FragmentShaderWrite:
+            case ResourceUsage::GraphicsShaderWrite:
+                result = vk::AccessFlagBits::eShaderWrite;
                 break;
             case ResourceUsage::HostRead:
                 result = vk::AccessFlagBits::eHostRead;
@@ -4902,39 +4896,65 @@ namespace VK
                     vk::ArrayProxy<const vk::ImageMemoryBarrier>(vkBarriers.Count(), vkBarriers.Buffer()));
             }
         }
-        virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter) override
+        List<vk::BufferMemoryBarrier> memoryBarriers[MaxRenderThreads];
+        virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter, CoreLib::ArrayView<GameEngine::Buffer*> deviceBuffers) override
         {
             auto primaryBuffer = jobSubmissionBuffers[renderThreadId];
             vk::PipelineStageFlags srcMask = ResourceUsageToPipelineStage(usageBefore, true);
             vk::PipelineStageFlags dstMask = ResourceUsageToPipelineStage(usageAfter, true);
-            vk::MemoryBarrier memBar;
-            switch (usageBefore)
+            memoryBarriers[renderThreadId].Clear();
+            for (auto buffer : deviceBuffers)
             {
-            case ResourceUsage::ComputeAccess:
-            case ResourceUsage::FragmentShaderAccess:
-            case ResourceUsage::NonFragmentShaderGraphicsAccess:
-            case ResourceUsage::GraphicsShaderAccess:
-                memBar.setSrcAccessMask(vk::AccessFlagBits::eShaderWrite);
-                break;
-            case ResourceUsage::RenderAttachmentOutput:
-                memBar.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-                break;
-            }
-            switch (usageAfter)
-            {
-            case ResourceUsage::ComputeAccess:
-            case ResourceUsage::FragmentShaderAccess:
-            case ResourceUsage::NonFragmentShaderGraphicsAccess:
-            case ResourceUsage::GraphicsShaderAccess:
-                memBar.setSrcAccessMask(vk::AccessFlagBits::eShaderRead);
-                break;
-            case ResourceUsage::RenderAttachmentInput:
-                memBar.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentRead);
-                break;
+                vk::BufferMemoryBarrier memBar;
+                memBar.setBuffer(dynamic_cast<VK::BufferObject*>(buffer)->buffer).setOffset(0).setSize(VK_WHOLE_SIZE)
+                    .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED).setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+                switch (usageBefore)
+                {
+                case ResourceUsage::ComputeRead:
+                case ResourceUsage::FragmentShaderRead:
+                case ResourceUsage::GraphicsShaderRead:
+                    memBar.setSrcAccessMask(vk::AccessFlagBits::eShaderRead);
+                case ResourceUsage::ComputeWrite:
+                case ResourceUsage::FragmentShaderWrite:
+                case ResourceUsage::GraphicsShaderWrite:
+                    memBar.setSrcAccessMask(vk::AccessFlagBits::eShaderWrite);
+                    break;
+                case ResourceUsage::RenderAttachmentOutput:
+                    memBar.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+                    break;
+                case ResourceUsage::HostRead:
+                    memBar.setSrcAccessMask(vk::AccessFlagBits::eHostRead);
+                    break;
+                case ResourceUsage::HostWrite:
+                    memBar.setSrcAccessMask(vk::AccessFlagBits::eHostWrite);
+                    break;
+                }
+                switch (usageAfter)
+                {
+                case ResourceUsage::ComputeRead:
+                case ResourceUsage::FragmentShaderRead:
+                case ResourceUsage::GraphicsShaderRead:
+                    memBar.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
+                case ResourceUsage::ComputeWrite:
+                case ResourceUsage::FragmentShaderWrite:
+                case ResourceUsage::GraphicsShaderWrite:
+                    memBar.setDstAccessMask(vk::AccessFlagBits::eShaderWrite);
+                    break;
+                case ResourceUsage::RenderAttachmentInput:
+                    memBar.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentRead);
+                    break;
+                case ResourceUsage::HostRead:
+                    memBar.setDstAccessMask(vk::AccessFlagBits::eHostRead);
+                    break;
+                case ResourceUsage::HostWrite:
+                    memBar.setDstAccessMask(vk::AccessFlagBits::eHostWrite);
+                    break;
+                }
+                memoryBarriers->Add(memBar);
             }
             primaryBuffer.pipelineBarrier(srcMask, dstMask, vk::DependencyFlags(),
-                vk::ArrayProxy<const vk::MemoryBarrier>(1, &memBar),
-                vk::ArrayProxy<const vk::BufferMemoryBarrier>(0, nullptr),
+                vk::ArrayProxy<const vk::MemoryBarrier>(0, nullptr),
+                vk::ArrayProxy<const vk::BufferMemoryBarrier>(memoryBarriers[renderThreadId].Count(), memoryBarriers[renderThreadId].Buffer()),
                 vk::ArrayProxy<const vk::ImageMemoryBarrier>(0, nullptr));
         }
 

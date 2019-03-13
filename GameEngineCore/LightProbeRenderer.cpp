@@ -185,7 +185,7 @@ namespace GameEngine
             fence->Reset();
 		}
         hw->BeginJobSubmission();
-        hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderAccess, 
+        hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderRead, 
             MakeArrayView(ImagePipelineBarrier(tempEnv.Ptr(), TextureLayout::ColorAttachment, TextureLayout::Sample)));
         hw->EndJobSubmission(nullptr);
 		// prefilter
@@ -285,7 +285,7 @@ namespace GameEngine
 		}
         hw->BeginJobSubmission();
         ImagePipelineBarrier probeTexBarrier(dynamic_cast<GameEngine::Texture*>(dest), TextureLayout::ColorAttachment, TextureLayout::Sample, id * 6, 6);
-        hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderAccess,
+        hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderRead,
             MakeArrayView(probeTexBarrier));
         hw->EndJobSubmission(fence.Ptr());
         fence->Wait();

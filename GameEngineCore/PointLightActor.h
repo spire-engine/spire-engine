@@ -11,12 +11,10 @@ namespace GameEngine
 	protected:
 		virtual Mesh CreateGizmoMesh() override;
 	public:
-		PROPERTY_DEF(float, Radius, 2000.0f);
-		PROPERTY_DEF(float, DecayDistance90Percent, 1200.0f);
 		PROPERTY_DEF(bool, IsSpotLight, false);
 		PROPERTY_DEF(VectorMath::Vec3, Color, VectorMath::Vec3::Create(1.0f, 1.0f, 1.0f));
 		PROPERTY_DEF(float, SpotLightStartAngle, 0.0f);
-		PROPERTY_DEF(float, SpotLightEndAngle, 0.0f);
+		PROPERTY_DEF(float, SpotLightEndAngle, 90.0f);
 		virtual CoreLib::String GetTypeName() override
 		{
 			return "PointLight";

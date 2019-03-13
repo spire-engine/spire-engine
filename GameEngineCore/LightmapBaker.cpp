@@ -21,7 +21,8 @@ namespace GameEngine
     {
     public:
         LightmapBakingSettings settings;
-        LightmapSet lightmaps;
+        LightmapSet lightmaps, lightmapsReturn;
+        ComputeKernel* lightmapComrpessionKernel;
     private:
         struct RawMapSet
         {
@@ -180,11 +181,20 @@ namespace GameEngine
             for (auto & light : staticScene->lights)
             {
                 VectorMath::Vec3 lighting;
+                auto l = light.Position - pos;
+                auto dist = l.Length();
+                float actualDecay = 1.0f;
+                if (light.Radius != 0.0f)
+                {
+                    actualDecay = Lerp(1.0, 0.0f, sqrt(dist / light.Radius));
+                    if (dist > light.Radius)
+                        continue;
+                }
                 switch (light.Type)
                 {
                 case StaticLightType::Directional:
                 {
-                    auto l = light.Direction;
+                    l = light.Direction;
                     auto nDotL = VectorMath::Vec3::Dot(normal, l);
                     Ray shadowRay;
                     shadowRay.tMax = FLT_MAX;
@@ -192,20 +202,19 @@ namespace GameEngine
                     shadowRay.Dir = l;
                     auto p1 = shadowRay.Origin + shadowRay.Dir * 1000.0f;
                     auto shadowFactor = light.EnableShadows ? TraceShadowRay(shadowRay) : VectorMath::Vec3::Create(1.0f);
+                    shadowFactor *= actualDecay;
                     lighting = light.Intensity * shadowFactor * Math::Max(0.0f, nDotL);
                     break;
                 }
                 case StaticLightType::Point:
                 case StaticLightType::Spot:
                 {
-                    auto l = light.Position - pos;
-                    auto dist = l.Length();
-                    if (dist < light.Radius)
+                    if (dist < light.Radius || light.Radius == 0.0f)
                     {
                         auto invDist = 1.0f / dist;
                         l *= invDist;
                         auto nDotL = VectorMath::Vec3::Dot(normal, l);
-                        float actualDecay = 1.0f / Math::Max(1.0f, dist * light.Decay);
+                        
                         if (light.Type == StaticLightType::Spot)
                         {
                             float ang = acos(VectorMath::Vec3::Dot(l, light.Direction));
@@ -605,7 +614,6 @@ namespace GameEngine
         void CompressLightmaps()
         {
             auto computeTaskManager = Engine::GetComputeTaskManager();
-            auto kernel = computeTaskManager->LoadKernel(Engine::Instance()->FindFile("BC6Compression.slang", ResourceType::Shader), "cs_main");
             auto hw = Engine::Instance()->GetRenderer()->GetHardwareRenderer();
             RefPtr<Fence> fence = hw->CreateFence();
             RefPtr<CommandBuffer> cmdBuffer = hw->CreateCommandBuffer();
@@ -621,7 +629,7 @@ namespace GameEngine
                 resBindings.Add(ResourceBinding(inputBuffer.Ptr(), 0, inputBufferSize));
                 resBindings.Add(ResourceBinding(outputBuffer.Ptr(), 0, outputBufferSize));
                 inputBuffer->SetData(lm.GetBuffer(), lm.Width*lm.Height * sizeof(float) * 3);
-                auto instance = computeTaskManager->CreateComputeTaskInstance(kernel, sizeof(uniformData), false);
+                auto instance = computeTaskManager->CreateComputeTaskInstance(lightmapComrpessionKernel, sizeof(uniformData), false);
                 instance->SetBinding(resBindings.GetArrayView());
                 instance->SetUniformData(&uniformData, sizeof(uniformData));
                 instance->Run(cmdBuffer.Ptr(), lm.Width >> 2, lm.Height >> 2, 1, fence.Ptr());
@@ -661,6 +669,7 @@ namespace GameEngine
         void Completed()
         {
             bool cancelled = isCancelled;
+            lightmapsReturn = lightmaps;
             Engine::Instance()->GetMainWindow()->InvokeAsync([this, cancelled]()
             {
                 OnCompleted(cancelled);
@@ -670,6 +679,7 @@ namespace GameEngine
         {
             if (!isCancelled)
             {
+                lightmapsReturn = lightmaps;
                 Engine::Instance()->GetMainWindow()->InvokeAsync([=]()
                 {
                     OnIterationCompleted();
@@ -765,7 +775,7 @@ namespace GameEngine
         }
         virtual LightmapSet& GetLightmapSet() override
         {
-            return lightmaps;
+            return lightmapsReturn;
         }
         virtual void Wait() override
         {
@@ -775,6 +785,11 @@ namespace GameEngine
         {
             isCancelled = true;
             Wait();
+        }
+        LightmapBakerImpl()
+        {
+            auto computeTaskManager = Engine::GetComputeTaskManager();
+            lightmapComrpessionKernel = computeTaskManager->LoadKernel("BC6Compression.slang", "cs_main");
         }
     };
     LightmapBaker * CreateLightmapBaker()
