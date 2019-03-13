@@ -111,7 +111,6 @@
     <ClCompile Include="EnvMapActor.cpp">
       <Filter>Actors</Filter>
     </ClCompile>
-    <ClCompile Include="ImageLayoutTransferTaskPool.cpp" />
     <ClCompile Include="ToneMappingPostRenderPass.cpp">
       <Filter>Renderer\PostProcess</Filter>
     </ClCompile>
@@ -335,9 +334,6 @@
     </ClInclude>
     <ClInclude Include="EnvMapActor.h">
       <Filter>Actors</Filter>
-    </ClInclude>
-    <ClInclude Include="ImageLayoutTransferTaskPool.h">
-      <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="Model.h" />
     <ClInclude Include="Physics.h" />

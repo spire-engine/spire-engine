@@ -3429,7 +3429,7 @@ namespace VK
 			.setDepthCompareOp(TranslateCompareFunc(pipelineBuilder->FixedFunctionStates.DepthCompareFunc))
 			.setDepthBoundsTestEnable(VK_FALSE)
 			.setMinDepthBounds(0.0f)
-			.setMaxDepthBounds(0.0f)
+			.setMaxDepthBounds(1.0f)
 			.setStencilTestEnable(pipelineBuilder->FixedFunctionStates.StencilCompareFunc != CompareFunc::Disabled)
 			.setFront(vk::StencilOpState()
 				.setCompareOp(TranslateCompareFunc(pipelineBuilder->FixedFunctionStates.StencilCompareFunc))

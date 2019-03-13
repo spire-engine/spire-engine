@@ -947,7 +947,7 @@ namespace VectorMath
 		mOut.m[3][3] = 1.0f;
 	}
 
-	inline void Matrix4::CreatePerspectiveMatrix(Matrix4 &mOut, float left, float right, float bottom, float top, float znear, float zfar, ClipSpaceType /*clipSpace*/)
+	inline void Matrix4::CreatePerspectiveMatrix(Matrix4 &mOut, float left, float right, float bottom, float top, float znear, float zfar, ClipSpaceType clipSpace)
 	{
 		memset(&mOut, 0, sizeof(Matrix4));
 		mOut.m[0][0] = (znear*2.0f) / (right - left);
@@ -956,9 +956,16 @@ namespace VectorMath
 		mOut.m[2][1] = (top + bottom) / (top - bottom);
 		mOut.m[2][3] = -1.0f;
 		
-		mOut.m[2][2] = (zfar + znear) / (znear - zfar);
-		mOut.m[3][2] = 2.0f*zfar*znear / (znear - zfar);
-		
+        if (clipSpace == ClipSpaceType::NegativeOneToOne) // for OpenGL
+        {
+		    mOut.m[2][2] = (zfar + znear) / (znear - zfar);
+		    mOut.m[3][2] = 2.0f*zfar*znear / (znear - zfar);
+        }
+        else // for Vulkan
+        {
+            mOut.m[2][2] = zfar / (znear - zfar);
+            mOut.m[3][2] = (zfar*znear) / (znear - zfar);
+        }
 	}
 
 	inline void Matrix4::CreatePerspectiveMatrixFromViewAngle(Matrix4 &mOut, float fovY, float aspect, float zNear, float zFar, ClipSpaceType clipSpace)

@@ -190,7 +190,6 @@
     <ClCompile Include="GizmoActor.cpp" />
     <ClCompile Include="GraphicsSettings.cpp" />
     <ClCompile Include="HardwareInputInterface-Win32.cpp" />
-    <ClCompile Include="ImageLayoutTransferTaskPool.cpp" />
     <ClCompile Include="InputDispatcher.cpp" />
     <ClCompile Include="Level.cpp" />
     <ClCompile Include="LevelEditor.cpp" />
@@ -270,7 +269,6 @@
     <ClInclude Include="Gizmo.h" />
     <ClInclude Include="GizmoActor.h" />
     <ClInclude Include="ComputeTaskManager.h" />
-    <ClInclude Include="ImageLayoutTransferTaskPool.h" />
     <ClInclude Include="LevelEditor.h" />
     <ClInclude Include="LightBinningPass.h" />
     <ClInclude Include="Drawable.h" />

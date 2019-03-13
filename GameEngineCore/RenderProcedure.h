@@ -2,7 +2,6 @@
 #define GAME_ENGINE_RENDER_PROCEDURE_H
 
 #include "RenderContext.h"
-#include "ImageLayoutTransferTaskPool.h"
 
 namespace GameEngine
 {
