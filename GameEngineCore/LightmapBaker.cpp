@@ -168,7 +168,20 @@ namespace GameEngine
         {
             auto inter = staticScene->TraceRay(shadowRay);
             if (inter.IsHit)
-                return VectorMath::Vec3::Create(0.0f, 0.0f, 0.0f);
+            {
+                auto diffuse = maps[inter.MapId].diffuseMap.Sample(inter.UV);
+                if (diffuse.w < 1.0f)
+                {
+                    Ray newShadowRay;
+                    newShadowRay.Origin = shadowRay.Origin + shadowRay.Dir * (inter.T + settings.ShadowBias);
+                    newShadowRay.tMax = shadowRay.tMax - (inter.T + settings.ShadowBias);
+                    newShadowRay.Dir = shadowRay.Dir;
+                    auto rs = TraceShadowRay(newShadowRay);
+                    return diffuse.xyz() * rs * (1.0f - diffuse.w);
+                }
+                else
+                    return VectorMath::Vec3::Create(0.0f, 0.0f, 0.0f);
+            }
 
             return VectorMath::Vec3::Create(1.0f, 1.0f, 1.0f);
         }
@@ -246,6 +259,45 @@ namespace GameEngine
             return VectorMath::Vec3::Create(x, r1, z);
         }
 
+        VectorMath::Vec3 TraceSampleRay(Ray& ray, float minValidDist, bool& isInvalid)
+        {
+            auto inter = staticScene->TraceRay(ray);
+            if (inter.IsHit)
+            {
+                auto surfaceAlbedo = maps[inter.MapId].diffuseMap.Sample(inter.UV);
+                if (surfaceAlbedo.w == 1.0f)
+                {
+                    if (VectorMath::Vec3::Dot(inter.Normal, ray.Dir) < 0.0f)
+                    {
+                        auto directDiffuse = maps[inter.MapId].lightMap.Sample(inter.UV).xyz();
+                        auto indirectDiffuse = maps[inter.MapId].indirectLightmap.Sample(inter.UV).xyz();
+                        auto totalDiffuseLight = directDiffuse + indirectDiffuse;
+                        return totalDiffuseLight * surfaceAlbedo.xyz();
+                    }
+                    else
+                    {
+                        if (inter.T < minValidDist)
+                            isInvalid = true;
+                        return VectorMath::Vec3::Create(0.0f, 0.0f, 0.0f);
+                    }
+                }
+                else
+                {
+                    Ray newRay = ray;
+                    newRay.Origin = ray.Origin + ray.Dir * (inter.T + settings.ShadowBias);
+                    newRay.Dir = ray.Dir;
+                    newRay.tMax = ray.tMax - (inter.T + settings.ShadowBias);
+                    bool isInvalidInner = false;
+                    auto result = TraceSampleRay(newRay, minValidDist, isInvalidInner);
+                    return result * surfaceAlbedo.xyz() * surfaceAlbedo.w;
+                }
+            }
+            else
+            {
+                return staticScene->ambientColor;
+            }
+        }
+
         VectorMath::Vec3 ComputeIndirectLighting(Random & random, VectorMath::Vec3 pos, VectorMath::Vec3 normal, int sampleCount, float minValidDistance, bool & isInvalidRegion)
         {
             VectorMath::Vec3 result;
@@ -263,25 +315,8 @@ namespace GameEngine
                 auto tanDir = UniformSampleHemisphere(r1, r2);
                 ray.Dir = tangent * tanDir.x + normal * tanDir.y + binormal * tanDir.z;
                 ray.tMax = FLT_MAX;
-                auto inter = staticScene->TraceRay(ray);
-                if (inter.IsHit)
-                {
-                    if (VectorMath::Vec3::Dot(inter.Normal, ray.Dir) < 0.0f)
-                    {
-                        auto directDiffuse = maps[inter.MapId].lightMap.Sample(inter.UV).xyz();
-                        auto indirectDiffuse = maps[inter.MapId].indirectLightmap.Sample(inter.UV).xyz();
-                        auto color = directDiffuse + indirectDiffuse;
-                        color *= maps[inter.MapId].diffuseMap.Sample(inter.UV).xyz();
-                        color *= r1;
-                        result += color;
-                    }
-                    else if (inter.T < minValidDistance)
-                        isInvalidRegion = true;
-                }
-                else
-                {
-                    result += staticScene->ambientColor * r1;
-                }
+                auto sampleColor = TraceSampleRay(ray, minValidDistance, isInvalidRegion) * r1;
+                result += sampleColor;
             }
             result *= 2.0f / (float)sampleCount;
             return result;
@@ -579,7 +614,7 @@ namespace GameEngine
             {
                 if (auto staticMeshActor = dynamic_cast<StaticMeshActor*>(actor.Value.Ptr()))
                 {
-                    referencedMeshes.Add(staticMeshActor->MeshFile.GetValue(), staticMeshActor->Mesh);
+                    referencedMeshes.AddIfNotExists(staticMeshActor->MeshFile.GetValue(), staticMeshActor->Mesh);
                 }
             }
             auto list = From(referencedMeshes).ToList();

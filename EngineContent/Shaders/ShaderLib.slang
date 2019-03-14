@@ -408,6 +408,7 @@ interface IMaterialPattern
 		float2 lightmapUV,
         float4 pixelLocation);
     bool alphaTest();
+	bool shadowAlphaTest();
     float4 getDiffuse();
     [mutating]
     void init();
@@ -447,6 +448,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
     float opacity;
     float ao;
     float alphaTestThreshold;
+	float shadowAlphaTestThreshold;
     bool isDoubleSided;
 	TSelfShadow selfShadow;
     [mutating]
@@ -461,6 +463,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
         ao = 1.0;
         isDoubleSided = false;
         alphaTestThreshold = 0.0;
+		shadowAlphaTestThreshold = 0.0;
     }
     float4 getDiffuse()
     {
@@ -470,6 +473,10 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
     {
         return opacity > alphaTestThreshold;
     }
+	bool shadowAlphaTest()
+	{
+		return opacity > shadowAlphaTestThreshold;
+	}
 	float4 computeForwardLighting(
 		LightingEnvironment lightEnv,
 		VertexPositionInfo shadingPoint,

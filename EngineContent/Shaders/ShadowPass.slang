@@ -86,6 +86,6 @@ void ps_main(VSOutput vsOut)
     vattribs.colorSet = vsOut.vertColorSet;
     vattribs.boneWeightSet.setPackedRepresentation(vsOut.vertBoneWeightSet);
     SPECIALIZATION_TYPE_1.MaterialPattern pattern = gMaterial.evalPattern(vin, vattribs, gView);
-    if (!pattern.alphaTest())
+    if (!pattern.shadowAlphaTest())
         discard;
 }

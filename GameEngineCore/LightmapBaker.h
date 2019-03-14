@@ -16,7 +16,7 @@ namespace GameEngine
         int MinResolution = 32;
         int MaxResolution = 1024;
         int IndirectLightingBounces = 8;
-        int SampleCount = 8;
+        int SampleCount = 2;
         int FinalGatherSampleCount = 128;
         float Epsilon = 1e-5f;
         float ShadowBias = 1e-2f;
