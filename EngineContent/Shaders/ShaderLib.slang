@@ -605,12 +605,8 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
             }
 		}
 #if 0
-        if (lightCount == 1)
-            color = lerp(color, float3(0.0, 1.0, 0.0), 0.6);
-        else if (lightCount == 2)
-            color = lerp(color, float3(1.0, 1.0, 0.0), 0.6);
-        else if (lightCount == 3)
-            color = lerp(color, float3(1.0, 0.0, 0.0), 0.6);
+        if (lightCount > 0)
+            color = lerp(color, lerp(float3(0.0, 1.0, 0.0), float3(1.0, 0.0, 0.0), min(float(lightCount)/8.0f,1.0)), 0.6);
 #endif
         // weighted sum over light probes
 		float3 specularIBL = 0.0;
@@ -627,7 +623,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
             float dist = length(shadingPoint.vertPos-lp.position_radius.xyz);
 			float radius = lp.position_radius.w;
 			if (radius == 0.0) radius = 1e7f;
-			float weight = 1000.0/dist;
+			float weight = 10000.0/(dist*dist);
 			weight = lerp(weight, 0.0, max((dist-radius*0.5) / (radius*0.5), 0.0));
             if (dist < radius)
             {

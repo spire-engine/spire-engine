@@ -6,7 +6,9 @@ struct ClassifyLightTilesParam
 	float4x4 viewMatrix;
 	int width, height;
 	int lightCount, lightProbeCount;
-	Texture2D<float> depthTexture;
+	Texture2D<float> maxDepthTexture;
+    Texture2D<float> minDepthTexture;
+
 	StructuredBuffer<Light> lights;
     StructuredBuffer<LightProbe> lightProbes;
 	RWStructuredBuffer<uint> tiles;
@@ -20,7 +22,7 @@ struct ClassifyLightTilesParam
 groupshared int lightIndexPtr;
 groupshared int lightProbeIndexPtr;
 groupshared uint lightList[LIGHT_LIST_MAX_SIZE];
-groupshared uint sharedZMax;
+groupshared uint sharedZMax, sharedZMin;
 
 ParameterBlock<ClassifyLightTilesParam> params;
 
@@ -32,7 +34,8 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
     {
         lightIndexPtr = 0;
 		lightProbeIndexPtr = 0;
-		sharedZMax = 0.0;
+		sharedZMax = 0;
+        sharedZMin = asuint(1.0f);
     }
 
 	// step 1: compute frustum side planes
@@ -61,19 +64,25 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
 
 	// step 2: read depth buffer for zMin and zMax
 	
-    float curZ = params.depthTexture.Load(globalId);
+    float curZ = params.maxDepthTexture.Load(globalId);
 	if (curZ != 0.0f)
 	{
 		uint originalZ;
 		InterlockedMax(sharedZMax, asuint(curZ), originalZ);
+        InterlockedMin(sharedZMin, asuint(curZ), originalZ);
 	}
+    {
+        curZ = params.minDepthTexture.Load(globalId);
+        uint originalZ;
+        InterlockedMin(sharedZMin, asuint(curZ), originalZ);
+    }
     GroupMemoryBarrierWithGroupSync();
 
 	// step 3: classify lights
     
     float zMax = asfloat(sharedZMax);
     zMax = (params.invProjMatrix[2][2]*zMax + params.invProjMatrix[2][3]) / (params.invProjMatrix[3][2] * zMax + params.invProjMatrix[3][3]);
-    float zMin = 0.0f;
+    float zMin = asfloat(sharedZMin);
     zMin = (params.invProjMatrix[2][2] * zMin + params.invProjMatrix[2][3]) / (params.invProjMatrix[3][2] * zMin + params.invProjMatrix[3][3]);
 	for (uint i = localThreadIndex; i < params.lightCount; i += THREAD_GROUP_SIZE)
 	{

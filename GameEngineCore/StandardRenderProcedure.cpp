@@ -63,10 +63,12 @@ namespace GameEngine
         RenderOutput * transparentAtmosphereOutput = nullptr;
         RenderOutput * customDepthOutput = nullptr;
         RenderOutput * preZOutput = nullptr;
+        RenderOutput * preZTransparentOutput = nullptr;
 
         StandardViewUniforms viewUniform;
 
-        RefPtr<WorldPassRenderTask> forwardBaseInstance, transparentPassInstance, customDepthPassInstance, preZPassInstance, debugGraphicsPassInstance;
+        RefPtr<WorldPassRenderTask> forwardBaseInstance, transparentPassInstance, customDepthPassInstance, 
+            preZPassInstance, preZPassTransparentInstance, debugGraphicsPassInstance;
         RefPtr<ComputeKernel> lightListBuildingComputeKernel;
         RefPtr<ComputeTaskInstance> lightListBuildingComputeTaskInstance;
 
@@ -165,6 +167,9 @@ namespace GameEngine
             preZOutput = viewRes->CreateRenderOutput(
                 customDepthRenderPass->GetRenderTargetLayout(),
                 viewRes->LoadSharedRenderTarget("depthBuffer", DepthBufferFormat));
+            preZTransparentOutput = viewRes->CreateRenderOutput(
+                customDepthRenderPass->GetRenderTargetLayout(),
+                viewRes->LoadSharedRenderTarget("depthBufferPreZTransparent", DepthBufferFormat));
 
             atmospherePass = CreateAtmospherePostRenderPass(viewRes);
             atmospherePass->SetSource(MakeArray(
@@ -306,7 +311,7 @@ namespace GameEngine
             customDepthRenderPass->ResetInstancePool();
             customDepthPassInstance = customDepthRenderPass->CreateInstance(customDepthOutput, true);
             preZPassInstance = customDepthRenderPass->CreateInstance(preZOutput, true);
-
+            preZPassTransparentInstance = customDepthRenderPass->CreateInstance(preZTransparentOutput, true);
             float aspect = w / (float)h;
             shadowRenderPass->ResetInstancePool();
 
@@ -413,14 +418,21 @@ namespace GameEngine
             QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
 
             // pre-z pass
+            Array<Texture*, 2> prezTextures;
             preZOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
+            prezTextures.Add(textures[0]);
+            preZTransparentOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
+            prezTextures.Add(textures[0]);
             customDepthRenderPass->Bind();
             sharedRes->pipelineManager.PushModuleInstance(&viewParams);
             preZPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
             sharedRes->pipelineManager.PopModuleInstance();
+            sharedRes->pipelineManager.PushModuleInstance(&viewParams);
+            preZPassTransparentInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Transparent, cameraCullFrustum, false));
+            sharedRes->pipelineManager.PopModuleInstance();
             preZPassInstance->Execute(hardwareRenderer, *params.renderStats);
-            QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToCompute);
-            auto preZDepthTexture = textures[0];
+            preZPassTransparentInstance->Execute(hardwareRenderer, *params.renderStats);
+            QueueImageBarrier(hardwareRenderer, prezTextures.GetArrayView(), DataDependencyType::RenderTargetToCompute);
 
             // build tiled light list
             BuildTiledLightListUniforms buildLightListUniforms;
@@ -430,8 +442,9 @@ namespace GameEngine
             buildLightListUniforms.lightProbeCount = lighting.lightProbes.Count();
             buildLightListUniforms.viewMatrix = viewUniform.ViewTransform;
             buildLightListUniforms.invProjMatrix = invProjMatrix;
-            Array<ResourceBinding, 4> buildLightListBindings;
-            buildLightListBindings.Add(ResourceBinding(preZDepthTexture));
+            Array<ResourceBinding, 5> buildLightListBindings;
+            buildLightListBindings.Add(ResourceBinding(prezTextures[0]));
+            buildLightListBindings.Add(ResourceBinding(prezTextures[1]));
             buildLightListBindings.Add(ResourceBinding(lighting.lightBuffer.Ptr(), lighting.moduleInstance.GetCurrentVersion()*lighting.lightBufferSize, lighting.lightBufferSize));
             buildLightListBindings.Add(ResourceBinding(lighting.lightProbeBuffer.Ptr(), lighting.moduleInstance.GetCurrentVersion()*lighting.lightProbeBufferSize, lighting.lightProbeBufferSize));
             buildLightListBindings.Add(ResourceBinding(lighting.tiledLightListBufffer.Ptr(), 0, lighting.tiledLightListBufferSize));
