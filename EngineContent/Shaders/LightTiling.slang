@@ -18,6 +18,7 @@ struct ClassifyLightTilesParam
 #define LIGHT_LIST_MAX_SIZE 128
 
 groupshared int lightIndexPtr;
+groupshared int lightProbeIndexPtr;
 groupshared uint lightList[LIGHT_LIST_MAX_SIZE];
 groupshared uint sharedZMax;
 
@@ -30,6 +31,7 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
     if (localThreadIndex == 0)
     {
         lightIndexPtr = 0;
+		lightProbeIndexPtr = 0;
 		sharedZMax = 0.0;
     }
 
@@ -76,7 +78,6 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
 	for (uint i = localThreadIndex; i < params.lightCount; i += THREAD_GROUP_SIZE)
 	{
 		float3 viewSpaceLightPos = mul(params.viewMatrix, float4(params.lights[i].position, 1.0f)).xyz;
-        uint lightType = params.lights[i].lightType_shadowMapId & 65535;
         float radius = params.lights[i].radius;
         bool intersect = true;
         if (radius > 0.0f)
@@ -91,20 +92,53 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
         {
             int ptr = 0;
             InterlockedAdd(lightIndexPtr, 1, ptr);
-            if (ptr < LIGHT_LIST_MAX_SIZE - 1)
+            if (ptr < LIGHT_LIST_MAX_SIZE)
                 lightList[ptr] = i;
         }
-        
 	}
 
     GroupMemoryBarrierWithGroupSync();
-
-	// step 4: write to output buffer
-	int numTilesX = (params.width + TILE_RES_X - 1) / TILE_RES_X;
-	for (int i = localThreadIndex; i < min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1); i+= THREAD_GROUP_SIZE)
-		params.tiles[(groupId.y * numTilesX + groupId.x)*LIGHT_LIST_MAX_SIZE + i] = lightList[i];
+	
+	// step 4: classify light probes
+	
+	for (uint i = localThreadIndex; i < params.lightProbeCount; i += THREAD_GROUP_SIZE)
+	{
+		float4 pos_rad = params.lightProbes[i].position_radius;
+		float3 viewSpaceLightPos = mul(params.viewMatrix, float4(pos_rad.xyz, 1.0f)).xyz;
+        float radius = pos_rad.w;
+        bool intersect = true;
+        if (radius > 0.0f)
+        {
+            intersect = intersect && dot(plane0, viewSpaceLightPos) >= -radius;
+            intersect = intersect && dot(plane1, viewSpaceLightPos) >= -radius;
+            intersect = intersect && dot(plane2, viewSpaceLightPos) >= -radius;
+            intersect = intersect && dot(plane3, viewSpaceLightPos) >= -radius;
+            intersect = intersect && (viewSpaceLightPos.z >= zMax - radius && viewSpaceLightPos.z <= zMin + radius);
+        }
+        if (intersect)
+        {
+            int ptr = 0;
+            InterlockedAdd(lightProbeIndexPtr, 1, ptr);
+            if (ptr < LIGHT_LIST_MAX_SIZE)
+			{
+                lightList[ptr] = (i<<16) + (lightList[ptr] & 0xFFFF);
+			}
+        }
+	}
+	
+	GroupMemoryBarrierWithGroupSync();
 	if (localThreadIndex == 0)
 	{
-        params.tiles[(groupId.y * numTilesX + groupId.x)*LIGHT_LIST_MAX_SIZE + min(lightIndexPtr, LIGHT_LIST_MAX_SIZE - 1)] = 0xFFFFFFFF;
+		if (lightIndexPtr < LIGHT_LIST_MAX_SIZE)
+			lightList[lightIndexPtr] |= 0xFFFF;
+		if (lightProbeIndexPtr < LIGHT_LIST_MAX_SIZE)
+			lightList[lightProbeIndexPtr] |= 0xFFFF0000;
 	}
+	GroupMemoryBarrierWithGroupSync();
+
+	// step 5: write to output buffer
+	int numTilesX = (params.width + TILE_RES_X - 1) / TILE_RES_X;
+	uint tileOffset = (groupId.y * numTilesX + groupId.x)*LIGHT_LIST_MAX_SIZE;
+	for (int i = localThreadIndex; i < min(max(lightIndexPtr, lightProbeIndexPtr) + 1, LIGHT_LIST_MAX_SIZE); i+= THREAD_GROUP_SIZE)
+		params.tiles[tileOffset + i] = lightList[i];
 }

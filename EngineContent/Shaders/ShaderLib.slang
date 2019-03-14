@@ -612,35 +612,52 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
         else if (lightCount == 3)
             color = lerp(color, float3(1.0, 0.0, 0.0), 0.6);
 #endif
-        // find closest light probe
-        int lightProbeId = -1;
-        float minDist = 1e10;
-        float3 lpTint = float3(1.0, 1.0, 1.0);
-        
-        for (int i = 0; i < lightEnv.lightProbeCount; i++)
-        {
-            LightProbe lp = lightEnv.lightProbes[i];
+        // weighted sum over light probes
+		float3 specularIBL = 0.0;
+		float3 diffuseIBL = 0.0;
+		float specularWeights = 0.0;
+		float diffuseWeights = 0.0;
+        for (int i = 0; i < MaxLightsPerTile; i++)
+		{
+            uint bufferContent = lightEnv.tiledLightList[lightListOffset + i];
+            uint lightProbeIndex = bufferContent >> 16;
+            if (lightProbeIndex == 0xFFFF)
+                break;
+            LightProbe lp = lightEnv.lightProbes[lightProbeIndex];
             float dist = length(shadingPoint.vertPos-lp.position_radius.xyz);
-            if (dist < lp.position_radius.w && dist < minDist)
+			float radius = lp.position_radius.w;
+			if (radius == 0.0) radius = 1e7f;
+			float weight = 1000.0/dist;
+			weight = lerp(weight, 0.0, max((dist-radius*0.5) / (radius*0.5), 0.0));
+            if (dist < radius)
             {
-                minDist = dist;
-                lightProbeId = asint(lp.tintColor_envMapId.w);
-                lpTint = lp.tintColor_envMapId.xyz;
+                int envMapId = asint(lp.tintColor_envMapId.w);
+                float3 lpTint = lp.tintColor_envMapId.xyz;
+				if (envMapId != -1)
+				{
+					specularIBL += lightEnv.envMap.SampleLevel(lightEnv.envMapSampler, float4(R, float(envMapId)), 
+                                clamp(roughness, 0.0, 1.0) * 6.0).xyz * lpTint * weight;
+					specularWeights += weight;
+					if (lightmapId == 0xFFFFFFFF)
+					{
+						diffuseIBL += (lightEnv.envMap.SampleLevel(lightEnv.envMapSampler, float4(lNormal, float(envMapId)), 
+											6.0).xyz) * lpTint * weight;
+						diffuseWeights += weight;
+					}
+				}
             }
         }
-        
-        if (lightProbeId != -1)
-        {
-            float3 specularIBL = specularColor * lightEnv.envMap.SampleLevel(lightEnv.envMapSampler, float4(R, float(lightProbeId)), 
-                                clamp(roughness, 0.0, 1.0) * 6.0).xyz;
-			color += specularIBL * lpTint;
-			if (lightmapId == 0xFFFFFFFF)
-			{
-				float3 diffuseIBL = diffuseColor * (lightEnv.envMap.SampleLevel(lightEnv.envMapSampler, float4(lNormal, float(lightProbeId)), 
-									6.0).xyz);
-				color += diffuseIBL * lpTint;
-			}
-        }
+		if (specularWeights > 0.0)
+		{
+			specularWeights = 1.0 / specularWeights;
+			color += specularIBL * specularColor * specularWeights;
+		}
+		if (diffuseWeights > 0.0)
+		{
+			diffuseWeights = 1.0 / diffuseWeights;
+			color += diffuseIBL * diffuseColor * diffuseWeights;
+		}
+
         color *= ao;
         return float4(color, opacity);
     }
