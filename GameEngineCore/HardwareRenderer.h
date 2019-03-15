@@ -115,10 +115,10 @@ namespace GameEngine
 		R_F16, R_F32,
 		RG_8, RG_16, RG_I8, RG_I16, RG_I32_Raw,
 		RG_F16, RG_F32,
-		RGBA_8, RGBA_I8, RGBA_16, RGBA_I16, RGBA_I32_Raw,
+		RGBA_8, RGBA_8_SRGB, RGBA_I8, RGBA_16, RGBA_I16, RGBA_I32_Raw,
 		RGBA_F16, RGBA_F32,
 		RGBA_Compressed, R11F_G11F_B10F, RGB10_A2,
-		BC1, BC3, BC5,
+		BC1, BC3, BC5, BC1_SRGB,
 		Depth24, Depth32, Depth24Stencil8,
         BC6H
 	};

@@ -213,7 +213,7 @@ namespace GameEngine
 		auto hw = rendererResource->hardwareRenderer.Ptr();
 
 		GameEngine::Texture2D* rs;
-		if (format == StorageFormat::BC1 || format == StorageFormat::BC5 || format == StorageFormat::BC3)
+		if (format == StorageFormat::BC1 || format == StorageFormat::BC1_SRGB || format == StorageFormat::BC5 || format == StorageFormat::BC3)
 		{
 			Array<void*, 32> mipData;
 			for(int level = 0; level < data.GetMipLevels(); level++)
@@ -622,6 +622,9 @@ namespace GameEngine
 					buffer[i * 16 * 16 + j * 16 + k] = c;
 				}
 		defaultColorLookupTexture->SetData(0, 0, 0, 0, 16, 16, 16, DataType::Byte4, buffer.Buffer());
+
+        histogramBuffer = hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, sizeof(int32_t) * 128);
+        adaptedLuminanceBuffer = hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, sizeof(float) * 1);
 	}
 	void RendererSharedResource::Destroy()
 	{

@@ -178,7 +178,7 @@ namespace GameEngine
 		ShadowMapResource shadowMapResources;
 	public:
 		CoreLib::RefPtr<TextureCubeArray> envMapArray;
-
+        CoreLib::RefPtr<Buffer> histogramBuffer, adaptedLuminanceBuffer;
 		CoreLib::RefPtr<Buffer> fullScreenQuadVertBuffer;
 		DeviceMemory indexBufferMemory, vertexBufferMemory;
 		PipelineContext pipelineManager;

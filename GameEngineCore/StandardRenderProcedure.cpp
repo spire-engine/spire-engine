@@ -10,6 +10,8 @@
 #include "RenderProcedure.h"
 #include "StandardViewUniforms.h"
 #include "LightingData.h"
+#include "BuildHistogram.h"
+#include "EyeAdaptation.h"
 
 using namespace VectorMath;
 
@@ -69,8 +71,12 @@ namespace GameEngine
 
         RefPtr<WorldPassRenderTask> forwardBaseInstance, transparentPassInstance, customDepthPassInstance, 
             preZPassInstance, preZPassTransparentInstance, debugGraphicsPassInstance;
-        RefPtr<ComputeKernel> lightListBuildingComputeKernel;
-        RefPtr<ComputeTaskInstance> lightListBuildingComputeTaskInstance;
+
+        ComputeKernel* lightListBuildingComputeKernel;
+        ComputeKernel* histogramBuildingComputeKernel;
+        ComputeKernel* eyeAdaptationComputeKernel;
+
+        RefPtr<ComputeTaskInstance> lightListBuildingComputeTaskInstance, histogramBuildingComputeTaskInstance, eyeAdaptationComputeTaskInstance;
 
         DeviceMemory renderPassUniformMemory;
         SharedModuleInstances sharedModules;
@@ -204,6 +210,10 @@ namespace GameEngine
                     ).GetArrayView());
                     editorOutlinePass->Init(renderer);
                 }
+                histogramBuildingComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("BuildHistogram.slang", "cs_BuildHistogram");
+                histogramBuildingComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(histogramBuildingComputeKernel, sizeof(BuildHistogramUniforms), true);
+                eyeAdaptationComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("EyeAdaptation.slang", "cs_EyeAdaptation");
+                eyeAdaptationComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(eyeAdaptationComputeKernel, sizeof(EyeAdaptationUniforms), true);
             }
             // initialize forwardBasePassModule and lightingModule
             renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
@@ -214,7 +224,7 @@ namespace GameEngine
             shadowViewInstances.Reserve(1024);
 
             lightListBuildingComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("LightTiling.slang", "cs_BuildTiledLightList");
-            lightListBuildingComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(lightListBuildingComputeKernel.Ptr(),
+            lightListBuildingComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(lightListBuildingComputeKernel,
                 sizeof(BuildTiledLightListUniforms), true);
         }
         enum class PassType
@@ -512,6 +522,40 @@ namespace GameEngine
 
             if (postProcess)
             {
+                // build histogram
+                const int histogramSize = 128;
+                BuildHistogramUniforms buildHistogramUniforms;
+                buildHistogramUniforms.width = w;
+                buildHistogramUniforms.height = h;
+                buildHistogramUniforms.histogramSize = histogramSize;
+                Array<ResourceBinding, 5> buildHistogramBindings;
+                if (useAtmosphere)
+                    transparentAtmosphereOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
+                else
+                    forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
+                buildHistogramBindings.Add(ResourceBinding(textures[0]));
+                buildHistogramBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, sizeof(int32_t)*128));
+                histogramBuildingComputeTaskInstance->UpdateVersionedParameters(&buildHistogramUniforms, sizeof(buildHistogramUniforms), buildHistogramBindings.GetArrayView());
+                histogramBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
+                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, sharedRes->histogramBuffer.Ptr());
+
+                EyeAdaptationUniforms eyeAdaptationUniforms;
+                eyeAdaptationUniforms.adaptSpeed[0] = 0.1f;
+                eyeAdaptationUniforms.adaptSpeed[1] = 0.1f;
+                eyeAdaptationUniforms.height = h;
+                eyeAdaptationUniforms.width = w;
+                eyeAdaptationUniforms.histogramSize = histogramSize;
+                eyeAdaptationUniforms.frameId = Engine::Instance()->GetFrameId();
+                eyeAdaptationUniforms.deltaTime = Engine::Instance()->GetTimeDelta(EngineThread::Rendering);
+                eyeAdaptationUniforms.minLuminance = 0.1f;
+                eyeAdaptationUniforms.maxLuminance = 5.0f;
+                Array<ResourceBinding, 5> eyeAdaptationBindings;
+                eyeAdaptationBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, sizeof(int32_t) * 128));
+                eyeAdaptationBindings.Add(ResourceBinding(sharedRes->adaptedLuminanceBuffer.Ptr(), 0, sizeof(float)));
+                eyeAdaptationComputeTaskInstance->UpdateVersionedParameters(&eyeAdaptationUniforms, sizeof(eyeAdaptationUniforms), eyeAdaptationBindings.GetArrayView());
+                eyeAdaptationComputeTaskInstance->Queue(1, 1, 1);
+                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, sharedRes->adaptedLuminanceBuffer.Ptr());
+
                 if (useAtmosphere)
                 {
                     toneMappingFromAtmospherePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);

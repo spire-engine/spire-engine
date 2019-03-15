@@ -429,6 +429,12 @@
     <ClInclude Include="ComputeTaskManager.h">
       <Filter>Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="BuildHistogram.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="EyeAdaptation.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Actors">
@@ -533,5 +539,16 @@
   <ItemGroup>
     <Natvis Include="core.natvis" />
     <Natvis Include="slang.natvis" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\EngineContent\Shaders\HDRHistogram.slang">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\EngineContent\Shaders\EyeAdaptation.slang">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\EngineContent\Shaders\LuminanceHistogram.slang">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

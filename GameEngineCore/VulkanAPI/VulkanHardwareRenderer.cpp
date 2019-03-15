@@ -850,11 +850,13 @@ namespace VK
 		case StorageFormat::RGBA_F16: return vk::Format::eR16G16B16A16Sfloat;
 		case StorageFormat::RGBA_F32: return vk::Format::eR32G32B32A32Sfloat;
 		case StorageFormat::RGBA_8: return vk::Format::eR8G8B8A8Unorm;
+        case StorageFormat::RGBA_8_SRGB: return vk::Format::eR8G8B8A8Srgb;
 		case StorageFormat::RGBA_16: return vk::Format::eR16G16B16A16Snorm;
 		case StorageFormat::RGBA_I8: return vk::Format::eR8G8B8A8Uint;
 		case StorageFormat::RGBA_I16: return vk::Format::eR16G16B16A16Uint;
 		case StorageFormat::RGBA_I32_Raw: return vk::Format::eR32G32B32A32Sint;//
 		case StorageFormat::BC1: return vk::Format::eBc1RgbUnormBlock;//
+        case StorageFormat::BC1_SRGB: return vk::Format::eBc1RgbSrgbBlock;//
 		case StorageFormat::BC3: return vk::Format::eBc3UnormBlock;
 		case StorageFormat::BC5: return vk::Format::eBc5UnormBlock;
         case StorageFormat::BC6H: return vk::Format::eBc6HUfloatBlock;
@@ -1414,10 +1416,10 @@ namespace VK
 			
 			// Set up staging buffer and copy data to new image
 			int bufferSize = pwidth * pheight * pdepth * layerCount * dataTypeSize;
-			if (format == StorageFormat::BC1 || format == StorageFormat::BC5 || format == StorageFormat::BC3 || format == StorageFormat::BC6H)
+			if (format == StorageFormat::BC1 || format == StorageFormat::BC1_SRGB|| format == StorageFormat::BC5 || format == StorageFormat::BC3 || format == StorageFormat::BC6H)
 			{
 				int blocks = (int)(ceil(pwidth / 4.0f) * ceil(pheight / 4.0f));
-				bufferSize = format == StorageFormat::BC1 ? blocks * 8 : blocks * 16;
+				bufferSize = (format == StorageFormat::BC1||format == StorageFormat::BC1_SRGB) ? blocks * 8 : blocks * 16;
 				bufferSize *= layerCount;
 			}
 
@@ -1557,10 +1559,10 @@ namespace VK
 		{
 			// Set up staging buffer and copy data to new image
 			int bufferSize = 0;
-			if (format == StorageFormat::BC1 || format == StorageFormat::BC5 || format == StorageFormat::BC3)
+			if (format == StorageFormat::BC1 || format == StorageFormat::BC1_SRGB || format == StorageFormat::BC5 || format == StorageFormat::BC3)
 			{
 				int blocks = (int)(ceil(width / 4.0f) * ceil(height / 4.0f));
-				bufferSize = format == StorageFormat::BC1 ? blocks * 8 : blocks * 16;
+				bufferSize = (format == StorageFormat::BC1 || format == StorageFormat::BC1_SRGB) ? blocks * 8 : blocks * 16;
 			}
 			else
 			{

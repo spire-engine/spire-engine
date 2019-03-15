@@ -1,7 +1,7 @@
 #include "Bitmap.h"
 #include "../Stream.h"
 #include "../LibIO.h"
-
+#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "lodepng.h"
 #include "../LibIO.h"
