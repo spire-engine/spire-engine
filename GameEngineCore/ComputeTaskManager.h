@@ -73,7 +73,7 @@ namespace GameEngine
         ComputeKernel* kernel;
         CoreLib::RefPtr<DescriptorSet> descriptorSets[DynamicBufferLengthMultiplier];
         int uniformBufferSize;
-        void* uniformData;
+        int uniformDataPtr;
         int version = 0;
         bool isVersioned = false;
     public:

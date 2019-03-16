@@ -15,7 +15,7 @@ float GetAverageLuminance(StructuredBuffer<uint> histogram, float minPercentile,
 {
     uint totalPixels = width * height;
     uint pixelCount = 0;
-    uint minPercentileCount = uint(minPercentail * totalPixels);
+    uint minPercentileCount = uint(minPercentile * totalPixels);
     uint maxPercentileCount = uint(maxPercentile * totalPixels);
     int avgStartBin = -1;
     int avgEndBin = histogramSize - 1;
@@ -34,7 +34,7 @@ float GetAverageLuminance(StructuredBuffer<uint> histogram, float minPercentile,
         }
     }
     avgStartBin = max(0, avgStartBin);
-    avgEndBin = mix(0, avgEndBin);
+    avgEndBin = min(0, avgEndBin);
     uint sumPixels = 0;
     for (int i = avgStartBin; i <= avgEndBin; i++)
         sumPixels += histogram[i];

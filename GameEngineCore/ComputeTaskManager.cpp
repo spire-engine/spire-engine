@@ -27,7 +27,7 @@ namespace GameEngine
     void ComputeTaskInstance::SetUniformData(void * data, int size)
     {
         CoreLib::Diagnostics::DynamicAssert("uniform size mismatch.", size <= uniformBufferSize);
-        manager->memory.SetDataAsync(uniformBufferSize * version, data, size);
+        manager->memory.SetDataAsync(uniformDataPtr + uniformBufferSize * version, data, size);
     }
 
     void ComputeTaskInstance::SetBinding(CoreLib::ArrayView<ResourceBinding> resources)
@@ -38,7 +38,7 @@ namespace GameEngine
         if (uniformBufferSize)
         {
             bindingOffset = 1;
-            descriptorSet->Update(0, manager->memory.GetBuffer(), uniformBufferSize * version, uniformBufferSize);
+            descriptorSet->Update(0, manager->memory.GetBuffer(), uniformDataPtr + uniformBufferSize * version, uniformBufferSize);
         }
         for (int i = 0; i < resources.Count(); i++)
         {
@@ -88,7 +88,7 @@ namespace GameEngine
     ComputeTaskInstance::~ComputeTaskInstance()
     {
         if (uniformBufferSize)
-            manager->memory.Free(uniformData, uniformBufferSize * (isVersioned?DynamicBufferLengthMultiplier:1));
+            manager->memory.Free((char*)manager->memory.BufferPtr() + uniformDataPtr, uniformBufferSize * (isVersioned?DynamicBufferLengthMultiplier:1));
     }
 
     ComputeKernel * ComputeTaskManager::LoadKernel(CoreLib::String shaderName, CoreLib::String functionName)
@@ -107,7 +107,9 @@ namespace GameEngine
             throw InvalidOperationException(String("Cannot compile compute shader kernel \')") + shaderName + String("'"));
         }
         kernel->shader = hardwareRenderer->CreateShader(ShaderType::ComputeShader, (char*)crs.ShaderCode[0].Buffer(), crs.ShaderCode[0].Count());
-
+        List<DescriptorLayout> descriptors = crs.BindingLayouts[0].Descriptors;
+        for (auto & desc : descriptors)
+            desc.Stages = sfCompute;
         kernel->descriptorSetLayout = hardwareRenderer->CreateDescriptorSetLayout(crs.BindingLayouts[0].Descriptors.GetArrayView());
         RefPtr<PipelineBuilder> pb = hardwareRenderer->CreatePipelineBuilder();
         kernel->pipeline = pb->CreateComputePipeline(MakeArrayView(kernel->descriptorSetLayout.Ptr()), kernel->shader.Ptr());
@@ -132,7 +134,7 @@ namespace GameEngine
         inst->isVersioned = isVersioned;
         inst->uniformBufferSize = uniformSize;
         if (uniformSize)
-            inst->uniformData = memory.Alloc(uniformSize * (isVersioned ? DynamicBufferLengthMultiplier : 1));
+            inst->uniformDataPtr = (int)((char*)memory.Alloc(uniformSize * (isVersioned ? DynamicBufferLengthMultiplier : 1)) - memory.BufferPtr());
         return inst;
     }
 

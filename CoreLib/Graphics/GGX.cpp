@@ -73,24 +73,16 @@ namespace CoreLib
 		{
 			auto data = ComputeTextureFV(maxRoughness, size);
 			TextureFile file;
-			List<unsigned char> udata;
-			udata.SetSize(size * size * 2);
-			for (int i = 0; i < data.Count(); i++)
-			{
-				udata[i * 2] = (unsigned char)Math::Clamp((int)(data[i].x * 255.0f), 0, 255);
-				udata[i * 2 + 1] = (unsigned char)Math::Clamp((int)(data[i].y * 255.0f), 0, 255);
-			}
-			file.SetData(TextureStorageFormat::RG_F32, size, size, 0, udata.GetArrayView());
+            file.Allocate(TextureStorageFormat::RG_F32, size, size, 1, 1);
+            memcpy(file.GetBuffer().Buffer(), data.Buffer(), data.Count() * sizeof(float) * 2);
 			return file;
 		}
 		TextureFile ComputeTextureFileD(float maxRoughness, int size)
 		{
 			auto data = ComputeTextureD(maxRoughness, size);
-			List<unsigned char> udata;
-			udata.SetSize(data.Count() * sizeof(float));
-			memcpy(udata.Buffer(), data.Buffer(), udata.Count());
 			TextureFile file;
-			file.SetData(TextureStorageFormat::R_F32, size, size, 0, udata.GetArrayView());
+            file.Allocate(TextureStorageFormat::R_F32, size, size, 1, 1);
+            memcpy(file.GetBuffer().Buffer(), data.Buffer(), data.Count() * sizeof(float));
 			return file;
 		}
 	}

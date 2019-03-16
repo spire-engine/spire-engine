@@ -5,6 +5,7 @@ struct ToneMappingPassParams
     Texture3D colorLUT;
     SamplerState nearestSampler;
     SamplerState linearSampler;
+    //StructuredBuffer<float> adaptedLuminance;
 };
 
 ParameterBlock<ToneMappingPassParams> params;

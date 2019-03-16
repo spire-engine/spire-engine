@@ -74,50 +74,51 @@ namespace CoreLib
 
 		void CreateTextureFile(CoreLib::Graphics::TextureFile & file, CoreLib::Graphics::TextureStorageFormat storageFormat, TextureData<Color4F>& tex)
 		{
-			List<unsigned char> buffer;
-			for (auto & pix : tex.Levels[0].Pixels)
+            file.Allocate(storageFormat, tex.Width, tex.Height, 1, 1);
+            auto buffer = file.GetBuffer();
+			for (int i = 0; i < tex.Levels[0].Pixels.Count(); i++)
 			{
+                auto pix = tex.Levels[0].Pixels[i];
 				switch (storageFormat)
 				{
 				case CoreLib::Graphics::TextureStorageFormat::R8:
-					buffer.Add((unsigned char)Math::Clamp((pix.x * 255.0f), 0.0f, 255.0f));
+					buffer[i] = ((unsigned char)Math::Clamp((pix.x * 255.0f), 0.0f, 255.0f));
 					break;
 				case CoreLib::Graphics::TextureStorageFormat::RG8:
-					buffer.Add((unsigned char)Math::Clamp((pix.x * 255.0f), 0.0f, 255.0f));
-					buffer.Add((unsigned char)Math::Clamp((pix.y * 255.0f), 0.0f, 255.0f));
+                    buffer[i * 2] = ((unsigned char)Math::Clamp((pix.x * 255.0f), 0.0f, 255.0f));
+                    buffer[i * 2 + 1] = ((unsigned char)Math::Clamp((pix.y * 255.0f), 0.0f, 255.0f));
 					break;
 				case CoreLib::Graphics::TextureStorageFormat::RGB8:
-					buffer.Add((unsigned char)Math::Clamp((pix.x * 255.0f), 0.0f, 255.0f));
-					buffer.Add((unsigned char)Math::Clamp((pix.y * 255.0f), 0.0f, 255.0f));
-					buffer.Add((unsigned char)Math::Clamp((pix.z * 255.0f), 0.0f, 255.0f));
+					buffer[i * 3] = ((unsigned char)Math::Clamp((pix.x * 255.0f), 0.0f, 255.0f));
+					buffer[i * 3 + 1] = ((unsigned char)Math::Clamp((pix.y * 255.0f), 0.0f, 255.0f));
+					buffer[i * 2 + 2] = ((unsigned char)Math::Clamp((pix.z * 255.0f), 0.0f, 255.0f));
 					break;
 				case CoreLib::Graphics::TextureStorageFormat::RGBA8:
-					buffer.Add((unsigned char)Math::Clamp((pix.x * 255.0f), 0.0f, 255.0f));
-					buffer.Add((unsigned char)Math::Clamp((pix.y * 255.0f), 0.0f, 255.0f));
-					buffer.Add((unsigned char)Math::Clamp((pix.z * 255.0f), 0.0f, 255.0f));
-					buffer.Add((unsigned char)Math::Clamp((pix.w * 255.0f), 0.0f, 255.0f));
+					buffer[i * 4] = ((unsigned char)Math::Clamp((pix.x * 255.0f), 0.0f, 255.0f));
+					buffer[i * 4 + 1] = ((unsigned char)Math::Clamp((pix.y * 255.0f), 0.0f, 255.0f));
+					buffer[i * 4 + 2] = ((unsigned char)Math::Clamp((pix.z * 255.0f), 0.0f, 255.0f));
+					buffer[i * 4 + 3] = ((unsigned char)Math::Clamp((pix.w * 255.0f), 0.0f, 255.0f));
 					break;
 				case CoreLib::Graphics::TextureStorageFormat::R_F32:
-					buffer.AddRange((unsigned char*)&pix.x, sizeof(float));
+                    ((float*)buffer.Buffer())[i] = pix.x;
 					break;
 				case CoreLib::Graphics::TextureStorageFormat::RG_F32:
-					buffer.AddRange((unsigned char*)&pix.x, sizeof(float));
-					buffer.AddRange((unsigned char*)&pix.y, sizeof(float));
+                    ((float*)buffer.Buffer())[i * 2] = pix.x;
+                    ((float*)buffer.Buffer())[i * 2 + 1] = pix.y;
 					break;
 				case CoreLib::Graphics::TextureStorageFormat::RGB_F32:
-					buffer.AddRange((unsigned char*)&pix.x, sizeof(float));
-					buffer.AddRange((unsigned char*)&pix.y, sizeof(float));
-					buffer.AddRange((unsigned char*)&pix.z, sizeof(float));
+                    ((float*)buffer.Buffer())[i * 2] = pix.x;
+                    ((float*)buffer.Buffer())[i * 2 + 1] = pix.y;
+                    ((float*)buffer.Buffer())[i * 2 + 2] = pix.z;
 					break;
 				case CoreLib::Graphics::TextureStorageFormat::RGBA_F32:
-					buffer.AddRange((unsigned char*)&pix.x, sizeof(float));
-					buffer.AddRange((unsigned char*)&pix.y, sizeof(float));
-					buffer.AddRange((unsigned char*)&pix.z, sizeof(float));
-					buffer.AddRange((unsigned char*)&pix.w, sizeof(float));
+                    ((float*)buffer.Buffer())[i * 2] = pix.x;
+                    ((float*)buffer.Buffer())[i * 2 + 1] = pix.y;
+                    ((float*)buffer.Buffer())[i * 2 + 2] = pix.z;
+                    ((float*)buffer.Buffer())[i * 2 + 3] = pix.w;
 					break;
 				}
 			}
-			file.SetData(storageFormat, tex.Width, tex.Height, 0, buffer.GetArrayView());
 		}
 
 		void CreateTextureDataFromBitmap(TextureData<Color4F> & tex, BitmapF & image)

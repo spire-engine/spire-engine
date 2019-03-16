@@ -165,9 +165,11 @@ namespace GameEngine
 				postPass = nullptr;
 
 			renderProcedure = nullptr;
+            cubemapRenderProc = nullptr;
 			mainView = nullptr;
 			sceneRes = nullptr;
 			sharedRes.Destroy();
+            computeTaskManager = nullptr;
 		}
 
 		virtual void Wait() override

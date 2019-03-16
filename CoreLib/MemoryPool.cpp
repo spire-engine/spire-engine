@@ -75,6 +75,7 @@ namespace CoreLib
 			bytesWasted += (1 << ((numLevels - order) + log2BlockSize)) - originalSize;
 
 			int blockId = AllocBlock(order);
+
 			if (blockId != -1)
 				return buffer + (blockId << log2BlockSize);
 			else
@@ -89,39 +90,40 @@ namespace CoreLib
 			used.Remove(blockIndex);
 			if (level > 0 && !used.Contains(buddyIndex))
 			{
-				auto buddyPtr = (FreeListNode *)(buffer + ((((int)(ptr - buffer) >> log2BlockSize) ^ (1 << (numLevels - level))) << log2BlockSize));
-				if (buddyPtr->PrevPtr)
-				{
-					buddyPtr->PrevPtr->NextPtr = buddyPtr->NextPtr;
-				}
-				if (buddyPtr->NextPtr)
-				{
-					buddyPtr->NextPtr->PrevPtr = buddyPtr->PrevPtr;
-				}
-				if (freeList[level] == buddyPtr)
-				{
-					freeList[level] = buddyPtr->NextPtr;
-				}
-				// recursively free parent blocks
-				auto parentPtr = Math::Min(buddyPtr, (FreeListNode*)ptr);
-				if (level > 0)
-					FreeBlock((unsigned char*)parentPtr, level - 1);
+                auto buddyPtr = (FreeListNode *)(buffer + ((((int)(ptr - buffer) >> log2BlockSize) ^ (1 << (numLevels - level))) << log2BlockSize));
+                if (buddyPtr->PrevPtr)
+                {
+                    buddyPtr->PrevPtr->NextPtr = buddyPtr->NextPtr;
+                }
+                if (buddyPtr->NextPtr)
+                {
+                    buddyPtr->NextPtr->PrevPtr = buddyPtr->PrevPtr;
+                }
+                if (freeList[level] == buddyPtr)
+                {
+                    freeList[level] = buddyPtr->NextPtr;
+                }
+                // recursively free parent blocks
+                auto parentPtr = Math::Min(buddyPtr, (FreeListNode*)ptr);
+                if (level > 0)
+                    FreeBlock((unsigned char*)parentPtr, level - 1);
 			}
-			else
-			{
-				// insert to freelist
-				auto freeNode = (FreeListNode *)ptr;
-				freeNode->NextPtr = freeList[level];
-				freeNode->PrevPtr = nullptr;
-				if (freeList[level])
-					freeList[level]->PrevPtr = freeNode;
-				freeList[level] = freeNode;
-			}
+            else
+            {
+                // insert to freelist
+                auto freeNode = (FreeListNode *)ptr;
+                freeNode->NextPtr = freeList[level];
+                freeNode->PrevPtr = nullptr;
+                if (freeList[level])
+                    freeList[level]->PrevPtr = freeNode;
+                freeList[level] = freeNode;
+            }
 		}
 		void MemoryPool::Free(unsigned char * ptr, int size)
 		{
 			if (size == 0)
 				return;
+
 			int originalSize = size;
 			if (size < blockSize)
 				size = blockSize;

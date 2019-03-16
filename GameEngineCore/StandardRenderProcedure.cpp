@@ -106,7 +106,9 @@ namespace GameEngine
                 viewRes->DestroyRenderOutput(forwardBaseOutput);
             if (transparentAtmosphereOutput)
                 viewRes->DestroyRenderOutput(transparentAtmosphereOutput);
-
+            histogramBuildingComputeTaskInstance = nullptr;
+            lightListBuildingComputeTaskInstance = nullptr;
+            eyeAdaptationComputeTaskInstance = nullptr;
         }
         virtual RenderTarget* GetOutput() override
         {

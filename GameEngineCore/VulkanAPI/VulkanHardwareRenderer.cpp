@@ -857,8 +857,8 @@ namespace VK
 		case StorageFormat::RGBA_I32_Raw: return vk::Format::eR32G32B32A32Sint;//
 		case StorageFormat::BC1: return vk::Format::eBc1RgbUnormBlock;//
         case StorageFormat::BC1_SRGB: return vk::Format::eBc1RgbSrgbBlock;//
-		case StorageFormat::BC3: return vk::Format::eBc3UnormBlock;
 		case StorageFormat::BC5: return vk::Format::eBc5UnormBlock;
+		case StorageFormat::BC3: return vk::Format::eBc3UnormBlock;
         case StorageFormat::BC6H: return vk::Format::eBc6HUfloatBlock;
 		case StorageFormat::RGBA_Compressed: return vk::Format::eBc7UnormBlock;//
 		case StorageFormat::R11F_G11F_B10F: return vk::Format::eB10G11R11UfloatPack32; // need to swizzle?

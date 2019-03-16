@@ -21,11 +21,11 @@ void cs_ClearHDRHistogram(uint3 threadId : SV_DispatchThreadID)
 void cs_BuildHistogram(uint3 threadId : SV_DispatchThreadID, uint localId : SV_GroupIndex)
 {
     if (localId < params.histogramSize)
-        luminances[localId] = 0.0f;
+        localHistogram[localId] = 0.0f;
 
     GroupMemoryBarrierWithGroupSync();
 
-    if (threadIdx.x < params.width && threadId.y < params.height)
+    if (threadId.x < params.width && threadId.y < params.height)
     {
         float3 data = params.inputTexture.Load(threadId).xyz;
         float l = 0.2126f*data.r + 0.7152f*data.g + 0.0722f*data.b;

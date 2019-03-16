@@ -13,7 +13,7 @@ using namespace CoreLib::Imaging;
 using namespace CoreLib::IO;
 using namespace GameEngine;
 
-void ConvertTexture(const String & fileName, TextureStorageFormat format, bool useSquish)
+void ConvertTexture(const String & fileName, TextureStorageFormat format)
 {
 	if (format == TextureStorageFormat::BC1 || format == TextureStorageFormat::BC5 || format == TextureStorageFormat::BC3)
 	{
@@ -28,9 +28,9 @@ void ConvertTexture(const String & fileName, TextureStorageFormat format, bool u
 		}
 		CoreLib::Graphics::TextureFile texFile;
 		if (format == TextureStorageFormat::BC1)
-			TextureCompressor::CompressRGBA_BC1(texFile, MakeArrayView((unsigned char*)pixelsInversed.Buffer(), pixelsInversed.Count() * 4), bmp.GetWidth(), bmp.GetHeight(), useSquish);
+			TextureCompressor::CompressRGBA_BC1(texFile, MakeArrayView((unsigned char*)pixelsInversed.Buffer(), pixelsInversed.Count() * 4), bmp.GetWidth(), bmp.GetHeight());
 		else if (format == TextureStorageFormat::BC3)
-			TextureCompressor::CompressRGBA_BC3(texFile, MakeArrayView((unsigned char*)pixelsInversed.Buffer(), pixelsInversed.Count() * 4), bmp.GetWidth(), bmp.GetHeight(), useSquish);
+			TextureCompressor::CompressRGBA_BC3(texFile, MakeArrayView((unsigned char*)pixelsInversed.Buffer(), pixelsInversed.Count() * 4), bmp.GetWidth(), bmp.GetHeight());
 		else
 			TextureCompressor::CompressRG_BC5(texFile, MakeArrayView((unsigned char*)pixelsInversed.Buffer(), pixelsInversed.Count() * 4), bmp.GetWidth(), bmp.GetHeight());
 		texFile.SaveToFile(Path::ReplaceExt(fileName, "texture"));
@@ -77,14 +77,11 @@ int wmain(int argc, const wchar_t ** argv)
 {
 	if (argc > 1)
 	{
-		bool useSquish = false;
 		TextureStorageFormat format = TextureStorageFormat::BC1;
 		String fileName = String::FromWString(argv[1]);
 		bool colorLookup = false;
 		for (int i = 0; i < argc; i++)
 		{
-			if (String::FromWString(argv[i]) == "-squish")
-				useSquish = true;
 			if (String::FromWString(argv[i]) == "-bc1")
 				format = TextureStorageFormat::BC1;
 			if (String::FromWString(argv[i]) == "-bc5")
@@ -107,7 +104,7 @@ int wmain(int argc, const wchar_t ** argv)
 		if (colorLookup)
 			CreateColorLookupTexture(fileName);
 		else
-			ConvertTexture(fileName, format, useSquish);
+			ConvertTexture(fileName, format);
 	}
 	else
 	{

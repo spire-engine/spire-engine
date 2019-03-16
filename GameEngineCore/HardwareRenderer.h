@@ -118,7 +118,7 @@ namespace GameEngine
 		RGBA_8, RGBA_8_SRGB, RGBA_I8, RGBA_16, RGBA_I16, RGBA_I32_Raw,
 		RGBA_F16, RGBA_F32,
 		RGBA_Compressed, R11F_G11F_B10F, RGB10_A2,
-		BC1, BC3, BC5, BC1_SRGB,
+		BC1, BC5, BC3, BC1_SRGB,
 		Depth24, Depth32, Depth24Stencil8,
         BC6H
 	};
@@ -238,6 +238,7 @@ namespace GameEngine
 			return 16;
 		case StorageFormat::BC1:
 		case StorageFormat::BC5:
+        case StorageFormat::BC3:
 		case StorageFormat::RGBA_Compressed:
 		default: throw HardwareRendererException("Unsupported storage format.");
 		}

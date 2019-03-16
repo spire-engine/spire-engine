@@ -18,12 +18,12 @@ ParameterBlock<EyeAdaptationParams> params;
 void cs_EyeAdaptation( uint3 DTid : SV_DispatchThreadID )
 {
     float avgLuminance = GetAverageLuminance(params.histogram, 0.8, 0.95, params.histogramSize, params.width, params.height);
-    if (frameId == 0)
-        adaptedLuminance[0] = avgLuminance;
+    if (params.frameId == 0)
+        params.adaptedLuminance[0] = avgLuminance;
     else
     {
-        float lastLuminance = adaptedLuminance[0];
-        float speed = avgLuminance > lastLuminance ? adaptSpeed.x : adaptSpeed.y;
-        adaptedLuminance[0] = clamp(lastLuminance + (avgLuminance - lastLuminance) * (1.0f - exp(-deltaTime * speed)), params.minLuminance, params.maxLuminance);
+        float lastLuminance = params.adaptedLuminance[0];
+        float speed = avgLuminance > lastLuminance ? params.adaptSpeed.x : params.adaptSpeed.y;
+        params.adaptedLuminance[0] = clamp(lastLuminance + (avgLuminance - lastLuminance) * (1.0f - exp(-params.deltaTime * speed)), params.minLuminance, params.maxLuminance);
     }
 }

@@ -157,7 +157,7 @@ namespace GameEngine
 			return value.Ptr();
 		StorageFormat format;
 		DataType dataType = DataType::Byte4;
-		char * textureData = (char*)data.GetData(0).Buffer();
+		char * textureData = (char*)data.GetBuffer().Buffer();
 		CoreLib::List<char> translatedData;
 		switch (data.GetFormat())
 		{
@@ -217,7 +217,7 @@ namespace GameEngine
 		{
 			Array<void*, 32> mipData;
 			for(int level = 0; level < data.GetMipLevels(); level++)
-				mipData.Add(data.GetData(level).Buffer());
+				mipData.Add(data.GetBuffer(level).Buffer());
 			rs = hw->CreateTexture2D(TextureUsage::Sampled, data.GetWidth(), data.GetHeight(), data.GetMipLevels(), format, dataType, mipData.GetArrayView());
 		}
 		else
@@ -267,7 +267,8 @@ namespace GameEngine
 				255,0,255,255,   0,0,0,255,
 				0,0,0,255,       255,0,255,255
 			};
-			errTex.SetData(CoreLib::Graphics::TextureStorageFormat::RGBA8, 2, 2, 0, ArrayView<unsigned char>(errorTexContent, 16));
+            errTex.Allocate(CoreLib::Graphics::TextureStorageFormat::RGBA8, 2, 2, 1, 1);
+            memcpy(errTex.GetBuffer().Buffer(), errorTexContent, sizeof(unsigned char) * 16);
 			return LoadTexture2D("ERROR_TEXTURE", errTex);
 		}
 	}
