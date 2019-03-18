@@ -48,6 +48,8 @@ namespace GameEngine
     class StandardRenderProcedure : public IRenderProcedure
     {
     private:
+        const int histogramSize = 128;
+
         RendererSharedResource * sharedRes = nullptr;
         ViewResource * viewRes = nullptr;
 
@@ -73,10 +75,12 @@ namespace GameEngine
             preZPassInstance, preZPassTransparentInstance, debugGraphicsPassInstance;
 
         ComputeKernel* lightListBuildingComputeKernel;
+        ComputeKernel* clearHistogramComputeKernel;
         ComputeKernel* histogramBuildingComputeKernel;
         ComputeKernel* eyeAdaptationComputeKernel;
 
-        RefPtr<ComputeTaskInstance> lightListBuildingComputeTaskInstance, histogramBuildingComputeTaskInstance, eyeAdaptationComputeTaskInstance;
+        RefPtr<ComputeTaskInstance> lightListBuildingComputeTaskInstance, 
+            clearHistogramComputeTaskInstance, histogramBuildingComputeTaskInstance, eyeAdaptationComputeTaskInstance;
 
         DeviceMemory renderPassUniformMemory;
         SharedModuleInstances sharedModules;
@@ -212,6 +216,12 @@ namespace GameEngine
                     ).GetArrayView());
                     editorOutlinePass->Init(renderer);
                 }
+                clearHistogramComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("ClearHistogram.slang", "cs_ClearHistogram");
+                clearHistogramComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(clearHistogramComputeKernel, sizeof(int), false);
+                clearHistogramComputeTaskInstance->SetUniformData((void*)&histogramSize, sizeof(int));
+                Array<ResourceBinding, 1> clearHistogramBindings;
+                clearHistogramBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, -1));
+                clearHistogramComputeTaskInstance->SetBinding(clearHistogramBindings.GetArrayView());
                 histogramBuildingComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("BuildHistogram.slang", "cs_BuildHistogram");
                 histogramBuildingComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(histogramBuildingComputeKernel, sizeof(BuildHistogramUniforms), true);
                 eyeAdaptationComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("EyeAdaptation.slang", "cs_EyeAdaptation");
@@ -356,6 +366,8 @@ namespace GameEngine
             levelBounds.Min = Vec3::Create(-10.0f);
             levelBounds.Max = Vec3::Create(10.0f);
             ToneMappingParameters toneMappingParameters;
+            EyeAdaptationUniforms eyeAdaptationUniforms;
+            
             for (auto & actor : params.level->Actors)
             {
                 levelBounds.Union(actor.Value->Bounds);
@@ -398,11 +410,17 @@ namespace GameEngine
                 else if (postProcess && actorType == EngineActorType::ToneMapping)
                 {
                     auto toneMappingActor = dynamic_cast<ToneMappingActor*>(actor.Value.Ptr());
-                    toneMappingParameters = toneMappingActor->Parameters;
+                    toneMappingParameters = toneMappingActor->GetToneMappingParameters();
+                    eyeAdaptationUniforms = toneMappingActor->GetEyeAdaptationParameters();
                 }
             }
             if (postProcess)
             {
+                eyeAdaptationUniforms.height = h;
+                eyeAdaptationUniforms.width = w;
+                eyeAdaptationUniforms.histogramSize = histogramSize;
+                eyeAdaptationUniforms.frameId = Engine::Instance()->GetFrameId();
+                eyeAdaptationUniforms.deltaTime = Engine::Instance()->GetTimeDelta(EngineThread::Rendering);
                 if (!(lastToneMappingParams == toneMappingParameters))
                 {
                     toneMappingFromAtmospherePass->SetParameters(&toneMappingParameters, sizeof(toneMappingParameters));
@@ -525,7 +543,8 @@ namespace GameEngine
             if (postProcess)
             {
                 // build histogram
-                const int histogramSize = 128;
+                clearHistogramComputeTaskInstance->Queue(1, 1, 1);
+                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, sharedRes->histogramBuffer.Ptr());
                 BuildHistogramUniforms buildHistogramUniforms;
                 buildHistogramUniforms.width = w;
                 buildHistogramUniforms.height = h;
@@ -541,22 +560,12 @@ namespace GameEngine
                 histogramBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
                 hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, sharedRes->histogramBuffer.Ptr());
 
-                EyeAdaptationUniforms eyeAdaptationUniforms;
-                eyeAdaptationUniforms.adaptSpeed[0] = 0.1f;
-                eyeAdaptationUniforms.adaptSpeed[1] = 0.1f;
-                eyeAdaptationUniforms.height = h;
-                eyeAdaptationUniforms.width = w;
-                eyeAdaptationUniforms.histogramSize = histogramSize;
-                eyeAdaptationUniforms.frameId = Engine::Instance()->GetFrameId();
-                eyeAdaptationUniforms.deltaTime = Engine::Instance()->GetTimeDelta(EngineThread::Rendering);
-                eyeAdaptationUniforms.minLuminance = 0.1f;
-                eyeAdaptationUniforms.maxLuminance = 5.0f;
                 Array<ResourceBinding, 5> eyeAdaptationBindings;
                 eyeAdaptationBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, sizeof(int32_t) * 128));
                 eyeAdaptationBindings.Add(ResourceBinding(sharedRes->adaptedLuminanceBuffer.Ptr(), 0, sizeof(float)));
                 eyeAdaptationComputeTaskInstance->UpdateVersionedParameters(&eyeAdaptationUniforms, sizeof(eyeAdaptationUniforms), eyeAdaptationBindings.GetArrayView());
                 eyeAdaptationComputeTaskInstance->Queue(1, 1, 1);
-                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, sharedRes->adaptedLuminanceBuffer.Ptr());
+                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::FragmentShaderRead, sharedRes->adaptedLuminanceBuffer.Ptr());
 
                 if (useAtmosphere)
                 {

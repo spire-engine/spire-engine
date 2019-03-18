@@ -10,13 +10,6 @@ struct HDRHistogramParams
 groupshared uint localHistogram[256];
 ParameterBlock<HDRHistogramParams> params;
 
-[numthreads(128, 1, 1)]
-void cs_ClearHDRHistogram(uint3 threadId : SV_DispatchThreadID)
-{
-    if (threadId.x < params.histogramSize)
-        params.result[threadId.x] = 0;
-}
-
 [numthreads(16, 16, 1)]
 void cs_BuildHistogram(uint3 threadId : SV_DispatchThreadID, uint localId : SV_GroupIndex)
 {

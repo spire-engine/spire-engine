@@ -535,20 +535,17 @@
     <None Include="..\EngineContent\Shaders\LightTiling.slang">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="..\EngineContent\Shaders\EyeAdaptation.slang" />
+    <None Include="..\EngineContent\Shaders\LuminanceHistogram.slang" />
+    <None Include="..\EngineContent\Shaders\BuildHistogram.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\ClearHistogram.slang">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="core.natvis" />
     <Natvis Include="slang.natvis" />
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="..\EngineContent\Shaders\HDRHistogram.slang">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\EngineContent\Shaders\EyeAdaptation.slang">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\EngineContent\Shaders\LuminanceHistogram.slang">
-      <Filter>Shaders</Filter>
-    </FxCompile>
   </ItemGroup>
 </Project>

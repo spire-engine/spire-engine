@@ -48,7 +48,7 @@ namespace GameEngine
 
 			descSet->Update(3, sharedRes->nearestSampler.Ptr());
 			descSet->Update(4, sharedRes->linearClampedSampler.Ptr());
-
+            descSet->Update(5, sharedRes->adaptedLuminanceBuffer.Ptr());
 			descSet->EndUpdate();
 
 			attachments.SetAttachment(0, colorOutBuffer->Texture.Ptr());

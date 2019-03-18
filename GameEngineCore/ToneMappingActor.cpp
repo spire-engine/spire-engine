@@ -6,14 +6,26 @@ using namespace CoreLib;
 
 namespace GameEngine
 {
+    ToneMappingParameters ToneMappingActor::GetToneMappingParameters()
+    {
+        ToneMappingParameters rs {};
+        rs.Exposure = Exposure.GetValue();
+        rs.lookupTexture = lookupTexture.Ptr();
+        return rs;
+    }
+    EyeAdaptationUniforms ToneMappingActor::GetEyeAdaptationParameters()
+    {
+        EyeAdaptationUniforms rs{};
+        rs.adaptSpeed[0] = AdaptSpeedUp.GetValue();
+        rs.adaptSpeed[1] = AdaptSpeedDown.GetValue();
+        rs.maxLuminance = MaxLuminance.GetValue();
+        rs.minLuminance = MinLuminance.GetValue();
+        return rs;
+    }
     void ToneMappingActor::ColorLUT_Changing(CoreLib::String & newFileName)
     {
         if (!LoadColorLookupTexture(newFileName))
             newFileName = "";
-    }
-    void ToneMappingActor::Exposure_Changed()
-    {
-        Parameters.Exposure = Exposure.GetValue();
     }
     bool ToneMappingActor::LoadColorLookupTexture(CoreLib::String fileName)
 	{
@@ -29,7 +41,6 @@ namespace GameEngine
             hw->Wait();
 			lookupTexture = hw->CreateTexture3D(TextureUsage::Sampled, size, size, size, 1, StorageFormat::RGBA_8);
 			lookupTexture->SetData(0, 0, 0, 0, size, size, size, DataType::Byte4, buffer.Buffer());
-			Parameters.lookupTexture = lookupTexture.Ptr();
             return true;
 		}
         return false;
@@ -37,9 +48,7 @@ namespace GameEngine
     void ToneMappingActor::OnLoad()
     {
         Actor::OnLoad();
-        Exposure.OnChanged.Bind(this, &ToneMappingActor::Exposure_Changed);
         ColorLUT.OnChanging.Bind(this, &ToneMappingActor::ColorLUT_Changing);
-        Exposure_Changed();
         String fileName = ColorLUT.GetValue();
         ColorLUT_Changing(fileName);
     }

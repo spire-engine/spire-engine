@@ -5,12 +5,12 @@ namespace GameEngine
 {
     struct EyeAdaptationUniforms
     {
-        int histogramSize;
-        int width, height;
-        int frameId;
-        float adaptSpeed[2];  // x = up, y = down
-        float deltaTime;
-        float minLuminance, maxLuminance;
+        int histogramSize = 0;
+        int width = 0, height = 0;
+        int frameId = 0;
+        float adaptSpeed[2] = {1.4f, 3.5f};  // x = up, y = down
+        float deltaTime = 0.1f;
+        float minLuminance = 0.1f, maxLuminance = 5.0f;
     };
 }
 

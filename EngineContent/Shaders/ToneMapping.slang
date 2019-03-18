@@ -5,7 +5,7 @@ struct ToneMappingPassParams
     Texture3D colorLUT;
     SamplerState nearestSampler;
     SamplerState linearSampler;
-    //StructuredBuffer<float> adaptedLuminance;
+    StructuredBuffer<float> adaptedLuminance;
 };
 
 ParameterBlock<ToneMappingPassParams> params;
@@ -73,8 +73,9 @@ VertexOut vs_main(VertexIn vin)
 
 float4 ps_main(VertexOut vin)
 {
+    float adaptedIllum = params.adaptedLuminance[0];
     float3 src = params.litColor.Sample(params.nearestSampler, vin.vertUV).xyz;
-    float3 ldr = ACESFitted(src * params.hdrExposure.x);
+    float3 ldr = ACESFitted(src * params.hdrExposure.x / adaptedIllum);
     float3 mapped = params.colorLUT.Sample(params.linearSampler, ldr).xyz;
     return float4(mapped, 1.0);
 }

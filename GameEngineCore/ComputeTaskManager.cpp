@@ -51,8 +51,14 @@ namespace GameEngine
                 descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.samplerBinding);
                 break;
             case ResourceBinding::BindingType::StorageBuffer:
-                descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.storageBufferBinding, resources[i].bufferOffset, resources[i].bufferLength);
+            {
+                int bufLen = resources[i].bufferLength;
+                if (bufLen == -1)
+                    bufLen = resources[i].resourceHandles.storageBufferBinding->GetSize();
+                resources[i].resourceHandles.storageBufferBinding->GetSize();
+                descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.storageBufferBinding, resources[i].bufferOffset, bufLen);
                 break;
+            }
             case ResourceBinding::BindingType::TextureArray:
                 descriptorSet->Update(bindingOffset + i, resources[i].textureArrayBinding, TextureAspect::Color);
                 break;
