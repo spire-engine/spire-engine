@@ -66,7 +66,7 @@ namespace GameEngine
 
 	enum class BindingType
 	{
-		Unused, UniformBuffer, StorageBuffer, Texture, Sampler
+		Unused, UniformBuffer, StorageBuffer, Texture, StorageTexture, Sampler
 	};
 
 	enum class DataType
@@ -146,10 +146,12 @@ namespace GameEngine
 		Nearest, Linear, Trilinear, Anisotropic4x, Anisotropic8x, Anisotropic16x
 	};
 
-	enum class TextureUsage
-	{
-		Unused = 0x0,
-		Sampled = 0x1,
+    enum class TextureUsage
+    {
+        Unused = 0x0,
+        Sampled = 0x1,
+        Storage = 0x10,
+        SampledStorage = 0x11,
 		ColorAttachment = 0x2,
 		SampledColorAttachment = 0x2 | 0x1,
 		DepthAttachment = 0x4,
@@ -723,6 +725,7 @@ namespace GameEngine
 		virtual void BeginUpdate() = 0;
 		virtual void Update(int location, Texture* texture, TextureAspect aspect) = 0;
         virtual void Update(int location, CoreLib::ArrayView<Texture*> texture, TextureAspect aspect) = 0;
+        virtual void UpdateStorageImage(int location, CoreLib::ArrayView<Texture*> texture, TextureAspect aspect) = 0;
 		virtual void Update(int location, TextureSampler* sampler) = 0;
 		virtual void Update(int location, Buffer* buffer, int offset = 0, int length = -1) = 0;
 		virtual void EndUpdate() = 0;

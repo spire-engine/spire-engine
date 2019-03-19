@@ -237,7 +237,7 @@ namespace GameEngine
             }
             throw ArgumentException("Unknown shader type.");
         }
-        BindingType SlangResourceKindToDescriptorType(slang::TypeReflection::Kind k, SlangResourceShape shape)
+        BindingType SlangResourceKindToDescriptorType(slang::TypeReflection::Kind k, SlangResourceShape shape, SlangResourceAccess access)
         {
             switch (k)
             {
@@ -252,8 +252,10 @@ namespace GameEngine
                 case SLANG_BYTE_ADDRESS_BUFFER:
                     return BindingType::StorageBuffer;
                 default:
-                    return BindingType::Texture;
-                    break;
+                    if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+                        return BindingType::StorageTexture;
+                    else
+                        return BindingType::Texture;
                 }
             }
             throw ArgumentException("Unknown slang resource kind.");
@@ -389,12 +391,12 @@ namespace GameEngine
                             desc.Name = field->getName();
                             if (field->getType()->getKind() == slang::TypeReflection::Kind::Array)
                             {
-                                desc.Type = SlangResourceKindToDescriptorType(field->getType()->getElementType()->getKind(), field->getType()->getResourceShape());
+                                desc.Type = SlangResourceKindToDescriptorType(field->getType()->getElementType()->getKind(), field->getType()->getResourceShape(), field->getType()->getResourceAccess());
                                 desc.ArraySize = (int)field->getType()->getElementCount();
                             }
                             else
                             {
-                                desc.Type = SlangResourceKindToDescriptorType(field->getType()->getKind(), field->getType()->getResourceShape());
+                                desc.Type = SlangResourceKindToDescriptorType(field->getType()->getKind(), field->getType()->getResourceShape(), field->getType()->getResourceAccess());
                             }
                             desc.Stages = stageFlags;
                             set.Descriptors.Add(desc);
@@ -513,7 +515,7 @@ namespace GameEngine
                     }
                     else
                         varLayout.BindingLength = 1;
-                    auto bindingType = SlangResourceKindToDescriptorType(kind, field->getType()->getResourceShape());
+                    auto bindingType = SlangResourceKindToDescriptorType(kind, field->getType()->getResourceShape(), field->getType()->getResourceAccess());
                     switch (bindingType)
                     {
                     case BindingType::UniformBuffer:

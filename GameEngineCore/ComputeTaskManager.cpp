@@ -47,6 +47,9 @@ namespace GameEngine
             case ResourceBinding::BindingType::Texture:
                 descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.textureBinding, TextureAspect::Color);
                 break;
+            case ResourceBinding::BindingType::StorageImage:
+                descriptorSet->UpdateStorageImage(bindingOffset + i, resources[i].resourceHandles.textureBinding, TextureAspect::Color);
+                break;
             case ResourceBinding::BindingType::Sampler:
                 descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.samplerBinding);
                 break;
@@ -140,7 +143,7 @@ namespace GameEngine
         inst->isVersioned = isVersioned;
         inst->uniformBufferSize = uniformSize;
         if (uniformSize)
-            inst->uniformDataPtr = (int)((char*)memory.Alloc(uniformSize * (isVersioned ? DynamicBufferLengthMultiplier : 1)) - memory.BufferPtr());
+            inst->uniformDataPtr = (int)((char*)memory.Alloc(uniformSize * (isVersioned ? DynamicBufferLengthMultiplier : 1)) - (char*)memory.BufferPtr());
         return inst;
     }
 

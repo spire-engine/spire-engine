@@ -15,6 +15,7 @@ namespace GameEngine
 		int Layer = 0;
 		float ResolutionScale = 1.0f;
 		bool UseFixedResolution = false;
+        bool EnableUseAsStorageImage = false;
 		int FixedWidth = 1024, FixedHeight = 1024;
 		int Width = 0, Height = 0;
 		RenderTarget() = default;
@@ -51,7 +52,7 @@ namespace GameEngine
 		void UpdateRenderResultFrameBuffer(RenderOutput * output);
 	public:
 		CoreLib::Event<> Resized;
-		CoreLib::RefPtr<RenderTarget> LoadSharedRenderTarget(CoreLib::String name, StorageFormat format, float ratio = 1.0f, int w0 = 1024, int h0 = 1024);
+		CoreLib::RefPtr<RenderTarget> LoadSharedRenderTarget(CoreLib::String name, StorageFormat format, float ratio = 1.0f, int w0 = 1024, int h0 = 1024, bool useAsStorage = false);
 		template<typename ...TRenderTargets>
 		RenderOutput * CreateRenderOutput(RenderTargetLayout * renderTargetLayout, TRenderTargets ... renderTargets)
 		{

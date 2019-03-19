@@ -12,6 +12,7 @@
 #include "LightingData.h"
 #include "BuildHistogram.h"
 #include "EyeAdaptation.h"
+#include "SSAO.h"
 
 using namespace VectorMath;
 
@@ -78,9 +79,15 @@ namespace GameEngine
         ComputeKernel* clearHistogramComputeKernel;
         ComputeKernel* histogramBuildingComputeKernel;
         ComputeKernel* eyeAdaptationComputeKernel;
+        ComputeKernel* ssaoComputeKernel;
+        ComputeKernel* ssaoBlurXComputeKernel;
+        ComputeKernel* ssaoBlurYComputeKernel;
 
         RefPtr<ComputeTaskInstance> lightListBuildingComputeTaskInstance, 
             clearHistogramComputeTaskInstance, histogramBuildingComputeTaskInstance, eyeAdaptationComputeTaskInstance;
+        RefPtr<ComputeTaskInstance> ssaoComputeTaskInstance, ssaoBlurXInstance, ssaoBlurYInstance;
+        RefPtr<RenderTarget> aoRenderTarget, aoBlurTarget;
+        RefPtr<Buffer> randomDirectionBuffer;
 
         DeviceMemory renderPassUniformMemory;
         SharedModuleInstances sharedModules;
@@ -147,6 +154,27 @@ namespace GameEngine
             }
             lighting.UpdateSharedResourceBinding();
         }
+        RefPtr<Buffer> CreateRandomDirectionsBuffer()
+        {
+            size_t bufferSize = sizeof(VectorMath::Vec4) * 16 * 16 * 16;
+            RefPtr<Buffer> rs = sharedRes->hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, (int)bufferSize);
+            List<VectorMath::Vec4> dirs;
+            dirs.SetSize(16 * 16 * 16);
+            Random random(7291);
+            for (int i = 0; i < dirs.Count(); i++)
+            {
+                VectorMath::Vec4 dir;
+                dir.y = random.NextFloat() * 0.8f + 0.2f;
+                float theta = random.NextFloat() * (2.0f * Math::Pi);
+                float s = sqrt(1.0f - dir.y * dir.y);
+                dir.x = s * cos(theta);
+                dir.z = s * sin(theta);
+                dir.w = 1.0f;
+                dirs[i] = dir;
+            }
+            rs->SetDataAsync(0, dirs.Buffer(), (int)bufferSize);
+            return rs;
+        }
         virtual void Init(Renderer * renderer, ViewResource * pViewRes) override
         {
             viewRes = pViewRes;
@@ -194,6 +222,9 @@ namespace GameEngine
 
             if (postProcess)
             {
+                aoRenderTarget = viewRes->LoadSharedRenderTarget("ao", StorageFormat::RG_8, 1.0f, 1024, 1024, true);
+                aoBlurTarget = viewRes->LoadSharedRenderTarget("aoBlur", StorageFormat::RG_8, 1.0f, 1024, 1024, true);
+
                 toneMappingFromAtmospherePass = CreateToneMappingPostRenderPass(viewRes);
                 toneMappingFromAtmospherePass->SetSource(MakeArray(
                     PostPassSource("litAtmosphereColor", StorageFormat::RGBA_F16),
@@ -216,16 +247,26 @@ namespace GameEngine
                     ).GetArrayView());
                     editorOutlinePass->Init(renderer);
                 }
-                clearHistogramComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("ClearHistogram.slang", "cs_ClearHistogram");
-                clearHistogramComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(clearHistogramComputeKernel, sizeof(int), false);
+                auto computeTaskManager = renderer->GetComputeTaskManager();
+                clearHistogramComputeKernel = computeTaskManager->LoadKernel("ClearHistogram.slang", "cs_ClearHistogram");
+                clearHistogramComputeTaskInstance = computeTaskManager->CreateComputeTaskInstance(clearHistogramComputeKernel, sizeof(int), false);
                 clearHistogramComputeTaskInstance->SetUniformData((void*)&histogramSize, sizeof(int));
                 Array<ResourceBinding, 1> clearHistogramBindings;
                 clearHistogramBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, -1));
                 clearHistogramComputeTaskInstance->SetBinding(clearHistogramBindings.GetArrayView());
-                histogramBuildingComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("BuildHistogram.slang", "cs_BuildHistogram");
-                histogramBuildingComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(histogramBuildingComputeKernel, sizeof(BuildHistogramUniforms), true);
-                eyeAdaptationComputeKernel = renderer->GetComputeTaskManager()->LoadKernel("EyeAdaptation.slang", "cs_EyeAdaptation");
-                eyeAdaptationComputeTaskInstance = renderer->GetComputeTaskManager()->CreateComputeTaskInstance(eyeAdaptationComputeKernel, sizeof(EyeAdaptationUniforms), true);
+                histogramBuildingComputeKernel = computeTaskManager->LoadKernel("BuildHistogram.slang", "cs_BuildHistogram");
+                histogramBuildingComputeTaskInstance = computeTaskManager->CreateComputeTaskInstance(histogramBuildingComputeKernel, sizeof(BuildHistogramUniforms), true);
+                eyeAdaptationComputeKernel = computeTaskManager->LoadKernel("EyeAdaptation.slang", "cs_EyeAdaptation");
+                eyeAdaptationComputeTaskInstance = computeTaskManager->CreateComputeTaskInstance(eyeAdaptationComputeKernel, sizeof(EyeAdaptationUniforms), true);
+            
+                ssaoComputeKernel = computeTaskManager->LoadKernel("SSAO.slang", "cs_SSAO");
+                ssaoComputeTaskInstance = computeTaskManager->CreateComputeTaskInstance(ssaoComputeKernel, sizeof(SSAOUniforms), true);
+                ssaoBlurXComputeKernel = computeTaskManager->LoadKernel("SSAO.slang", "cs_SSAOBlurX");
+                ssaoBlurXInstance = computeTaskManager->CreateComputeTaskInstance(ssaoBlurXComputeKernel, sizeof(SSAOUniforms), true);
+                ssaoBlurYComputeKernel = computeTaskManager->LoadKernel("SSAO.slang", "cs_SSAOBlurY");
+                ssaoBlurYInstance = computeTaskManager->CreateComputeTaskInstance(ssaoBlurYComputeKernel, sizeof(SSAOUniforms), true);
+
+                randomDirectionBuffer = CreateRandomDirectionsBuffer();
             }
             // initialize forwardBasePassModule and lightingModule
             renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
@@ -464,6 +505,46 @@ namespace GameEngine
             preZPassTransparentInstance->Execute(hardwareRenderer, *params.renderStats);
             QueueImageBarrier(hardwareRenderer, prezTextures.GetArrayView(), DataDependencyType::RenderTargetToCompute);
 
+            if (postProcess)
+            {
+                // ssao
+                Array<ImagePipelineBarrier, 2> aoImageBarriers;
+                aoImageBarriers.Add(ImagePipelineBarrier(aoRenderTarget->Texture.Ptr(), TextureLayout::Undefined, TextureLayout::General));
+                aoImageBarriers.Add(ImagePipelineBarrier(aoBlurTarget->Texture.Ptr(), TextureLayout::Undefined, TextureLayout::General));
+                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeWrite, aoImageBarriers.GetArrayView());
+                Array<ResourceBinding, 3> ssaoBindings;
+                ssaoBindings.Add(ResourceBinding(prezTextures[0]));
+                ssaoBindings.Add(ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage));
+                ssaoBindings.Add(ResourceBinding(randomDirectionBuffer.Ptr(), 0, -1));
+
+                SSAOUniforms ssaoUniforms;
+                ssaoUniforms.width = w;
+                ssaoUniforms.height = h;
+                ssaoUniforms.ProjMatrix = mainProjMatrix;
+                ssaoUniforms.InvProjMatrix = invProjMatrix;
+                ssaoComputeTaskInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
+                ssaoComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
+                aoImageBarriers.Clear();
+                aoImageBarriers.Add(ImagePipelineBarrier(aoRenderTarget->Texture.Ptr(), TextureLayout::General, TextureLayout::General));
+                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, aoImageBarriers.GetArrayView());
+
+                ssaoBindings[0] = ResourceBinding(aoRenderTarget->Texture.Ptr());
+                ssaoBindings[1] = ResourceBinding(aoBlurTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage);
+                ssaoBlurXInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
+                ssaoBlurXInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
+                aoImageBarriers.Clear();
+                aoImageBarriers.Add(ImagePipelineBarrier(aoBlurTarget->Texture.Ptr(), TextureLayout::General, TextureLayout::General));
+                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, aoImageBarriers.GetArrayView());
+
+                ssaoBindings[0] = ResourceBinding(aoBlurTarget->Texture.Ptr());
+                ssaoBindings[1] = ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage);
+                ssaoBlurYInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
+                ssaoBlurYInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
+                aoImageBarriers.Clear();
+                aoImageBarriers.Add(ImagePipelineBarrier(aoRenderTarget->Texture.Ptr(), TextureLayout::General, TextureLayout::General));
+                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, aoImageBarriers.GetArrayView());
+            }
+
             // build tiled light list
             BuildTiledLightListUniforms buildLightListUniforms;
             buildLightListUniforms.width = w;
@@ -504,6 +585,12 @@ namespace GameEngine
             debugGraphicsPassInstance->Execute(hardwareRenderer, *params.renderStats);
             QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
 
+            if (postProcess)
+            {
+                // composite AO with lit buffer
+
+            }
+
             if (useAtmosphere)
             {
                 atmospherePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
@@ -542,7 +629,12 @@ namespace GameEngine
 
             if (postProcess)
             {
-                // build histogram
+                if (useAtmosphere)
+                    transparentAtmosphereOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
+                else
+                    forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
+                auto lightingOutput = textures[0];
+                // build histogram for eye adaptation
                 clearHistogramComputeTaskInstance->Queue(1, 1, 1);
                 hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, sharedRes->histogramBuffer.Ptr());
                 BuildHistogramUniforms buildHistogramUniforms;
@@ -550,16 +642,13 @@ namespace GameEngine
                 buildHistogramUniforms.height = h;
                 buildHistogramUniforms.histogramSize = histogramSize;
                 Array<ResourceBinding, 5> buildHistogramBindings;
-                if (useAtmosphere)
-                    transparentAtmosphereOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-                else
-                    forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-                buildHistogramBindings.Add(ResourceBinding(textures[0]));
+                buildHistogramBindings.Add(ResourceBinding(lightingOutput));
                 buildHistogramBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, sizeof(int32_t)*128));
                 histogramBuildingComputeTaskInstance->UpdateVersionedParameters(&buildHistogramUniforms, sizeof(buildHistogramUniforms), buildHistogramBindings.GetArrayView());
                 histogramBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
                 hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, sharedRes->histogramBuffer.Ptr());
 
+                // compute adapted luminance
                 Array<ResourceBinding, 5> eyeAdaptationBindings;
                 eyeAdaptationBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, sizeof(int32_t) * 128));
                 eyeAdaptationBindings.Add(ResourceBinding(sharedRes->adaptedLuminanceBuffer.Ptr(), 0, sizeof(float)));
@@ -567,6 +656,7 @@ namespace GameEngine
                 eyeAdaptationComputeTaskInstance->Queue(1, 1, 1);
                 hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::FragmentShaderRead, sharedRes->adaptedLuminanceBuffer.Ptr());
 
+                // tone mapping with adapted luminance
                 if (useAtmosphere)
                 {
                     toneMappingFromAtmospherePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);

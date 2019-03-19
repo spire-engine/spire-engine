@@ -812,6 +812,7 @@ namespace VK
 		poolSizes.Add(vk::DescriptorPoolSize(vk::DescriptorType::eSampledImage, 20000));
 		poolSizes.Add(vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 5000));
 		poolSizes.Add(vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2500));
+        poolSizes.Add(vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, 32));
 
 		vk::DescriptorPoolCreateInfo poolCreateInfo = vk::DescriptorPoolCreateInfo()
 			.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
@@ -956,6 +957,7 @@ namespace VK
 		switch (bindType)
 		{
 		case BindingType::Texture: return vk::DescriptorType::eSampledImage;
+        case BindingType::StorageTexture: return vk::DescriptorType::eStorageImage;
 		case BindingType::Sampler: return vk::DescriptorType::eSampler;
 		case BindingType::UniformBuffer: return vk::DescriptorType::eUniformBuffer; //TODO: dynamic?
 		case BindingType::StorageBuffer: return vk::DescriptorType::eStorageBuffer; //TODO: ^
@@ -990,6 +992,9 @@ namespace VK
 			return vk::ImageLayout::eDepthStencilAttachmentOptimal;
 		case TextureUsage::Sampled:
 			return vk::ImageLayout::eShaderReadOnlyOptimal;
+        case TextureUsage::Storage:
+        case TextureUsage::SampledStorage:
+            return vk::ImageLayout::eGeneral;
 		default: throw CoreLib::NotImplementedException("LayoutFromUsage");
 		}
 	}
@@ -1193,6 +1198,10 @@ namespace VK
 			{
 				usageFlags |= vk::ImageUsageFlagBits::eSampled;
 			}
+            if (!!(this->usage & TextureUsage::Storage))
+            {
+                usageFlags |= vk::ImageUsageFlagBits::eStorage;
+            }
 
 			vk::ImageCreateInfo imageCreateInfo = vk::ImageCreateInfo()
 				.setFlags(createFlags)
@@ -3042,7 +3051,7 @@ namespace VK
                     VK::Texture* internalTexture = dynamic_cast<VK::Texture*>(texture);
 
                     vk::ImageView view = internalTexture->views[0];
-                    if (isDepthFormat(internalTexture->format) && aspect == TextureAspect::Depth)
+                    if (isDepthFormat(internalTexture->format)/* && aspect == TextureAspect::Depth*/)
                         view = internalTexture->views[1];
                     if (internalTexture->format == StorageFormat::Depth24Stencil8 &&  aspect == TextureAspect::Stencil)
                         view = internalTexture->views[2];
@@ -3070,6 +3079,50 @@ namespace VK
                 .setDstArrayElement(0)
                 .setDescriptorCount(textures.Count())
                 .setDescriptorType(vk::DescriptorType::eSampledImage)
+                .setPImageInfo(imageInfo.Buffer() + imageInfoStart)
+                .setPBufferInfo(nullptr)
+                .setPTexelBufferView(nullptr)
+            );
+        }
+
+        virtual void UpdateStorageImage(int location, ArrayView<GameEngine::Texture*> textures, TextureAspect aspect) override
+        {
+            int imageInfoStart = imageInfo.Count();
+            for (auto texture : textures)
+            {
+                if (texture)
+                {
+                    VK::Texture* internalTexture = dynamic_cast<VK::Texture*>(texture);
+
+                    vk::ImageView view = internalTexture->views[0];
+                    if (isDepthFormat(internalTexture->format) /*&& aspect == TextureAspect::Depth*/)
+                        view = internalTexture->views[1];
+                    if (internalTexture->format == StorageFormat::Depth24Stencil8 &&  aspect == TextureAspect::Stencil)
+                        view = internalTexture->views[2];
+
+                    imageInfo.Add(
+                        vk::DescriptorImageInfo()
+                        .setSampler(vk::Sampler())
+                        .setImageView(view)
+                        .setImageLayout(vk::ImageLayout::eGeneral)//
+                    );
+                }
+                else
+                    imageInfo.Add(
+                        vk::DescriptorImageInfo()
+                        .setSampler(vk::Sampler())
+                        .setImageView(vk::ImageView())
+                        .setImageLayout(vk::ImageLayout::eGeneral)//
+                    );
+            }
+
+            writeDescriptorSets.Add(
+                vk::WriteDescriptorSet()
+                .setDstSet(this->descriptorSet)
+                .setDstBinding(location)
+                .setDstArrayElement(0)
+                .setDescriptorCount(textures.Count())
+                .setDescriptorType(vk::DescriptorType::eStorageImage)
                 .setPImageInfo(imageInfo.Buffer() + imageInfoStart)
                 .setPBufferInfo(nullptr)
                 .setPTexelBufferView(nullptr)

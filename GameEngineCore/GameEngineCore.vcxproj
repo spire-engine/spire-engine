@@ -222,7 +222,6 @@
     <ClCompile Include="SimpleAnimationControllerActor.cpp" />
     <ClCompile Include="SkeletalMeshActor.cpp" />
     <ClCompile Include="Skeleton.cpp" />
-    <ClCompile Include="SSAO.cpp" />
     <ClCompile Include="StandardRenderProcedure.cpp" />
     <ClCompile Include="StaticMeshActor.cpp" />
     <ClCompile Include="StaticScene.cpp" />

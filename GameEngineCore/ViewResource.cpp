@@ -5,7 +5,7 @@ namespace GameEngine
 {
 	using namespace CoreLib;
 	
-	RefPtr<RenderTarget> ViewResource::LoadSharedRenderTarget(String name, StorageFormat format, float ratio, int w, int h)
+	RefPtr<RenderTarget> ViewResource::LoadSharedRenderTarget(String name, StorageFormat format, float ratio, int w, int h, bool useAsStorage)
 	{
 		RefPtr<RenderTarget> result;
 		if (renderTargets.TryGetValue(name, result))
@@ -18,6 +18,7 @@ namespace GameEngine
 		result = new RenderTarget();
 		result->Format = format;
 		result->UseFixedResolution = ratio == 0.0f;
+        result->EnableUseAsStorageImage = useAsStorage;
 		if (screenWidth > 0 || result->UseFixedResolution)
 		{
 			if (ratio == 0.0f)
@@ -30,10 +31,13 @@ namespace GameEngine
 				result->Width = (int)(screenWidth * ratio);
 				result->Height = (int)(screenHeight * ratio);
 			}
+            TextureUsage baseUsage = (TextureUsage)0;
+            if (useAsStorage)
+                baseUsage = TextureUsage::Storage;
 			if (format == StorageFormat::Depth24Stencil8 || format == StorageFormat::Depth32 || format == StorageFormat::Depth24)
-				result->Texture = hwRenderer->CreateTexture2D(TextureUsage::SampledDepthAttachment, result->Width, result->Height, 1, format);
+				result->Texture = hwRenderer->CreateTexture2D(TextureUsage((int)baseUsage | (int)TextureUsage::SampledDepthAttachment), result->Width, result->Height, 1, format);
 			else
-				result->Texture = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, result->Width, result->Height, 1, format);
+				result->Texture = hwRenderer->CreateTexture2D(TextureUsage((int)baseUsage | (int)TextureUsage::SampledColorAttachment), result->Width, result->Height, 1, format);
 			
 		}
 		result->FixedWidth = w;
@@ -52,11 +56,14 @@ namespace GameEngine
 			{
 				r.Value->Width = (int)(screenWidth * r.Value->ResolutionScale);
 				r.Value->Height = (int)(screenHeight * r.Value->ResolutionScale);
-				if (r.Value->Format == StorageFormat::Depth24Stencil8 || r.Value->Format == StorageFormat::Depth32 || r.Value->Format == StorageFormat::Depth24)
-					r.Value->Texture = hwRenderer->CreateTexture2D(TextureUsage::SampledDepthAttachment, r.Value->Width, r.Value->Height, 1, r.Value->Format);
-				else
-					r.Value->Texture = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, r.Value->Width, r.Value->Height, 1, r.Value->Format);
-			}
+                TextureUsage baseUsage = (TextureUsage)0;
+                if (r.Value->EnableUseAsStorageImage)
+                    baseUsage = TextureUsage::Storage;
+                if (r.Value->Format == StorageFormat::Depth24Stencil8 || r.Value->Format == StorageFormat::Depth32 || r.Value->Format == StorageFormat::Depth24)
+                    r.Value->Texture = hwRenderer->CreateTexture2D(TextureUsage((int)baseUsage | (int)TextureUsage::SampledDepthAttachment), r.Value->Width, r.Value->Height, 1, r.Value->Format);
+                else
+                    r.Value->Texture = hwRenderer->CreateTexture2D(TextureUsage((int)baseUsage | (int)TextureUsage::SampledColorAttachment), r.Value->Width, r.Value->Height, 1, r.Value->Format);
+            }
 		}
 		for (auto & output : renderOutputs)
 		{

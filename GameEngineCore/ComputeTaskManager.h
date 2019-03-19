@@ -26,16 +26,16 @@ namespace GameEngine
         } resourceHandles;
         enum class BindingType
         {
-            Texture, TextureArray, Sampler, StorageBuffer
+            Texture, TextureArray, Sampler, StorageBuffer, StorageImage
         };
         BindingType type;
         int bufferOffset;
         int bufferLength;
         CoreLib::ArrayView<Texture*> textureArrayBinding;
         ResourceBinding() {}
-        ResourceBinding(Texture* texture)
+        ResourceBinding(Texture* texture, BindingType bindingType = BindingType::Texture)
         {
-            type = BindingType::Texture;
+            type = bindingType;
             resourceHandles.textureBinding = texture;
         }
         ResourceBinding(TextureSampler* sampler)
