@@ -229,7 +229,7 @@ namespace GameEngine
 
     class WindowsFont : public GraphicsUI::IFont
     {
-    private:
+    public:
         CoreLib::RefPtr<TextRasterizer> rasterizer;
         UISystemBase * system;
         HWND wndHandle;
@@ -683,12 +683,15 @@ namespace GameEngine
 		BakedText * result = prev;
 		if (!prevBuffer || imageData.ImageData != prevBuffer)
 			result = new BakedText();
+        result->font = this;
+        result->options = options;
+        result->textContent = text;
 		result->system = system;
 		result->Width = imageData.Size.x;
 		result->Height = imageData.Size.y;
 		result->textBuffer = imageData.ImageData;
 		result->BufferSize = imageData.BufferSize;
-
+        system->bakedTexts.Add(result);
 		return result;
 	}
 
@@ -748,7 +751,10 @@ namespace GameEngine
 		result.ImageData = buffer;
 		result.Size.x = TextWidth;
 		result.Size.y = TextHeight;
-		result.BufferSize = bytes > existingBufferSize ? bytes : existingBufferSize;
+        if (buffer)
+            result.BufferSize = bytes > existingBufferSize ? bytes : existingBufferSize;
+        else
+            result.BufferSize = 0;
 		return result;
 	}
 
@@ -761,6 +767,16 @@ namespace GameEngine
 	{
 		return Bit->canvas->GetTextSize(text, options);
 	}
+
+    void BakedText::Rebake()
+    {
+        auto imageData = font->rasterizer->RasterizeText(system, textContent, textBuffer, this->BufferSize, this->options);
+        this->BufferSize = imageData.BufferSize;
+        this->Width = imageData.Size.x;
+        this->Height = imageData.Size.y;
+        this->textBuffer = imageData.ImageData;
+    }
+
 }
 
 #ifdef RCVR_UNICODE

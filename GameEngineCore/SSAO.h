@@ -10,6 +10,7 @@ namespace GameEngine
         VectorMath::Matrix4 ProjMatrix, InvProjMatrix;
         int width = 1024, height = 1024;
         int blurRadius = 7;
+        float aoDistance = 20.0f;
         float aoRadius = 50.0f, aoPower = 4.0f;
     };
 }

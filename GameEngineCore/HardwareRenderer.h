@@ -724,7 +724,7 @@ namespace GameEngine
 	public:
 		virtual void BeginUpdate() = 0;
 		virtual void Update(int location, Texture* texture, TextureAspect aspect) = 0;
-        virtual void Update(int location, CoreLib::ArrayView<Texture*> texture, TextureAspect aspect) = 0;
+        virtual void Update(int location, CoreLib::ArrayView<Texture*> texture, TextureAspect aspect, TextureLayout layout = TextureLayout::Sample) = 0;
         virtual void UpdateStorageImage(int location, CoreLib::ArrayView<Texture*> texture, TextureAspect aspect) = 0;
 		virtual void Update(int location, TextureSampler* sampler) = 0;
 		virtual void Update(int location, Buffer* buffer, int offset = 0, int length = -1) = 0;
@@ -844,7 +844,7 @@ namespace GameEngine
     enum class ResourceUsage
     {
         FragmentShaderRead = 1, FragmentShaderWrite = 2, GraphicsShaderRead = 3, GraphicsShaderWrite = 4,
-        ComputeRead = 5, ComputeWrite = 6, 
+        ComputeRead = 5, ComputeWrite = 6, ComputeReadWrite = 7,
         RenderAttachmentOutput = 8, RenderAttachmentInput = 16, HostRead = 32, HostWrite = 64,
         All = 0xFFFF
     };

@@ -202,6 +202,7 @@
     <ClCompile Include="ComputeTaskManager.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="SSAOActor.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -432,6 +433,9 @@
     <ClInclude Include="SSAO.h">
       <Filter>Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="SSAOActor.h">
+      <Filter>Actors</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Actors">
@@ -532,12 +536,20 @@
     <None Include="..\EngineContent\Shaders\LightTiling.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\EyeAdaptation.slang" />
     <None Include="..\EngineContent\Shaders\LuminanceHistogram.slang" />
     <None Include="..\EngineContent\Shaders\BuildHistogram.slang">
       <Filter>Shaders</Filter>
     </None>
     <None Include="..\EngineContent\Shaders\ClearHistogram.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\EyeAdaptation.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\SSAO.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\SSAOComposite.slang">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

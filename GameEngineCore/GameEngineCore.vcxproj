@@ -222,6 +222,7 @@
     <ClCompile Include="SimpleAnimationControllerActor.cpp" />
     <ClCompile Include="SkeletalMeshActor.cpp" />
     <ClCompile Include="Skeleton.cpp" />
+    <ClCompile Include="SSAOActor.cpp" />
     <ClCompile Include="StandardRenderProcedure.cpp" />
     <ClCompile Include="StaticMeshActor.cpp" />
     <ClCompile Include="StaticScene.cpp" />
@@ -318,6 +319,7 @@
     <ClInclude Include="SkeletalMeshActor.h" />
     <ClInclude Include="Skeleton.h" />
     <ClInclude Include="SSAO.h" />
+    <ClInclude Include="SSAOActor.h" />
     <ClInclude Include="StandardViewUniforms.h" />
     <ClInclude Include="StaticMeshActor.h" />
     <ClInclude Include="StaticScene.h" />
@@ -361,6 +363,8 @@
     <None Include="..\EngineContent\Shaders\ShadowPass.slang" />
     <None Include="..\EngineContent\Shaders\SkeletalMesh.slang" />
     <None Include="..\EngineContent\Shaders\SolidColor.slang" />
+    <None Include="..\EngineContent\Shaders\SSAO.slang" />
+    <None Include="..\EngineContent\Shaders\SSAOComposite.slang" />
     <None Include="..\EngineContent\Shaders\ToneMapping.slang" />
     <None Include="..\EngineContent\Shaders\UI.slang" />
   </ItemGroup>

@@ -12,7 +12,7 @@
 #include "LightingData.h"
 #include "BuildHistogram.h"
 #include "EyeAdaptation.h"
-#include "SSAO.h"
+#include "SSAOActor.h"
 
 using namespace VectorMath;
 
@@ -85,7 +85,7 @@ namespace GameEngine
 
         RefPtr<ComputeTaskInstance> lightListBuildingComputeTaskInstance, 
             clearHistogramComputeTaskInstance, histogramBuildingComputeTaskInstance, eyeAdaptationComputeTaskInstance;
-        RefPtr<ComputeTaskInstance> ssaoComputeTaskInstance, ssaoBlurXInstance, ssaoBlurYInstance;
+        RefPtr<ComputeTaskInstance> ssaoComputeTaskInstance, ssaoBlurXInstance, ssaoBlurYInstance, ssaoCompositeInstance;
         RefPtr<RenderTarget> aoRenderTarget, aoBlurTarget;
         RefPtr<Buffer> randomDirectionBuffer;
 
@@ -135,7 +135,7 @@ namespace GameEngine
                 if (useAtmosphere)
                     return viewRes->LoadSharedRenderTarget("litAtmosphereColor", StorageFormat::RGBA_F16).Ptr();
                 else
-                    return viewRes->LoadSharedRenderTarget("litColor", StorageFormat::RGBA_F16).Ptr();
+                    return viewRes->LoadSharedRenderTarget("litColor", StorageFormat::RGBA_F16, 1.0f, 1024, 1024, true).Ptr();
             }
         }
         virtual void UpdateSceneResourceBinding(SceneResource* sceneRes) override
@@ -193,7 +193,7 @@ namespace GameEngine
 
             forwardBaseOutput = viewRes->CreateRenderOutput(
                 forwardRenderPass->GetRenderTargetLayout(),
-                viewRes->LoadSharedRenderTarget("litColor", StorageFormat::RGBA_F16),
+                viewRes->LoadSharedRenderTarget("litColor", StorageFormat::RGBA_F16, 1.0f, 1024, 1024, true),
                 viewRes->LoadSharedRenderTarget("depthBuffer", DepthBufferFormat)
             );
             transparentAtmosphereOutput = viewRes->CreateRenderOutput(
@@ -265,6 +265,8 @@ namespace GameEngine
                 ssaoBlurXInstance = computeTaskManager->CreateComputeTaskInstance(ssaoBlurXComputeKernel, sizeof(SSAOUniforms), true);
                 ssaoBlurYComputeKernel = computeTaskManager->LoadKernel("SSAO.slang", "cs_SSAOBlurY");
                 ssaoBlurYInstance = computeTaskManager->CreateComputeTaskInstance(ssaoBlurYComputeKernel, sizeof(SSAOUniforms), true);
+                auto ssaoCompositeKernel = computeTaskManager->LoadKernel("SSAOComposite.slang", "cs_SSAOComposite");
+                ssaoCompositeInstance = computeTaskManager->CreateComputeTaskInstance(ssaoCompositeKernel, 0, true);
 
                 randomDirectionBuffer = CreateRandomDirectionsBuffer();
             }
@@ -313,7 +315,8 @@ namespace GameEngine
 
         enum class DataDependencyType
         {
-            RenderTargetToGraphics, ComputeToGraphics, RenderTargetToCompute, UndefinedToRenderTarget, SampledToRenderTarget
+            RenderTargetToGraphics, ComputeToGraphics, RenderTargetToCompute, UndefinedToRenderTarget, SampledToRenderTarget, RenderTargetToComputeStorage,
+            ComputeStorageToSample, ComputeStorageToRenderTarget
         };
         List<ImagePipelineBarrier> imageBarriers;
         void QueueImageBarrier(HardwareRenderer* hw, ArrayView<Texture*> texturesToUse, DataDependencyType dep)
@@ -323,16 +326,22 @@ namespace GameEngine
             {
                 ImagePipelineBarrier ib;
                 ib.Image = img;
-                if (dep == DataDependencyType::UndefinedToRenderTarget || dep == DataDependencyType::SampledToRenderTarget)
+                if (dep == DataDependencyType::UndefinedToRenderTarget || dep == DataDependencyType::SampledToRenderTarget ||
+                    dep == DataDependencyType::ComputeStorageToRenderTarget)
                     ib.LayoutAfter = img->IsDepthStencilFormat() ? TextureLayout::DepthStencilAttachment : TextureLayout::ColorAttachment;
+                else if (dep == DataDependencyType::RenderTargetToComputeStorage)
+                    ib.LayoutAfter = TextureLayout::General;
                 else
                     ib.LayoutAfter = TextureLayout::Sample;
                 if (dep == DataDependencyType::UndefinedToRenderTarget)
                     ib.LayoutBefore = TextureLayout::Undefined;
                 else
                 {
-                    if (dep == DataDependencyType::RenderTargetToGraphics || dep == DataDependencyType::RenderTargetToCompute)
+                    if (dep == DataDependencyType::RenderTargetToGraphics || dep == DataDependencyType::RenderTargetToCompute ||
+                        dep == DataDependencyType::RenderTargetToComputeStorage)
                         ib.LayoutBefore = img->IsDepthStencilFormat() ? TextureLayout::DepthStencilAttachment : TextureLayout::ColorAttachment;
+                    else if (dep == DataDependencyType::ComputeStorageToSample || dep == DataDependencyType::ComputeStorageToRenderTarget)
+                        ib.LayoutBefore = TextureLayout::General;
                     else
                         ib.LayoutBefore = TextureLayout::Sample;
                 }
@@ -349,17 +358,29 @@ namespace GameEngine
             case DataDependencyType::RenderTargetToCompute:
                 hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::ComputeRead, imageBarriers.GetArrayView());
                 break;
+            case DataDependencyType::RenderTargetToComputeStorage:
+                hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::ComputeReadWrite, imageBarriers.GetArrayView());
+                break;
+            case DataDependencyType::ComputeStorageToSample:
+                hw->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::FragmentShaderRead, imageBarriers.GetArrayView());
+                break;
             case DataDependencyType::UndefinedToRenderTarget:
                 hw->QueuePipelineBarrier(ResourceUsage::FragmentShaderRead, ResourceUsage::All, imageBarriers.GetArrayView());
                 break;
             case DataDependencyType::SampledToRenderTarget:
                 hw->QueuePipelineBarrier(ResourceUsage::FragmentShaderRead, ResourceUsage::All, imageBarriers.GetArrayView());
                 break;
+            case DataDependencyType::ComputeStorageToRenderTarget:
+                hw->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::All, imageBarriers.GetArrayView());
+                break;
             }
         }
 
         virtual void Run(const RenderProcedureParameters & params) override
         {
+            bool ssaoEnabled = false;
+            SSAOUniforms ssaoUniforms = {};
+
             int w = 0, h = 0;
             auto hardwareRenderer = params.renderer->GetHardwareRenderer();
             hardwareRenderer->BeginJobSubmission();
@@ -454,6 +475,11 @@ namespace GameEngine
                     toneMappingParameters = toneMappingActor->GetToneMappingParameters();
                     eyeAdaptationUniforms = toneMappingActor->GetEyeAdaptationParameters();
                 }
+                else if (postProcess && actorType == EngineActorType::SSAO)
+                {
+                    ssaoUniforms = dynamic_cast<SSAOActor*>(actor.Value.Ptr())->GetParameters();
+                    ssaoEnabled = true;
+                }
             }
             if (postProcess)
             {
@@ -505,30 +531,30 @@ namespace GameEngine
             preZPassTransparentInstance->Execute(hardwareRenderer, *params.renderStats);
             QueueImageBarrier(hardwareRenderer, prezTextures.GetArrayView(), DataDependencyType::RenderTargetToCompute);
 
-            if (postProcess)
+            if (ssaoEnabled)
             {
                 // ssao
                 Array<ImagePipelineBarrier, 2> aoImageBarriers;
                 aoImageBarriers.Add(ImagePipelineBarrier(aoRenderTarget->Texture.Ptr(), TextureLayout::Undefined, TextureLayout::General));
                 aoImageBarriers.Add(ImagePipelineBarrier(aoBlurTarget->Texture.Ptr(), TextureLayout::Undefined, TextureLayout::General));
-                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeWrite, aoImageBarriers.GetArrayView());
+                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeRead, ResourceUsage::ComputeWrite, aoImageBarriers.GetArrayView());
                 Array<ResourceBinding, 3> ssaoBindings;
                 ssaoBindings.Add(ResourceBinding(prezTextures[0]));
                 ssaoBindings.Add(ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage));
                 ssaoBindings.Add(ResourceBinding(randomDirectionBuffer.Ptr(), 0, -1));
 
-                SSAOUniforms ssaoUniforms;
                 ssaoUniforms.width = w;
                 ssaoUniforms.height = h;
                 ssaoUniforms.ProjMatrix = mainProjMatrix;
                 ssaoUniforms.InvProjMatrix = invProjMatrix;
+
                 ssaoComputeTaskInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
                 ssaoComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
                 aoImageBarriers.Clear();
                 aoImageBarriers.Add(ImagePipelineBarrier(aoRenderTarget->Texture.Ptr(), TextureLayout::General, TextureLayout::General));
                 hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, aoImageBarriers.GetArrayView());
 
-                ssaoBindings[0] = ResourceBinding(aoRenderTarget->Texture.Ptr());
+                ssaoBindings[0] = ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture, TextureLayout::General);
                 ssaoBindings[1] = ResourceBinding(aoBlurTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage);
                 ssaoBlurXInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
                 ssaoBlurXInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
@@ -536,7 +562,7 @@ namespace GameEngine
                 aoImageBarriers.Add(ImagePipelineBarrier(aoBlurTarget->Texture.Ptr(), TextureLayout::General, TextureLayout::General));
                 hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, aoImageBarriers.GetArrayView());
 
-                ssaoBindings[0] = ResourceBinding(aoBlurTarget->Texture.Ptr());
+                ssaoBindings[0] = ResourceBinding(aoBlurTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture, TextureLayout::General);
                 ssaoBindings[1] = ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage);
                 ssaoBlurYInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
                 ssaoBlurYInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
@@ -581,15 +607,22 @@ namespace GameEngine
             debugGraphicsPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer,
                 Engine::GetDebugGraphics()->GetDrawables(Engine::Instance()->GetRenderer()->GetRendererService()));
             sharedRes->pipelineManager.PopModuleInstance();
-
             debugGraphicsPassInstance->Execute(hardwareRenderer, *params.renderStats);
-            QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
 
-            if (postProcess)
+            if (ssaoEnabled)
             {
+                QueueImageBarrier(hardwareRenderer, MakeArrayView(textures[0]), DataDependencyType::RenderTargetToComputeStorage);
                 // composite AO with lit buffer
-
+                Array<ResourceBinding, 2> aoCompositeBindings;
+                aoCompositeBindings.Add(ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture, TextureLayout::General));
+                aoCompositeBindings.Add(ResourceBinding(textures[0],ResourceBinding::BindingType::StorageImage));
+                ssaoCompositeInstance->UpdateVersionedParameters(nullptr, 0, aoCompositeBindings.GetArrayView());
+                ssaoCompositeInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
+                QueueImageBarrier(hardwareRenderer, MakeArrayView(textures[0]), DataDependencyType::ComputeStorageToSample);
+                QueueImageBarrier(hardwareRenderer, MakeArrayView(textures[1]), DataDependencyType::RenderTargetToGraphics);
             }
+            else
+                QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), DataDependencyType::RenderTargetToGraphics);
 
             if (useAtmosphere)
             {

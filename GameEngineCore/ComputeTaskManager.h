@@ -29,14 +29,16 @@ namespace GameEngine
             Texture, TextureArray, Sampler, StorageBuffer, StorageImage
         };
         BindingType type;
+        TextureLayout textureLayout;
         int bufferOffset;
         int bufferLength;
         CoreLib::ArrayView<Texture*> textureArrayBinding;
         ResourceBinding() {}
-        ResourceBinding(Texture* texture, BindingType bindingType = BindingType::Texture)
+        ResourceBinding(Texture* texture, BindingType bindingType = BindingType::Texture, TextureLayout layout = TextureLayout::Sample)
         {
             type = bindingType;
             resourceHandles.textureBinding = texture;
+            textureLayout = layout;
         }
         ResourceBinding(TextureSampler* sampler)
         {
@@ -50,10 +52,11 @@ namespace GameEngine
             bufferOffset = offset;
             bufferLength = size;
         }
-        ResourceBinding(CoreLib::ArrayView<Texture*> texArray)
+        ResourceBinding(CoreLib::ArrayView<Texture*> texArray, TextureLayout layout = TextureLayout::Sample)
         {
             type = BindingType::TextureArray;
             textureArrayBinding = texArray;
+            textureLayout = layout;
         }
     };
 

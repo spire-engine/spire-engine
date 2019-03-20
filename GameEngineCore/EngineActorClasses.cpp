@@ -13,6 +13,7 @@
 #include "AmbientLightActor.h"
 #include "FrameIdDisplayActor.h"
 #include "SimpleAnimationControllerActor.h"
+#include "SSAOActor.h"
 
 namespace GameEngine
 {
@@ -34,5 +35,6 @@ namespace GameEngine
 		REGISTER_ACTOR_CLASS(EnvMap);
         REGISTER_ACTOR_CLASS(FrameIdDisplay);
         REGISTER_ACTOR_CLASS(SimpleAnimationController);
+        REGISTER_ACTOR_CLASS(SSAO);
 	}
 }

@@ -1,10 +1,9 @@
-import LuminanceHistogram;
-
 struct SSAOParams
 {
     float4x4 ProjMatrix, InvProjMatrix;
     int width, height;
     int blurRadius;
+    float aoDistance;
     float aoRadius;
     float aoPower;
     Texture2D inputTexture;
@@ -75,16 +74,20 @@ void cs_SSAO(uint3 threadId : SV_DispatchThreadID, uint3 localId : SV_GroupThrea
             float thatZ = params.inputTexture.Load(int3((projNewPos.xy*0.5+0.5)*float2(params.width, params.height), 0)).x;
             if (thatZ < projNewPos.z)
             {
-                newPos.z = DepthZToWorldZ(thatZ);
+                float thatZViewSpace = DepthZToWorldZ(thatZ);
+                float zDist = abs(newPos.z - thatZViewSpace);
+                newPos.z = thatZViewSpace;
+                float thisOcclusion = clamp(1.0 - zDist / params.aoDistance, 0.0, 1.0);
+
                 float dist = length(newPos - thisWorldPos);
                 if (dist > params.aoRadius * 0.02f)
-                    occlusion += clamp(lerp(1.0f, 0.0f, dist/params.aoRadius), 0.0f, 1.0f);
+                    occlusion += clamp(lerp(thisOcclusion, 0.0f, dist/params.aoRadius), 0.0f, 1.0f);
                 break;
             }
         }
     }
     occlusion /= 16;
-    params.outputTexture[threadId.xy] = float4(1.0f - occlusion);
+    params.outputTexture[threadId.xy] = pow(float4(1.0f - occlusion), params.aoPower);
 }
 
 float gaussianKernel(int size, int i)
@@ -99,12 +102,11 @@ void cs_SSAOBlurX(uint3 threadId : SV_DispatchThreadID)
     int rad = params.blurRadius;
     float rs = 0.0f;
     float sumWeight = 0.0f;
-    for (int i = threadId.x - rad; i <= threadId.x + rad; i++)
+    for (int i = max((int)threadId.x - rad, 0); i <= min((int)threadId.x + rad, params.width-1); i++)
     {
-        int idx = clamp(i, 0, params.width - 1);
-        int dist = abs(idx - int(threadId.x));
+        int dist = abs(i - int(threadId.x));
         float kernel = gaussianKernel(rad, dist);
-        float val = params.inputTexture.Load(uint3(idx, threadId.y, 0)).x;
+        float val = params.inputTexture.Load(uint3(i, threadId.y, 0)).x;
         rs += val * kernel;
         sumWeight += kernel;
     }
@@ -117,7 +119,7 @@ void cs_SSAOBlurY(uint3 threadId : SV_DispatchThreadID)
     int rad = params.blurRadius;
     float rs = 0.0f;
     float sumWeight = 0.0f;
-    for (int i = threadId.y - rad; i <= threadId.y + rad; i++)
+    for (int i = int(threadId.y) - rad; i <= int(threadId.y) + rad; i++)
     {
         int idx = clamp(i, 0, params.height - 1);
         int dist = abs(idx - int(threadId.y));

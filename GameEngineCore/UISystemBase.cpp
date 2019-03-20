@@ -40,9 +40,11 @@ namespace GameEngine
 
     BakedText::~BakedText()
     {
+        system->bakedTexts.Remove(this);
         if (textBuffer)
             system->FreeTextBuffer(textBuffer, BufferSize);
     }
+
 
     void UIWindowContext::SetSize(int w, int h)
     {
@@ -81,137 +83,6 @@ namespace GameEngine
     {
     private:
         GameEngine::HardwareRenderer * rendererApi;
-        const char * uberSpireShader = R"(
-			pipeline EnginePipeline
-			{
-				[Pinned]
-				input world rootVert;
-
-				world vs;
-				world fs;
-
-				require @vs vec4 projCoord;
-				
-				[VertexInput]
-				extern @vs rootVert vertAttribIn;
-				import(rootVert->vs) vertexImport()
-				{
-					return project(vertAttribIn);
-				}
-
-				extern @fs vs vsIn;
-				import(vs->fs) standardImport()
-				{
-					return project(vsIn);
-				}
-    
-				stage vs : VertexShader
-				{
-					World: vs;
-					Position: projCoord;
-				}
-    
-				stage fs : FragmentShader
-				{
-					World: fs;
-				}
-			}
-
-			// This approximates the error function, needed for the gaussian integral
-			vec4 erf(vec4 x)
-			{
-				vec4 s = sign(x); vec4 a = abs(x);
-				x = 1.0 + (0.278393 + (0.230389 + 0.078108 * (a * a)) * a) * a;
-				x *= x;
-				return s - s / (x * x);
-			}
-			// Return the mask for the shadow of a box from lower to upper
-			float boxShadow(vec2 lower, vec2 upper, vec2 point, float sigma)
-			{
-				vec4 query = vec4(point - lower, point - upper);
-				vec4 integral = 0.5 + 0.5 * erf(query * (sqrt(0.5) / sigma));
-				return (integral.z - integral.x) * (integral.w - integral.y);
-			}
-
-			module UberUIShaderParams
-			{
-				public param mat4 orthoMatrix;
-				public param StructuredBuffer<uvec4> uniformInput;
-				public param StructuredBuffer<uint> textContent;
-			}
-			shader UberUIShader
-			{
-				[Binding: "0"]
-				public using UberUIShaderParams;
-
-				@rootVert vec2 vert_pos;
-				@rootVert vec2 vert_uv;
-				@rootVert int vert_primId;
-				vec4 projCoord = orthoMatrix * vec4(vert_pos, 0.0, 1.0);
-				public out @fs vec4 color
-				{
-					vec4 result = vec4(0.0);
-					uvec4 params0 = uniformInput[int(vert_primId) * 2];
-					uvec4 params1 = uniformInput[int(vert_primId) * 2 + 1];
-					int clipBoundX = int(params0.x & 65535);
-					int clipBoundY = int(params0.x >> 16);
-					int clipBoundX1 = int(params0.y & 65535);
-					int clipBoundY1 = int(params0.y >> 16);
-					int shaderType = int(params0.z);
-					uint pColor = params0.w;
-					vec4 inputColor = vec4(float(pColor&255), float((pColor>>8)&255), float((pColor>>16)&255), float((pColor>>24)&255)) * (1.0/255.0);
-					if (shaderType == 0) // solid color
-					{
-						if (vert_pos.x < clipBoundX) discard;
-						if (vert_pos.y < clipBoundY) discard;
-						if (vert_pos.x > clipBoundX1) discard;
-						if (vert_pos.y > clipBoundY1) discard;
-						result = inputColor;
-					}
-					else if (shaderType == 1) // text
-					{
-						if (vert_pos.x < clipBoundX) discard;
-						if (vert_pos.y < clipBoundY) discard;
-						if (vert_pos.x > clipBoundX1) discard;
-						if (vert_pos.y > clipBoundY1) discard;
-			
-						int textWidth = int(params1.x);
-						int textHeight = int(params1.y);
-						int startAddr = int(params1.z);
-			
-						ivec2 fetchPos = ivec2(vert_uv * ivec2(textWidth, textHeight));
-						int relAddr = fetchPos.y * textWidth + fetchPos.x;
-						int ptr = startAddr + (relAddr >> 1);  // in bytes
-						uint word = textContent[ptr >> 2];     // fetch the word at ptr
-						uint ptrMod = (ptr & 3);
-						word >>= (ptrMod<<3);                  // we are in the right byte now
-						int bitPtr = relAddr & 1;              // two pixels per byte
-						word >>= (bitPtr << 2);                // shift to get the correct half
-						float alpha = float(word & 15) * (1.0/15.0);  // extract alpha
-						result = inputColor;
-						result.w *= alpha;
-					}
-					else if (shaderType == 2)
-					{
-						if (vert_pos.x > clipBoundX && vert_pos.x < clipBoundX1 && vert_pos.y > clipBoundY && vert_pos.y < clipBoundY1)
-							discard;
-						vec2 origin; vec2 size;
-						origin.x = float(params1.x & 65535);
-						origin.y = float(params1.x >> 16);
-						size.x = float(params1.y & 65535);
-						size.y = float(params1.y >> 16);
-						float shadowSize = float(params1.z);
-						float shadow = boxShadow(origin, origin+size, vert_pos, shadowSize);
-						result = vec4(inputColor.xyz, inputColor.w*shadow);
-					}
-					else
-						discard;
-					
-					return result;
-				}
-			}
-		)";
-
         // Read all bytes from a file
         CoreLib::List<unsigned char> ReadAllBytes(String fileName)
         {
@@ -534,8 +405,42 @@ namespace GameEngine
         }
         void DrawTextQuad(BakedText * text, const GraphicsUI::Color & fontColor, float x, float y, float x1, float y1)
         {
+            static int64_t useStamp = 0;
+            useStamp++;
             if (IsBufferFull())
                 return;
+            if (!text->textBuffer && text->Height > 0)
+            {
+                do
+                {
+                    text->Rebake();
+                    // kick out last used text from cache
+                    if (!text->textBuffer && text->Height > 0)
+                    {
+                        BakedText* victim = nullptr;
+                        int64_t minTimeStamp = 0xFFFFFFFFFFFF;
+                        for (auto ftext : text->system->bakedTexts)
+                        {
+                            if (ftext->textBuffer)
+                            {
+                                if (ftext->lastUse < minTimeStamp)
+                                {
+                                    minTimeStamp = ftext->lastUse;
+                                    victim = ftext;
+                                }
+                            }
+                        }
+                        if (!victim)
+                        {
+                            break;
+                        }
+                        victim->system->FreeTextBuffer(victim->textBuffer, victim->BufferSize);
+                        victim->textBuffer = nullptr;
+                        victim->BufferSize = 0;
+                    }
+                } while (!text->textBuffer && text->Height > 0);
+            }
+            text->lastUse = useStamp;
             indexStream.Add(vertexStream.Count());
             indexStream.Add(vertexStream.Count() + 1);
             indexStream.Add(vertexStream.Count() + 2);

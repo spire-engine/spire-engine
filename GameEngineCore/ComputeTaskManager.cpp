@@ -45,7 +45,7 @@ namespace GameEngine
             switch (resources[i].type)
             {
             case ResourceBinding::BindingType::Texture:
-                descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.textureBinding, TextureAspect::Color);
+                descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.textureBinding, TextureAspect::Color, resources[i].textureLayout);
                 break;
             case ResourceBinding::BindingType::StorageImage:
                 descriptorSet->UpdateStorageImage(bindingOffset + i, resources[i].resourceHandles.textureBinding, TextureAspect::Color);
@@ -63,7 +63,7 @@ namespace GameEngine
                 break;
             }
             case ResourceBinding::BindingType::TextureArray:
-                descriptorSet->Update(bindingOffset + i, resources[i].textureArrayBinding, TextureAspect::Color);
+                descriptorSet->Update(bindingOffset + i, resources[i].textureArrayBinding, TextureAspect::Color, resources[i].textureLayout);
                 break;
             }
         }

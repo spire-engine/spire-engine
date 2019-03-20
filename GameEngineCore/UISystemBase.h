@@ -15,8 +15,9 @@ namespace GameEngine
 {
     class GLUIRenderer;
     class UISystemBase;
+    class WindowsFont;
 
-    const int TextBufferSize = 4 * 1024 * 1024;
+    const int TextBufferSize = 6 * 1024 * 1024;
     const int TextPixelBits = 4;
     const int Log2TextPixelsPerByte = CoreLib::Math::Log2Floor(8 / TextPixelBits);
     const int Log2TextBufferBlockSize = 6;
@@ -26,8 +27,13 @@ namespace GameEngine
     public:
         UISystemBase* system;
         unsigned char * textBuffer;
+        WindowsFont * font;
+        CoreLib::String textContent;
+        int64_t lastUse = 0;
         int BufferSize;
+        GraphicsUI::DrawTextOptions options;
         int Width, Height;
+        void Rebake();
         virtual int GetWidth() override
         {
             return Width;
@@ -75,6 +81,7 @@ namespace GameEngine
         VectorMath::Vec4 ColorToVec(GraphicsUI::Color c);
         Fence* textBufferFence = nullptr;
     public:
+        CoreLib::EnumerableHashSet<BakedText*> bakedTexts;
         GLUIRenderer * uiRenderer;
         CoreLib::EnumerableDictionary<SystemWindow*, UIWindowContext*> windowContexts;
         HardwareRenderer * rendererApi = nullptr;

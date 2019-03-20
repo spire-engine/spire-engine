@@ -3041,7 +3041,7 @@ namespace VK
 			writeDescriptorSets.Clear();
 		}
 
-        virtual void Update(int location, ArrayView<GameEngine::Texture*> textures, TextureAspect aspect) override
+        virtual void Update(int location, ArrayView<GameEngine::Texture*> textures, TextureAspect aspect, TextureLayout layout) override
         {
             int imageInfoStart = imageInfo.Count();
             for (auto texture : textures)
@@ -3060,7 +3060,7 @@ namespace VK
                         vk::DescriptorImageInfo()
                         .setSampler(vk::Sampler())
                         .setImageView(view)
-                        .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)//
+                        .setImageLayout(TranslateImageLayout(layout))
                     );
                 }
                 else
@@ -3068,7 +3068,7 @@ namespace VK
                         vk::DescriptorImageInfo()
                         .setSampler(vk::Sampler())
                         .setImageView(vk::ImageView())
-                        .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)//
+                        .setImageLayout(TranslateImageLayout(layout))
                     );
             }
 
@@ -3131,7 +3131,7 @@ namespace VK
 
 		virtual void Update(int location, GameEngine::Texture* texture, TextureAspect aspect) override
 		{
-            Update(location, MakeArrayView(texture), aspect);
+            Update(location, MakeArrayView(texture), aspect, TextureLayout::Sample);
 		}
 
 		virtual void Update(int location, GameEngine::TextureSampler* sampler) override
@@ -4845,6 +4845,9 @@ namespace VK
             case ResourceUsage::GraphicsShaderWrite:
                 result = vk::AccessFlagBits::eShaderWrite;
                 break;
+            case ResourceUsage::ComputeReadWrite:
+                result = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite;
+                break;
             case ResourceUsage::HostRead:
                 result = vk::AccessFlagBits::eHostRead;
                 break;
@@ -4882,6 +4885,9 @@ namespace VK
             case ResourceUsage::FragmentShaderWrite:
             case ResourceUsage::GraphicsShaderWrite:
                 result = vk::AccessFlagBits::eShaderWrite;
+                break;
+            case ResourceUsage::ComputeReadWrite:
+                result = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite;
                 break;
             case ResourceUsage::HostRead:
                 result = vk::AccessFlagBits::eHostRead;
