@@ -68,6 +68,7 @@ namespace GameEngine
     void Skeleton::SaveToStream(CoreLib::IO::Stream * stream)
 	{
 		BinaryWriter writer(stream);
+		writer.Write(this->Name);
 		writer.Write(this->Bones.Count());
 		for (int i = 0; i < Bones.Count(); i++)
 		{
@@ -82,6 +83,7 @@ namespace GameEngine
 	void Skeleton::LoadFromStream(CoreLib::IO::Stream * stream)
 	{
 		BinaryReader reader(stream);
+		Name = reader.ReadString();
 		int boneCount = reader.ReadInt32();
 		Bones.SetSize(boneCount);
 		InversePose.SetSize(boneCount);
@@ -115,6 +117,7 @@ namespace GameEngine
 		BinaryWriter writer(stream);
 		writer.Write(Name);
 		writer.Write(Speed);
+		writer.Write(FPS);
 		writer.Write(Duration);
 		writer.Write(Reserved);
 		writer.Write(Channels.Count());
@@ -130,6 +133,7 @@ namespace GameEngine
 		BinaryReader reader(stream);
 		reader.Read(Name);
 		reader.Read(Speed);
+		reader.Read(FPS);
 		reader.Read(Duration);
 		reader.Read(Reserved);
 		int channelCount = reader.ReadInt32();
@@ -212,6 +216,68 @@ namespace GameEngine
 		{
 			id = i;
 			i++;
+		}
+	}
+
+	// used in Rendering
+	void Pose::GetMatrices(const Skeleton * skeleton, CoreLib::List<VectorMath::Matrix4>& matrices, bool multiplyInversePose, RetargetFile * retarget) const
+	{
+		matrices.Clear();
+		matrices.SetSize(skeleton->Bones.Count());
+
+		// Consider the case that the skeleton for animation may contain less bones than the skeleton for mesh
+		// So, we should skip those missing bones and using its bind pose
+		for (int i = 0; i < matrices.Count(); i++)
+		{
+			matrices[i] = skeleton->Bones[i].BindPose.ToMatrix();
+		}
+
+		for (int i = 0; i < skeleton->BoneMapping.Count(); i++)
+		{
+			BoneTransformation transform = skeleton->Bones[i].BindPose;
+			int targetId = i;
+			if (retarget)
+			{
+				targetId = retarget->ModelBoneIdToAnimationBoneId[i];
+				if (targetId != -1)
+					transform = Transforms[targetId];
+				if (i == 0)
+				{
+					transform.Translation.x *= retarget->RootTranslationScale.x;
+					transform.Translation.y *= retarget->RootTranslationScale.y;
+					transform.Translation.z *= retarget->RootTranslationScale.z;
+				}
+				else
+					transform.Translation = retarget->RetargetedBoneOffsets[i];
+				matrices[i] = transform.ToMatrix();
+				//matrices[i] = transform.ToMatrix() * skeleton->Bones[i].BindPose.Rotation.ToMatrix4();
+			}
+			else
+			{
+				transform = Transforms[i];
+				if (i != 0)
+					transform.Translation = skeleton->Bones[i].BindPose.Translation;
+				matrices[i] = transform.ToMatrix();
+				//matrices[i] = transform.ToMatrix() * skeleton->Bones[i].BindPose.Rotation.ToMatrix4();
+			}
+		}
+		for (int i = 1; i < skeleton->Bones.Count(); i++)
+		{
+			VectorMath::Matrix4::Multiply(matrices[i], matrices[skeleton->Bones[i].ParentId], matrices[i]);
+		}
+
+		if (multiplyInversePose)
+		{
+			if (retarget)
+			{
+				for (int i = 0; i < skeleton->Bones.Count(); i++)
+					VectorMath::Matrix4::Multiply(matrices[i], matrices[i], retarget->RetargetedInversePose[i]);
+			}
+			else
+			{
+				for (int i = 0; i < matrices.Count(); i++)
+					VectorMath::Matrix4::Multiply(matrices[i], matrices[i], skeleton->InversePose[i]);
+			}
 		}
 	}
 }

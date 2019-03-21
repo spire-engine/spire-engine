@@ -122,61 +122,8 @@ namespace GameEngine
 	{
 	public:
 		CoreLib::List<BoneTransformation> Transforms;
-		// used in Rendering
-		void GetMatrices(const Skeleton * skeleton, CoreLib::List<VectorMath::Matrix4> & matrices, bool multiplyInversePose = true, RetargetFile * retarget = nullptr) const
-		{
-			matrices.Clear();
-			matrices.SetSize(skeleton->Bones.Count());
-			for (int i = 0; i < matrices.Count(); i++)
-			{
-				matrices[i] = skeleton->Bones[i].BindPose.ToMatrix();
-			}
-			for (int i = 0; i < skeleton->BoneMapping.Count(); i++)
-			{
-				BoneTransformation transform = skeleton->Bones[i].BindPose;
-				int targetId = i;
-				if (retarget)
-				{
-					targetId = retarget->ModelBoneIdToAnimationBoneId[i];
-					if (targetId != -1)
-						transform = Transforms[targetId];
-					if (i == 0)
-					{
-						transform.Translation.x *= retarget->RootTranslationScale.x;
-						transform.Translation.y *= retarget->RootTranslationScale.y;
-						transform.Translation.z *= retarget->RootTranslationScale.z;
-					}
-					else
-						transform.Translation = retarget->RetargetedBoneOffsets[i];
-				}
-				else
-				{
-					if (i < Transforms.Count())
-						transform = Transforms[i];
-					if (i != 0)
-						transform.Translation = skeleton->Bones[i].BindPose.Translation;
-				}
-				matrices[i] = transform.ToMatrix();
-			}
-			for (int i = 1; i < skeleton->Bones.Count(); i++)
-			{
-				VectorMath::Matrix4::Multiply(matrices[i], matrices[skeleton->Bones[i].ParentId], matrices[i]);
-			}
-			
-			if (multiplyInversePose)
-			{
-				if (retarget)
-				{
-					for (int i = 0; i < skeleton->Bones.Count(); i++)
-						VectorMath::Matrix4::Multiply(matrices[i], matrices[i], retarget->RetargetedInversePose[i]);
-				}
-				else
-				{
-					for (int i = 0; i < matrices.Count(); i++)
-						VectorMath::Matrix4::Multiply(matrices[i], matrices[i], skeleton->InversePose[i]);
-				}
-			}
-		}
+
+		void GetMatrices(const Skeleton * skeleton, CoreLib::List<VectorMath::Matrix4> & matrices, bool multiplyInversePose = true, RetargetFile * retarget = nullptr) const;
 	};
 
 	class AnimationKeyFrame
@@ -223,6 +170,7 @@ namespace GameEngine
 		CoreLib::String Name;
 		float Speed;
 		float Duration;
+		float FPS;
 		int Reserved[15];
 		CoreLib::List<AnimationChannel> Channels;
 		void SaveToStream(CoreLib::IO::Stream * stream);
