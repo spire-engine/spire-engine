@@ -97,9 +97,54 @@ namespace GameEngine
 		UpdateBounds();
 	}
 
+	Pose SkeletalMeshActor::GetPose()
+	{
+		return nextPose;
+	}
+
     void SkeletalMeshActor::SetPose(const Pose & p)
     {
         nextPose = p;
+    }
+
+    VectorMath::Vec3 SkeletalMeshActor::GetRootPosition()
+    {
+        VectorMath::Matrix4 rs = GetRootTransform();
+        if (model && model->GetSkeleton())
+        {
+            auto pos = rs.TransformHomogeneous(model->GetSkeleton()->Bones[0].BindPose.Translation);
+            return pos;
+        }
+        else
+        {
+            return rs.GetTranslation();
+        }
+    }
+
+    VectorMath::Matrix4 SkeletalMeshActor::GetRootTransform()
+    {
+        VectorMath::Matrix4 rs;
+        if (retargetFile)
+        {
+            VectorMath::Matrix4::Multiply(rs, nextPose.Transforms[0].ToMatrix(), retargetFile->RetargetedInversePose[0]);
+        }
+        else
+        {
+            if (model && model->GetSkeleton())
+                VectorMath::Matrix4::Multiply(rs, nextPose.Transforms[0].ToMatrix(), model->GetSkeleton()->InversePose[0]);
+            else
+                rs = nextPose.Transforms[0].ToMatrix();
+        }
+        VectorMath::Matrix4::Multiply(rs, LocalTransform.GetValue(), rs);
+        return rs;
+    }
+
+    VectorMath::Vec3 SkeletalMeshActor::GetRootOrientation()
+    {
+        VectorMath::Matrix4 rootTransform = GetRootTransform();
+        VectorMath::Vec3 result;
+        MatrixToEulerAngle(rootTransform.GetMatrix3(), result.x, result.y, result.z, VectorMath::EulerAngleOrder::ZXY);
+        return result;
     }
 
     void SkeletalMeshActor::GetDrawables(const GetDrawablesParameter & params)
@@ -127,15 +172,15 @@ namespace GameEngine
 
 	void SkeletalMeshActor::OnLoad()
 	{
-		model = level->LoadModel(*ModelFileName);
-		if (RetargetFileName.GetValue().Length())
-			retargetFile = level->LoadRetargetFile(*RetargetFileName);
+		model = level->LoadModel(*ModelFile);
+		if (RetargetFile.GetValue().Length())
+			retargetFile = level->LoadRetargetFile(*RetargetFile);
 		
 		LocalTransform.OnChanging.Bind(this, &SkeletalMeshActor::LocalTransform_Changing);
 		UpdateStates();
 
-		ModelFileName.OnChanging.Bind(this, &SkeletalMeshActor::ModelFileName_Changing);
-		RetargetFileName.OnChanging.Bind(this, &SkeletalMeshActor::RetargetFileName_Changing);
+        ModelFile.OnChanging.Bind(this, &SkeletalMeshActor::ModelFileName_Changing);
+        RetargetFile.OnChanging.Bind(this, &SkeletalMeshActor::RetargetFileName_Changing);
 	}
 
 	void SkeletalMeshActor::OnUnload()

@@ -748,6 +748,24 @@ namespace VectorMath
 		float InverseFPU(Matrix4 &mOut_d) const;
 		void GetNormalMatrix(Matrix4 & mOut) const;
 		inline float Inverse(Matrix4 &mOut_d) const;
+
+        inline Vec3 GetTranslation()
+        {
+            return Vec3::Create(values[12], values[13], values[14]);
+        }
+
+        inline void SetTranslation(float x, float y, float z)
+        {
+            values[12] = x;
+            values[13] = y;
+            values[14] = z;
+        }
+        inline void SetTranslation(Vec3 trans)
+        {
+            values[12] = trans.x;
+            values[13] = trans.y;
+            values[14] = trans.z;
+        }
 	};
 
 	//__declspec(align(16))

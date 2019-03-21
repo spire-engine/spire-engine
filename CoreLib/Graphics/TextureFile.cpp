@@ -66,7 +66,7 @@ namespace CoreLib
                     int bufSize = reader.ReadInt32();
                     reader.Read(buffer.Buffer() + offset, bufSize);
                     offset += bufSize;
-                    if (bufSize != GetImagePlaneSize(width >> i, height >> i))
+                    if (bufSize != GetImagePlaneSize(Math::Max(1, width >> i), Math::Max(1, height >> i)))
                     {
                         error = true;
                         goto end;

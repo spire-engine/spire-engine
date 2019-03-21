@@ -86,7 +86,7 @@ namespace CoreLib
                 {
                     int lw = width >> i;
                     int lh = height >> i;
-                    size += GetImagePlaneSize(lw, lh);
+                    size += GetImagePlaneSize(Math::Max(1, lw), Math::Max(1, lh));
                 }
                 return size;
             }

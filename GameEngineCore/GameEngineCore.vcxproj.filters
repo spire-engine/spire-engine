@@ -32,9 +32,6 @@
     <ClCompile Include="Skeleton.cpp">
       <Filter>Animation</Filter>
     </ClCompile>
-    <ClCompile Include="AnimationSynthesizer.cpp">
-      <Filter>Animation</Filter>
-    </ClCompile>
     <ClCompile Include="Renderer.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
@@ -203,6 +200,9 @@
       <Filter>Renderer</Filter>
     </ClCompile>
     <ClCompile Include="SSAOActor.cpp" />
+    <ClCompile Include="AnimationSynthesizer.cpp">
+      <Filter>Animation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -231,9 +231,6 @@
       <Filter>Actors</Filter>
     </ClInclude>
     <ClInclude Include="Skeleton.h">
-      <Filter>Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="AnimationSynthesizer.h">
       <Filter>Animation</Filter>
     </ClInclude>
     <ClInclude Include="Renderer.h">
@@ -435,6 +432,9 @@
     </ClInclude>
     <ClInclude Include="SSAOActor.h">
       <Filter>Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimationSynthesizer.h">
+      <Filter>Animation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

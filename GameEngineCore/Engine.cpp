@@ -438,16 +438,16 @@ namespace GameEngine
         {
             parser.ReadToken();
             debugGraphics->AddLine(VectorMath::Vec4::Create(1.0f, 0.0f, 0.0f, 1.0f),
-                Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()),
-                Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()));
+                VectorMath::Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()),
+                VectorMath::Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()));
         }
         else if (parser.LookAhead("debugtriangle"))
         {
             parser.ReadToken();
             debugGraphics->AddTriangle(VectorMath::Vec4::Create(0.0f, 1.0f, 0.0f, 1.0f),
-                Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()),
-                Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()),
-                Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()));
+                VectorMath::Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()),
+                VectorMath::Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()),
+                VectorMath::Vec3::Create(parser.ReadFloat(), parser.ReadFloat(), parser.ReadFloat()));
         }
         else if (parser.LookAhead("debugclear"))
         {
@@ -645,7 +645,7 @@ namespace GameEngine
 		}
 		Ray rs;
 		rs.Origin.SetZero();
-		rs.Dir = Vec3::Create(0.0f, 0.0f, -1.0f);
+		rs.Dir = VectorMath::Vec3::Create(0.0f, 0.0f, -1.0f);
 		return rs;
 	}
 
@@ -733,7 +733,7 @@ namespace GameEngine
 		List<unsigned char> imageBuffer;
 		imageBuffer.SetSize(imgRef.Width * imgRef.Height * 4);
 		image->GetData(0, imageBuffer.Buffer(), imageBuffer.Count());
-		List<Vec4> imageBufferf;
+		List<VectorMath::Vec4> imageBufferf;
 		imageBufferf.SetSize(imgRef.Width * imgRef.Height);
 		for (int i = 0; i < imgRef.Width * imgRef.Height; i++)
 		{
