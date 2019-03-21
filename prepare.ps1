@@ -13,17 +13,25 @@ if (Test-path '.\ExternalLibs\Slang\') {
     Remove-Item -Recurse -Force '.\ExternalLibs\Slang\'
 }
 New-Item -ItemType directory -Path .\ExternalLibs\Slang\
-$slangVersion='0.11.18'
+$slangVersion='0.12.4'
 (New-Object Net.WebClient).DownloadFile("https://github.com/shader-slang/slang/releases/download/v$slangVersion/slang-$slangVersion-win64.zip", 'slang-x64.zip')
 Expand-Archive -Path "slang-x64.zip" -DestinationPath '.\ExternalLibs\Slang\' -Force
 Remove-Item 'slang-x64.zip'
 (New-Object Net.WebClient).DownloadFile("https://github.com/shader-slang/slang/releases/download/v$slangVersion/slang-$slangVersion-win32.zip", 'slang-32.zip')
 Expand-Archive -Path "slang-32.zip" -DestinationPath '.\ExternalLibs\Slang\' -Force
 Remove-Item 'slang-32.zip'
-New-Item .\x64\Debug -ItemType Directory
-New-Item .\x64\Release -ItemType Directory
-New-Item .\Debug -ItemType Directory
-New-Item .\Release -ItemType Directory
+if (-not (Test-path '.\x64\Debug')) {
+    New-Item .\x64\Debug -ItemType Directory
+}
+if (-not (Test-path '.\x64\Release')) {
+    New-Item .\x64\Release -ItemType Directory
+}
+if (-not (Test-path '.\Debug')) {
+    New-Item .\Debug -ItemType Directory
+}
+if (-not (Test-path '.\Release')) {
+    New-Item .\Release -ItemType Directory
+}
 Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang.dll" "x64\Debug\slang.dll"
 Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang.dll" "x64\Release\slang.dll"
 Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang-glslang.dll" "x64\Debug\slang-glslang.dll"

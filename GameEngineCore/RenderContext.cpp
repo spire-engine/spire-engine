@@ -100,7 +100,7 @@ namespace GameEngine
 
 		const int poseMatrixSize = skeleton->Bones.Count() * sizeof(Matrix4);
 
-		// ensure allocated transform buffer is sufficient
+		// ensure allocated transform buffer is sufficient 
 		_ASSERT(transformModule->BufferLength >= poseMatrixSize);
 
 		List<Matrix4> matrices;
@@ -123,8 +123,8 @@ namespace GameEngine
         RefPtr<DrawableMesh> result = new DrawableMesh(rendererResource);
         result->vertexBufferOffset = (int)((char*)rendererResource->vertexBufferMemory.Alloc(mesh->GetVertexCount() * mesh->GetVertexSize()) - (char*)rendererResource->vertexBufferMemory.BufferPtr());
         result->indexBufferOffset = (int)((char*)rendererResource->indexBufferMemory.Alloc(mesh->Indices.Count() * sizeof(mesh->Indices[0])) - (char*)rendererResource->indexBufferMemory.BufferPtr());
-        result->vertexFormat = rendererResource->pipelineManager.LoadVertexFormat(mesh->GetVertexFormat());
         result->meshVertexFormat = mesh->GetVertexFormat();
+        result->vertexFormat = rendererResource->pipelineManager.LoadVertexFormat(mesh->GetVertexFormat());
         result->vertexCount = mesh->GetVertexCount();
         rendererResource->indexBufferMemory.SetDataAsync(result->indexBufferOffset, mesh->Indices.Buffer(), mesh->Indices.Count() * sizeof(mesh->Indices[0]));
         rendererResource->vertexBufferMemory.SetDataAsync(result->vertexBufferOffset, mesh->GetVertexBuffer(), mesh->GetVertexCount() * result->vertexFormat.Size());

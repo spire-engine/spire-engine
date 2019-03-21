@@ -412,6 +412,8 @@ namespace GameEngine
             for (int i = 0; i < charts.Count(); i++)
             {
                 auto & chart = charts[i];
+                if (chart.size.x * scale > 1.0f || chart.size.y * scale > 1.0f)
+                    return false;
                 int chartBitmapWidth = Math::Max(1, (int)(chart.size.x * textureSize * scale));
                 int chartBitmapHeight = Math::Max(1, (int)(chart.size.y * textureSize * scale));
                 Canvas bmp;
@@ -461,8 +463,16 @@ namespace GameEngine
             List<ChartPlacement> chartPositions;
             // sort charts by size
             scale = 1.0f;
-            float failScale = 1.0f, succScale = 0.0f;
-            while (scale > 1e-3f)
+            // determine initial scale such that the largest chart will scale to between 0-1
+            for (auto & c : charts)
+            {
+                if (c.size.x > 1.0f)
+                    scale = Math::Min(scale, 1.0f / c.size.x);
+                if (c.size.y > 1.0f)
+                    scale = Math::Min(scale, 1.0f / c.size.y);
+            }
+            float failScale = scale, succScale = 0.0f;
+            while (scale > 1e-5f)
             {
                 List<ChartPlacement> tmpChartPositions;
                 if (TryPackCharts(textureSize, scale, paddingPixels, tmpChartPositions))
@@ -475,7 +485,7 @@ namespace GameEngine
                 scale = scale * 0.5f;
             }
             // find best scale
-            if (scale < 1e-3)
+            if (scale < 1e-5)
                 return false;
             for (int iter = 0; iter < 5;  iter++)
             {

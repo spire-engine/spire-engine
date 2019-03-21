@@ -1,7 +1,6 @@
 #include "TextureCompressor.h"
 #define STB_DXT_IMPLEMENTATION
 #include "TextureTool/stb_dxt.h"
-#include "TextureTool/LibSquish.h"
 
 namespace GameEngine
 {

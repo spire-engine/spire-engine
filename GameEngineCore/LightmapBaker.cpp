@@ -53,7 +53,7 @@ namespace GameEngine
                 {
                     auto transformMatrix = smActor->LocalTransform.GetValue();
                     float scale = Math::Max(transformMatrix.m[0][0], transformMatrix.m[1][1], transformMatrix.m[2][2]);
-                    auto size = sqrt(smActor->Mesh->GetSurfaceArea()) * scale;
+                    auto size = sqrt(smActor->GetMesh()->GetSurfaceArea()) * scale;
                     int resolution = Math::Clamp(1 << Math::Log2Ceil((int)(size * settings.ResolutionScale)), settings.MinResolution, settings.MaxResolution);
                     lightmaps.ActorLightmapIds[actor.Value.Ptr()] = mapResolutions.Count();
                     mapResolutions.Add(resolution);
@@ -139,6 +139,7 @@ namespace GameEngine
                         if (diffusePixel.x > 1e-5f || diffusePixel.y > 1e-5f || diffusePixel.z > 1e-5f)
                             map->validPixels.Add(i * width + j);
                     }
+                //map->diffuseMap.DebugSaveAsImage("d:/debugDiffuse.pfm");
                 progress++;
                 ProgressChanged(LightmapBakerProgressChangedEventArgs(progress, lightmaps.ActorLightmapIds.Count()));
                 if (isCancelled) return;
@@ -169,18 +170,30 @@ namespace GameEngine
             auto inter = staticScene->TraceRay(shadowRay);
             if (inter.IsHit)
             {
-                auto diffuse = maps[inter.MapId].diffuseMap.Sample(inter.UV);
-                if (diffuse.w < 1.0f)
+                if (inter.CastShadow)
+                {
+                    auto diffuse = maps[inter.MapId].diffuseMap.Sample(inter.UV);
+                    if (diffuse.w < 1.0f)
+                    {
+                        Ray newShadowRay;
+                        newShadowRay.Origin = shadowRay.Origin + shadowRay.Dir * (inter.T + settings.ShadowBias);
+                        newShadowRay.tMax = shadowRay.tMax - (inter.T + settings.ShadowBias);
+                        newShadowRay.Dir = shadowRay.Dir;
+                        auto rs = TraceShadowRay(newShadowRay);
+                        return diffuse.xyz() * rs * (1.0f - diffuse.w);
+                    }
+                    else
+                        return VectorMath::Vec3::Create(0.0f, 0.0f, 0.0f);
+                }
+                else
                 {
                     Ray newShadowRay;
                     newShadowRay.Origin = shadowRay.Origin + shadowRay.Dir * (inter.T + settings.ShadowBias);
                     newShadowRay.tMax = shadowRay.tMax - (inter.T + settings.ShadowBias);
                     newShadowRay.Dir = shadowRay.Dir;
-                    auto rs = TraceShadowRay(newShadowRay);
-                    return diffuse.xyz() * rs * (1.0f - diffuse.w);
+                    return TraceShadowRay(newShadowRay);
                 }
-                else
-                    return VectorMath::Vec3::Create(0.0f, 0.0f, 0.0f);
+                
             }
 
             return VectorMath::Vec3::Create(1.0f, 1.0f, 1.0f);
@@ -259,7 +272,7 @@ namespace GameEngine
             return VectorMath::Vec3::Create(x, r1, z);
         }
 
-        VectorMath::Vec3 TraceSampleRay(Ray& ray, float minValidDist, bool& isInvalid)
+        VectorMath::Vec3 TraceSampleRay(Ray& ray, float minValidDist, bool& isInvalid, int recurseLevel = 0)
         {
             auto inter = staticScene->TraceRay(ray);
             if (inter.IsHit)
@@ -283,12 +296,16 @@ namespace GameEngine
                 }
                 else
                 {
+                    if (recurseLevel > 16)
+                    {
+                        return VectorMath::Vec3::Create(0.0f, 0.0f, 0.0f);
+                    }
                     Ray newRay = ray;
                     newRay.Origin = ray.Origin + ray.Dir * (inter.T + settings.ShadowBias);
                     newRay.Dir = ray.Dir;
                     newRay.tMax = ray.tMax - (inter.T + settings.ShadowBias);
                     bool isInvalidInner = false;
-                    auto result = TraceSampleRay(newRay, minValidDist, isInvalidInner);
+                    auto result = TraceSampleRay(newRay, minValidDist, isInvalidInner, recurseLevel + 1);
                     return result * surfaceAlbedo.xyz() * surfaceAlbedo.w;
                 }
             }
@@ -446,10 +463,15 @@ namespace GameEngine
                         Random threadRandom(threadRandomSeed);
                         bool isInvalidRegion = false;
                         lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(threadRandom, pos, normal, sampleCount, posPixel.w*2.0f, isInvalidRegion), 1.0f);
-                        if (sampleCount >= 16 && isInvalidRegion)
-                            map.validPixels.Remove(pixelIdx);
-                        threadRandomSeed = threadRandom.GetSeed();
-                        resultMap.SetPixel(x, y, lighting);
+                        if (isnan(lighting.x) || isnan(lighting.y) || isnan(lighting.z) || isnan(lighting.w))
+                            lighting.SetZero();
+                        else
+                        {
+                            if (sampleCount >= 16 && isInvalidRegion)
+                                map.validPixels.Remove(pixelIdx);
+                            threadRandomSeed = threadRandom.GetSeed();
+                            resultMap.SetPixel(x, y, lighting);
+                        }
                     }
                 }
                 map.indirectLightmap = _Move(resultMap);
@@ -614,7 +636,10 @@ namespace GameEngine
             {
                 if (auto staticMeshActor = dynamic_cast<StaticMeshActor*>(actor.Value.Ptr()))
                 {
-                    referencedMeshes.AddIfNotExists(staticMeshActor->MeshFile.GetValue(), staticMeshActor->Mesh);
+                    if (staticMeshActor->GetMesh())
+                    {
+                        referencedMeshes.AddIfNotExists(staticMeshActor->GetMesh()->GetFileName(), staticMeshActor->GetMesh());
+                    }
                 }
             }
             auto list = From(referencedMeshes).ToList();

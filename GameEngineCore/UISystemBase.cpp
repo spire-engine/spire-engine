@@ -566,6 +566,7 @@ namespace GameEngine
     UISystemBase::~UISystemBase()
     {
         textBufferObj->Unmap();
+        fonts = decltype(fonts)();
         delete uiRenderer;
     }
 

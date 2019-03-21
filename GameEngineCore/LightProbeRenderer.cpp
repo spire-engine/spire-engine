@@ -137,6 +137,7 @@ namespace GameEngine
 
 			params.view.Transform = viewMatrix;
 			renderProc->Run(params);
+
 			copyDescSet->BeginUpdate();
 			copyDescSet->Update(0, renderProc->GetOutput()->Texture.Ptr(), TextureAspect::Color);
 			copyDescSet->Update(1, sharedRes->nearestSampler.Ptr());

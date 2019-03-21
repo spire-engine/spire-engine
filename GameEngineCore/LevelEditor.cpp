@@ -6,7 +6,9 @@
 #include "FreeRoamCameraController.h"
 #include "PropertyEditControl.h"
 #include "CameraActor.h"
+#include "StaticMeshActor.h"
 #include "LightmapBaker.h"
+#include "LightmapUVGeneration.h"
 
 using namespace CoreLib;
 using namespace GraphicsUI;
@@ -281,6 +283,12 @@ namespace GameEngine
 			new MenuItem(mnEdit);
 			auto mnDelete = new MenuItem(mnEdit, "&Delete", "Del");
 			mnDelete->OnClick.Bind(this, &LevelEditorImpl::mnDelete_Clicked);
+            
+            auto mnMesh = new MenuItem(mainMenu, "&Mesh");
+            auto mnRegenLightmapUV = new MenuItem(mnMesh, "&Regenerate Lightmap UV");
+            mnRegenLightmapUV->OnClick.Bind(this, &LevelEditorImpl::mnRegenerateLightmapUV_Clicked);
+            auto mnFlipNormal = new MenuItem(mnMesh, "&Flip Normal");
+            mnFlipNormal->OnClick.Bind(this, &LevelEditorImpl::mnFlipNormal_Clicked);
 
 			auto mnLighting = new MenuItem(mainMenu, "&Lighting");
             auto mnPrebakeLighting = new MenuItem(mnLighting, "&Bake Lightmaps");
@@ -349,6 +357,7 @@ namespace GameEngine
 			editorCamController = new FreeRoamCameraControllerActor();
 			editorCamController->SetTargetCamera(editorCam.Ptr());
 			editorCamController->InputChannel = EditorChannelId;
+            editorCamController->Speed = 200.0f;
 			editorCam->OnLoad();
 			editorCamController->OnLoad();
 		}
@@ -638,6 +647,67 @@ namespace GameEngine
         {
             if (lightmapBaker)
                 lightmapBaker->Cancel();
+        }
+        void mnRegenerateLightmapUV_Clicked(UI_Base*)
+        {
+            if (auto staticMeshActor = dynamic_cast<StaticMeshActor*>(selectedActor))
+            {
+                Mesh meshOut;
+                auto oldFileName = staticMeshActor->GetMesh()->GetFileName();
+                if (oldFileName.Length())
+                {
+                    GenerateLightmapUV(&meshOut, staticMeshActor->GetMesh(), 1024, 6);
+                    *staticMeshActor->GetMesh() = _Move(meshOut);
+                    auto newFileName = Engine::Instance()->FindFile(oldFileName, ResourceType::Mesh);
+                    if (newFileName.Length())
+                    {
+                        staticMeshActor->GetMesh()->SaveToFile(newFileName);
+                        Engine::Instance()->GetRenderer()->GetSceneResource()->UpdateDrawableMesh(staticMeshActor->GetMesh());
+                    }
+                    else
+                    {
+                        OsApplication::ShowMessage("Existing mesh does not have a filename.", "Error");
+                    }
+                }
+            }
+        }
+
+        void FlipMeshNormals(Mesh* mesh)
+        {
+            if (mesh->GetVertexFormat().HasTangent())
+            {
+                for (int i = 0; i < mesh->GetVertexCount(); i++)
+                {
+                    auto tangentFrame = mesh->GetVertexTangentFrame(i);
+                    auto m0 = tangentFrame.ToMatrix3();
+                    for (int j = 0; j < 6; j++)
+                        m0.values[j] = -m0.values[j];
+                    tangentFrame = Quaternion::FromMatrix(m0);
+                    mesh->SetVertexTangentFrame(i, tangentFrame);
+                }
+            }
+        }
+        void mnFlipNormal_Clicked(UI_Base*)
+        {
+            if (auto staticMeshActor = dynamic_cast<StaticMeshActor*>(selectedActor))
+            {
+                Mesh meshOut;
+                auto oldFileName = staticMeshActor->GetMesh()->GetFileName();
+                if (oldFileName.Length())
+                {
+                    FlipMeshNormals(staticMeshActor->GetMesh());
+                    auto newFileName = Engine::Instance()->FindFile(oldFileName, ResourceType::Mesh);
+                    if (newFileName.Length())
+                    {
+                        staticMeshActor->GetMesh()->SaveToFile(newFileName);
+                        Engine::Instance()->GetRenderer()->GetSceneResource()->UpdateDrawableMesh(staticMeshActor->GetMesh());
+                    }
+                    else
+                    {
+                        OsApplication::ShowMessage("Existing mesh does not have a filename.", "Error");
+                    }
+                }
+            }
         }
         void mnBakeLightmaps_Clicked(UI_Base*)
         {

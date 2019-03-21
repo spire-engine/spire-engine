@@ -75,7 +75,7 @@ namespace GameEngine
     {
     protected:
         unsigned char * textBuffer = nullptr;
-        CoreLib::Dictionary<CoreLib::String, CoreLib::RefPtr<GraphicsUI::IFont>> fonts;
+        CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::RefPtr<GraphicsUI::IFont>> fonts;
         CoreLib::RefPtr<Buffer> textBufferObj;
         CoreLib::MemoryPool textBufferPool;
         VectorMath::Vec4 ColorToVec(GraphicsUI::Color c);

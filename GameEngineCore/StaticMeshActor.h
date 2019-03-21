@@ -13,7 +13,9 @@ namespace GameEngine
 	{
 	private:
 		bool useInlineMaterial = false;
+        bool isVisible = true;
 		CoreLib::String inlineMeshSpec;
+		Mesh * mesh = nullptr;
 	protected:
 		CoreLib::RefPtr<Model> model = nullptr;
 		CoreLib::RefPtr<ModelPhysicsInstance> physInstance;
@@ -27,12 +29,15 @@ namespace GameEngine
 		void LocalTransform_Changing(VectorMath::Matrix4 & value);
 		void ModelChanged();
 	public:
-		PROPERTY_ATTRIB(CoreLib::String, MeshFile, "resource(Mesh, mesh)");
+        PROPERTY_ATTRIB(CoreLib::String, MeshFile, "resource(Mesh, mesh)");
 		PROPERTY_ATTRIB(CoreLib::String, MaterialFile, "resource(Material, material)");
 		PROPERTY_ATTRIB(CoreLib::String, ModelFile, "resource(Mesh, model)");
-		Mesh * Mesh = nullptr;
 		Material * MaterialInstance;
-		
+        void SetVisible(bool visible) 
+        {
+            isVisible = visible;
+        }
+        Mesh* GetMesh();
 		virtual void OnLoad() override;
 		virtual void OnUnload() override;
 		virtual void GetDrawables(const GetDrawablesParameter & params) override;

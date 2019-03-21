@@ -114,6 +114,7 @@ namespace GameEngine
 		CoreLib::Basic::List<MeshElementRange> ElementRanges;
 		Mesh();
 		CoreLib::String GetUID();
+        CoreLib::String GetFileName();
         int GetMinimumLightmapResolution() { return minLightmapResolution; }
         void SetMinimumLightmapResolution(int val) { minLightmapResolution = val; }
         float GetSurfaceArea() { return surfaceArea; }

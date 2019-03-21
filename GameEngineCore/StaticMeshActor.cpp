@@ -31,14 +31,14 @@ namespace GameEngine
 					mb.AddBox(Vec3::Create(x0, y0, z0), Vec3::Create(x1, y1, z1));
 				}
 				parser.Read("}");
-				Mesh = level->LoadMesh("immMesh" + String(meshCounter++), mb.ToMesh());
+				mesh = level->LoadMesh("immMesh" + String(meshCounter++), mb.ToMesh());
 			}
 			else
 			{
 				MeshFile = parser.ReadStringLiteral();
 			}
-			if (Mesh)
-				Bounds = Mesh->Bounds;
+			if (mesh)
+				Bounds = mesh->Bounds;
 			return true;
 		}
 		else if (fieldName == "material")
@@ -70,10 +70,10 @@ namespace GameEngine
 	{
 		ModelFile.WriteValue("");
 		if (newMeshFile.Length())
-			Mesh = level->LoadMesh(newMeshFile);
-		if (!Mesh)
+			mesh = level->LoadMesh(newMeshFile);
+		if (!mesh)
 		{
-			Mesh = level->LoadErrorMesh();
+			mesh = level->LoadErrorMesh();
 			newMeshFile = "";
 		}
 		model = nullptr;
@@ -117,9 +117,9 @@ namespace GameEngine
 	
 	void StaticMeshActor::ModelChanged()
 	{
-		if (!model && Mesh && MaterialInstance)
+		if (!model && mesh && MaterialInstance)
 		{
-			model = new GameEngine::Model(Mesh, MaterialInstance);
+			model = new GameEngine::Model(mesh, MaterialInstance);
 		}
 		SetLocalTransform(*LocalTransform); // update bbox
 		// update physics scene
@@ -128,7 +128,12 @@ namespace GameEngine
 		modelInstance.Drawables.Clear();
 	}
 
-	void StaticMeshActor::OnLoad()
+    Mesh * StaticMeshActor::GetMesh()
+    {
+        return model->GetMesh();
+    }
+
+    void StaticMeshActor::OnLoad()
 	{
 		if (ModelFile.GetValue().Length())
 		{
@@ -137,9 +142,9 @@ namespace GameEngine
 		else
 		{
 			if (MeshFile.GetValue().Length())
-				Mesh = level->LoadMesh(MeshFile.GetValue());
-			if (!Mesh)
-				Mesh = level->LoadErrorMesh();
+				mesh = level->LoadMesh(MeshFile.GetValue());
+			if (!mesh)
+				mesh = level->LoadErrorMesh();
 			if (MaterialFile.GetValue().Length())
 				MaterialInstance = level->LoadMaterial(MaterialFile.GetValue());
 			if (!MaterialInstance)
@@ -161,7 +166,7 @@ namespace GameEngine
 
 	void StaticMeshActor::GetDrawables(const GetDrawablesParameter & params)
 	{
-		if (model)
+		if (model && isVisible)
 		{
 			GetDrawablesParameter newParams = params;
 			newParams.UseSkeleton = false;

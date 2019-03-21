@@ -603,7 +603,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
                     shadow *= val;
                 }
 
-                float dotNL = clamp(dot(lNormal, lightDir), 0.01, 0.99);
+                float dotNL = clamp(dot(lNormal, lightDir), 0.0, 1.0);
                 float NoV = max(dot(lNormal, view), 0.0);
                 float3 fspecularColor = EnvBRDFApprox(specularColor, roughness, NoV);
 
@@ -662,7 +662,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 		}
 
         color *= ao;
-        return float4(color, opacity);
+        return clamp(float4(color, opacity), float4(0.0), float4(100.0f));
     }
 };
 

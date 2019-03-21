@@ -16,7 +16,9 @@ namespace GameEngine
         Vec3 verts[3];
         Vec2 uvs[3];
         Vec3 normal;
-        int mapId;
+        uint32_t castShadow : 1;
+        int mapId:31;
+
     };
     
     class MeshBvhEvaluator
@@ -38,14 +40,14 @@ namespace GameEngine
             Vec3 e1 = face.verts[1] - face.verts[0];
             Vec3 e2 = face.verts[2] - face.verts[0];
             Vec3 s1 = Vec3::Cross(ray.Dir, e2);
-            float  invd = 1.0f / (Vec3::Dot(s1, e1));
+            float di = Vec3::Dot(s1, e1);
+            float  invd = 1.0f / (di);
             Vec3 d = ray.Origin - face.verts[0];
             float  b1 = Vec3::Dot(d, s1) * invd;
             Vec3 s2 = Vec3::Cross(d, e1);
             float  b2 = Vec3::Dot(ray.Dir, s2) * invd;
             float temp = Vec3::Dot(e2, s2) * invd;
-
-            if (b1 < 0.f || b1 > 1.f || b2 < 0.f || b1 + b2 > 1.f || temp < 0.f || temp > ray.tMax)
+            if (b1 < 0.f || b1 > 1.f || b2 < 0.f || b1 + b2 > 1.f || temp < 1e-5f || temp > ray.tMax)
             {
                 return false;
             }
@@ -55,6 +57,7 @@ namespace GameEngine
                 inter.IsHit = true;
                 inter.MapId = face.mapId;
                 inter.Normal = face.normal;
+                inter.CastShadow = (face.castShadow != 0);
                 inter.UV = face.uvs[0] * (1.0f - b1 - b2) + face.uvs[1] * b1 + face.uvs[2] * b2;
                 return true;
             }
@@ -84,13 +87,14 @@ namespace GameEngine
         }
     };
 
-    void AddMeshInstance(List<StaticFace>& faces, Mesh * mesh, Matrix4 localTransform, int id)
+    void AddMeshInstance(List<StaticFace>& faces, Mesh * mesh, Matrix4 localTransform, int id, bool castShadow)
     {
         int uvChannelId = mesh->GetVertexFormat().GetUVChannelCount() - 1;
         for (int i = 0; i < mesh->Indices.Count() / 3; i++)
         {
             StaticFace f;
             f.mapId = id;
+            f.castShadow = castShadow ? 1 : 0;
             for (int j = 0; j < 3; j++)
             {
                 int vid = mesh->Indices[i * 3 + j];
@@ -98,7 +102,10 @@ namespace GameEngine
                 f.verts[j] = localTransform.Transform(Vec4::Create(mesh->GetVertexPosition(vid), 1.0f)).xyz();
                 f.normal = Vec3::Cross(f.verts[1] - f.verts[0], f.verts[2] - f.verts[0]).Normalize();
             }
-            faces.Add(f);
+            if ((f.verts[0] - f.verts[1]).Length2() > 1e-6f &&
+                (f.verts[0] - f.verts[2]).Length2() > 1e-6f &&
+                (f.verts[1] - f.verts[2]).Length2() > 1e-6f)
+                faces.Add(f);
         }
     }
 
@@ -163,7 +170,7 @@ namespace GameEngine
         {
             if (auto smActor = actor.Value.As<StaticMeshActor>())
             {
-                AddMeshInstance(faces, smActor->Mesh, smActor->LocalTransform.GetValue(), id);
+                AddMeshInstance(faces, smActor->GetMesh(), smActor->LocalTransform.GetValue(), id, smActor->CastShadow.GetValue());
                 id++;
             }
         }

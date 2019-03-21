@@ -104,6 +104,11 @@ namespace GameEngine
 		return fileName;
 	}
 
+    CoreLib::String Mesh::GetFileName()
+    {
+        return fileName;
+    }
+
 	void Mesh::SaveToStream(Stream * stream)
 	{
 		auto writer = BinaryWriter(stream);

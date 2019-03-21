@@ -16,6 +16,7 @@ namespace GameEngine
         int MapId;
         float T = FLT_MAX;
         bool IsHit = false;
+        bool CastShadow = true;
         VectorMath::Vec3 Normal;
     };
 

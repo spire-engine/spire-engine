@@ -62,20 +62,20 @@ namespace GameEngine
         }
     }
 
-    class Canvas
+    class GDICanvas
     {
     private:
         HFONT hdFont;
         HBRUSH hdBrush;
     public:
         HDC Handle;
-        Canvas(HDC DC)
+        GDICanvas(HDC DC)
         {
             Handle = DC;
             hdBrush = CreateSolidBrush(RGB(255, 255, 255));
             SelectObject(Handle, hdBrush);
         }
-        ~Canvas()
+        ~GDICanvas()
         {
             DeleteObject(hdFont);
             DeleteObject(hdBrush);
@@ -201,13 +201,13 @@ namespace GameEngine
     public:
         HDC Handle;
         HBITMAP bitHandle;
-        Canvas * canvas;
+        GDICanvas * canvas;
         unsigned char** ScanLine;
         DIBImage()
         {
             ScanLine = NULL;
             Handle = CreateCompatibleDC(NULL);
-            canvas = new Canvas(Handle);
+            canvas = new GDICanvas(Handle);
             canvas->ChangeFont(Font("Segoe UI", 10), 96);
 
         }
