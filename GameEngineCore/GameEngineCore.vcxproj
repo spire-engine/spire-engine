@@ -196,6 +196,8 @@
     <ClCompile Include="LightActor.cpp" />
     <ClCompile Include="LightingData.cpp" />
     <ClCompile Include="LightmapBaker.cpp" />
+    <ClCompile Include="LightmapDebugViewRenderPass.cpp" />
+    <ClCompile Include="LightmapDebugViewRenderProcedure.cpp" />
     <ClCompile Include="LightmapSet.cpp" />
     <ClCompile Include="LightmapUVGeneration.cpp" />
     <ClCompile Include="LightProbeRenderer.cpp" />
@@ -230,7 +232,6 @@
     <ClCompile Include="SystemWindow-Win32.cpp" />
     <ClCompile Include="TerrainActor.cpp" />
     <ClCompile Include="TextureCompressor.cpp" />
-    <ClCompile Include="TextureTool\LibSquish.cpp" />
     <ClCompile Include="ToneMappingActor.cpp" />
     <ClCompile Include="UISystemBase.cpp" />
     <ClCompile Include="UISystem-Win32.cpp" />
@@ -271,8 +272,8 @@
     <ClInclude Include="Gizmo.h" />
     <ClInclude Include="GizmoActor.h" />
     <ClInclude Include="ComputeTaskManager.h" />
+    <ClInclude Include="ImageBarrierHelper.h" />
     <ClInclude Include="LevelEditor.h" />
-    <ClInclude Include="LightBinningPass.h" />
     <ClInclude Include="Drawable.h" />
     <ClInclude Include="EngineLimits.h" />
     <ClInclude Include="DeviceMemory.h" />
@@ -327,7 +328,6 @@
     <ClInclude Include="SystemWindow-Win32.h" />
     <ClInclude Include="TerrainActor.h" />
     <ClInclude Include="TextureCompressor.h" />
-    <ClInclude Include="TextureTool\LibSquish.h" />
     <ClInclude Include="TextureTool\stb_dxt.h" />
     <ClCompile Include="ToneMappingPostRenderPass.cpp">
       <FileType>CppCode</FileType>

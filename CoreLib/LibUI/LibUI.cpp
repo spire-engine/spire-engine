@@ -6341,14 +6341,14 @@ namespace GraphicsUI
 	}
 
 	StatusPanel::StatusPanel(StatusStrip * parent)
-		: Container(parent)
+		: Container(parent), panelType(Text)
 	{
 		Init();
 		parent->AddItem(this);
 	}
 
 	StatusPanel::StatusPanel(StatusStrip * parent, const String & _text, int width, _FillMode fm)
-		: Container(parent)
+		: Container(parent), panelType(Text)
 	{
 		Init();
 		FillMode = fm;
@@ -6358,24 +6358,60 @@ namespace GraphicsUI
 		parent->AddItem(this);
 	}
 
+    StatusPanel::StatusPanel(StatusStrip * parent, StatusPanelType type, int width, _FillMode fm)
+        : Container(parent), panelType(type)
+    {
+        Init();
+        FillMode = fm;
+        Width = width;
+        Height = (int)(GetEntry()->GetLineHeight() * 1.2f);
+        parent->AddItem(this);
+    }
+
 	void StatusPanel::Init()
 	{
 		BackColor = Color(0,0,0,0);
 		BorderStyle = BS_NONE;
 		FillMode = Fixed;
 		Width = 50;
-		text = new Label(this);
+        if (panelType == Text)
+            text = new Label(this);
+        else
+        {
+            progressBar = new ProgressBar(this);
+            progressBar->BorderStyle = BS_FLAT_;
+            progressBar->Style = 0;
+            progressBar->DockStyle = dsFill;
+            progressBar->Visible = false;
+        }
 	}
 
 	void StatusPanel::SetText(const String & _text)
 	{
-		text->SetText(_text);
+        if (text)
+		    text->SetText(_text);
 	}
 
 	String StatusPanel::GetText()
 	{
-		return text->GetText();
+        if (text)
+            return text->GetText();
+        else
+            return String();
 	}
+
+    void StatusPanel::SetProgress(int value, int max)
+    {
+        if (progressBar)
+        {
+            progressBar->Visible = (max != 0);
+            if (max != 0)
+            {
+                progressBar->SetMax(max);
+                progressBar->SetPosition(Math::Min(value, max));
+            }
+        }
+    }
 
 	int StatusPanel::MeasureWidth()
 	{
@@ -6391,9 +6427,17 @@ namespace GraphicsUI
 	{
 		Control::Draw(absX, absY);
 		auto entry = GetEntry();
-		entry->ClipRects->AddRect(Rect(absX + Left, absY + Top, Width - text->TextHeight, Height));
-		text->Draw(absX+Left, absY+Top + ((Height - text->TextHeight) >> 1));
-		entry->ClipRects->PopRect();
+        if (text)
+        {
+            entry->ClipRects->AddRect(Rect(absX + Left, absY + Top, Width - text->TextHeight, Height));
+            text->Draw(absX + Left, absY + Top + ((Height - text->TextHeight) >> 1));
+            entry->ClipRects->PopRect();
+        }
+        else if (progressBar)
+        {
+            if (progressBar->Visible)
+                progressBar->Draw(absX + Left, absY + Top);
+        }
 	}
 		
 	StatusStrip::StatusStrip(Container * parent)
@@ -6435,18 +6479,18 @@ namespace GraphicsUI
 			fc = 1;
 		int fw = w/fc;
 		int h = Height - Padding.Vertical();
-		int left = 0;
+		int left = Padding.Left;
 		for (int i=0; i<panels.Count(); i++)
 		{
 			int cw = panels[i]->MeasureWidth();
 			if (cw != -1)
 			{
-				panels[i]->Posit(left, 0, cw, h);
+				panels[i]->Posit(left, Padding.Top, cw, h);
 				left += cw;
 			}
 			else
 			{
-				panels[i]->Posit(left, 0, fw, h);
+				panels[i]->Posit(left, Padding.Top, fw, h);
 				left += fw;
 			}
 		}

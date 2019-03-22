@@ -1278,15 +1278,23 @@ namespace GraphicsUI
 		{
 			Fill, Fixed, AutoSize
 		};
+        enum StatusPanelType
+        {
+            Text, Progress
+        };
 	private:
-		Label* text;
+        StatusPanelType panelType = Text;
+		Label* text = nullptr;
+        ProgressBar* progressBar = nullptr;
 		void Init();
 	public:
 		_FillMode FillMode;
 		StatusPanel(StatusStrip * parent);
 		StatusPanel(StatusStrip * parent, const CoreLib::String & text, int width, _FillMode fm);
+        StatusPanel(StatusStrip * parent, StatusPanelType panelType, int width, _FillMode fm);
 		void SetText(const CoreLib::String & text);
 		CoreLib::String GetText();
+        void SetProgress(int value, int max);
 		int MeasureWidth();
 		void Draw(int absX, int absY);
 	};

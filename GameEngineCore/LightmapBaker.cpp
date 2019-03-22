@@ -23,6 +23,8 @@ namespace GameEngine
         LightmapBakingSettings settings;
         LightmapSet lightmaps, lightmapsReturn;
         ComputeKernel* lightmapComrpessionKernel;
+        int totalBlocks;
+        std::atomic<int> completedBlocks;
     private:
         struct RawMapSet
         {
@@ -260,6 +262,8 @@ namespace GameEngine
                 if (!light.IncludeDirectLighting)
                     dynamicDirectLighting += lighting;
             }
+            if (isnan(result.x) || isnan(result.y) || isnan(result.z))
+                result.SetZero();
             return result;
         }
 
@@ -296,7 +300,7 @@ namespace GameEngine
                 }
                 else
                 {
-                    if (recurseLevel > 16)
+                    if (recurseLevel > settings.SampleCount)
                     {
                         return VectorMath::Vec3::Create(0.0f, 0.0f, 0.0f);
                     }
@@ -432,47 +436,151 @@ namespace GameEngine
                 }
             }
         }
+        static const int MaxLightmapBlockSize = 16;
+        void ComputeIndirectLightmapBlock(RawMapSet& map, RawObjectSpaceMap& resultMap, int sampleCount, int x0, int y0, int blockSize,
+            VectorMath::Vec4* result, VectorMath::Vec3* normals, VectorMath::Vec3* positions, bool* valid, bool * computed)
+        {
+            int x1 = x0 + blockSize - 1;
+            int y1 = y0 + blockSize - 1;
+            for (int i = 0; i < 4; i++)
+            {
+                if (computed[i]) continue;
+                valid[i] = false;
+                int x = (i & 1) ? x0 : x1;
+                int y = (i & 2) ? y0 : y1;
+                int pixelIdx = y * map.diffuseMap.Width + x;
+                if (map.validPixels.Contains(pixelIdx))
+                {
+                    valid[i] = true;
+                    pixelCounter++;
+                    VectorMath::Vec4 lighting;
+                    lighting.SetZero();
+                    auto posPixel = map.positionMap.GetPixel(x, y);
+                    auto pos = posPixel.xyz();
+                    auto normal = map.normalMap.GetPixel(x, y).xyz().Normalize();
+                    Random threadRandom(threadRandomSeed);
+                    bool isInvalidRegion = false;
+                    positions[i] = pos;
+                    normals[i] = normal;
+                    lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(threadRandom, pos, normal, sampleCount, posPixel.w*2.0f, isInvalidRegion), 1.0f);
+                    if (isnan(lighting.x) || isnan(lighting.y) || isnan(lighting.z) || isnan(lighting.w))
+                        lighting.SetZero();
+                    else
+                    {
+                        if (sampleCount >= settings.SampleCount && isInvalidRegion)
+                        {
+                            map.validPixels.Remove(pixelIdx);
+                            valid[i] = false;
+                        }
+                    }
+                    resultMap.SetPixel(x, y, lighting);
+                    result[i] = lighting;
+                    threadRandomSeed = threadRandom.GetSeed();
+                }
+            }
+            if (blockSize > 2)
+            {
+                // do we need to refine?
+                bool shouldRefine = (!valid[0] || !valid[1] || !valid[2] || !valid[3]);
+                shouldRefine = shouldRefine || (positions[3] - positions[0]).Length() > settings.IndirectLightingWorldGranularity;
+                if (sampleCount == settings.FinalGatherSampleCount)
+                {
+                    shouldRefine = shouldRefine || (result[1] - result[0]).Length() > 0.1f || (result[2] - result[0]).Length() > 0.1f ||
+                        (result[3] - result[0]).Length() > settings.FinalGatherAdaptiveSampleThreshold;
+                }
+                
+                if (shouldRefine)
+                {
+                    VectorMath::Vec4 nResult[4];
+                    VectorMath::Vec3 nPositions[4];
+                    VectorMath::Vec3 nNormals[4];
+                    bool nValid[4], nComputed[4];
+                    for (int j = 0; j < 4; j++)
+                    {
+                        nValid[j] = valid[j];
+                        nResult[j] = result[j];
+                        nPositions[j] = positions[j];
+                        nNormals[j] = normals[j];
+                        nComputed[0] = nComputed[1] = nComputed[2] = nComputed[3] = false;
+                        nComputed[j] = true; 
+                        int nx0 = x0 + ((j & 1) ? (blockSize >> 1) : 0);
+                        int ny0 = y0 + ((j & 2) ? (blockSize >> 1) : 0);
+                        ComputeIndirectLightmapBlock(map, resultMap, sampleCount, nx0, ny0, blockSize >> 1, nResult, nNormals, nPositions, nValid, nComputed);
+                    }
+                }
+                else
+                {
+                    float invBlockSize = 1.0f / (blockSize - 1);
+                    VectorMath::Vec4 first[MaxLightmapBlockSize];
+                    VectorMath::Vec4 last[MaxLightmapBlockSize];
+                    first[0] = result[0];
+                    first[blockSize - 1] = result[1];
+                    last[0] = result[2];
+                    last[blockSize - 1] = result[3];
+                    // fill first row and last row
+                    for (int j = 1; j < blockSize - 1; j++)
+                    {
+                        float t = j * invBlockSize;
+                        float invT = 1.0f - t;
+                        first[j] = result[0] * invT + result[1] * t;
+                        resultMap.SetPixel(x0 + j, y0, first[j]);
+                        last[j] = result[2] * invT + result[3] * t;
+                        resultMap.SetPixel(x0 + j, y1, last[j]);
+                    }
+                    // fill all columns
+                    for (int j = 0; j < blockSize; j++)
+                    {
+                        auto a = first[j];
+                        auto b = last[j];
+                        for (int k = 1; k < blockSize - 1; k++)
+                        {
+                            float t = k * invBlockSize;
+                            float invT = 1.0f - t;
+                            resultMap.SetPixel(x0 + j, y0 + k, a*invT + b * t);
+                        }
+                    }
+                }
+            }
+        }
 
         void ComputeLightmaps_Indirect(int sampleCount)
         {
             static int iteration = 0;
             iteration++;
+            totalBlocks = 0;
+            for (auto & map : maps)
+            {
+                int horizontalBlockCount = (map.diffuseMap.Width + MaxLightmapBlockSize - 1) / MaxLightmapBlockSize;
+                int blockCount = horizontalBlockCount * (map.diffuseMap.Height + MaxLightmapBlockSize - 1) / MaxLightmapBlockSize;
+                totalBlocks += blockCount;
+            }
+            completedBlocks = 0;
             for (auto & map : maps)
             {
                 if (isCancelled) return;
-                int imageSize = map.diffuseMap.Width * map.diffuseMap.Height;
+                int horizontalBlockCount = (map.diffuseMap.Width + MaxLightmapBlockSize - 1) / MaxLightmapBlockSize;
+                int blockCount = horizontalBlockCount * (map.diffuseMap.Height + MaxLightmapBlockSize - 1) / MaxLightmapBlockSize;
                 auto resultMap = map.indirectLightmap;
                 #pragma omp parallel for
-                for (int pixelIdx = 0; pixelIdx < imageSize; pixelIdx++)
+                for (int blockIdx = 0; blockIdx < blockCount; blockIdx++)
                 {
-                    if (map.validPixels.Contains(pixelIdx))
+                    if (threadCancelled || (pixelCounter & 15) == 0)
                     {
-                        pixelCounter++;
-                        if (threadCancelled || (pixelCounter & 15) == 0)
-                        {
-                            threadCancelled = isCancelled;
-                        }
-                        if (threadCancelled) continue;
-                        int x = pixelIdx % map.diffuseMap.Width;
-                        int y = pixelIdx / map.diffuseMap.Width;
-                        VectorMath::Vec4 lighting;
-                        lighting.SetZero();
-                        auto posPixel = map.positionMap.GetPixel(x, y);
-                        auto pos = posPixel.xyz();
-                        auto normal = map.normalMap.GetPixel(x, y).xyz().Normalize();
-                        Random threadRandom(threadRandomSeed);
-                        bool isInvalidRegion = false;
-                        lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(threadRandom, pos, normal, sampleCount, posPixel.w*2.0f, isInvalidRegion), 1.0f);
-                        if (isnan(lighting.x) || isnan(lighting.y) || isnan(lighting.z) || isnan(lighting.w))
-                            lighting.SetZero();
-                        else
-                        {
-                            if (sampleCount >= 16 && isInvalidRegion)
-                                map.validPixels.Remove(pixelIdx);
-                            threadRandomSeed = threadRandom.GetSeed();
-                            resultMap.SetPixel(x, y, lighting);
-                        }
+                        threadCancelled = isCancelled;
                     }
+                    if (threadCancelled) continue;
+
+                    int x0 = (blockIdx % horizontalBlockCount) * MaxLightmapBlockSize;
+                    int y0 = (blockIdx / horizontalBlockCount) * MaxLightmapBlockSize;
+                    VectorMath::Vec3 positions[4], normals[4];
+                    VectorMath::Vec4 results[4];
+                    bool valid[4];
+                    bool computed[4] = { false, false ,false, false };
+                    ComputeIndirectLightmapBlock(map, resultMap, sampleCount, x0, y0, MaxLightmapBlockSize,
+                        results, normals, positions, valid, computed);
+                    auto progress = completedBlocks.fetch_add(1);
+                    if ((progress & 7) == 0)
+                        ProgressChanged(LightmapBakerProgressChangedEventArgs(progress + 1, totalBlocks));
                 }
                 map.indirectLightmap = _Move(resultMap);
             }
@@ -586,7 +694,7 @@ namespace GameEngine
             {
                 auto & lm = lightmaps.Lightmaps[i];
                 lm.Init(RawObjectSpaceMap::DataType::RGB32F, maps[i].lightMap.Width, maps[i].lightMap.Height);
-                int indirectBlurRadius = Math::Clamp(maps[i].indirectLightmap.Width / 100, 1, 20);
+                int indirectBlurRadius = Math::Clamp(maps[i].indirectLightmap.Width / 50, 1, 40);
 
                 // get direct lighting
                 #pragma omp parallel for
@@ -789,7 +897,7 @@ namespace GameEngine
                 auto statusText = statusTextSB.ToString();
                 StatusChanged(statusText);
                 ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
-                ComputeLightmaps_Indirect(i == settings.IndirectLightingBounces-1 ? settings.FinalGatherSampleCount : settings.SampleCount);
+                ComputeLightmaps_Indirect(i == settings.IndirectLightingBounces-1 ? settings.FinalGatherSampleCount : Math::Min((i + 1) * 2, settings.SampleCount));
                 CompositeLightmaps();
                 if (isCancelled) goto computeThreadEnd;
                 IterationCompleted();

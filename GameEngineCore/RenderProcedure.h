@@ -25,8 +25,11 @@ namespace GameEngine
         virtual void UpdateSceneResourceBinding(SceneResource* sceneRes) = 0;
 		virtual void Run(const RenderProcedureParameters & params) = 0;
 		virtual RenderTarget* GetOutput() = 0;
+        virtual CoreLib::String GetName() = 0;
 	};
 
+    IRenderProcedure * CreateLightmapDebugViewRenderProcedure();
+    IRenderProcedure * CreateWorldNormalViewRenderProcedure();
 	IRenderProcedure * CreateStandardRenderProcedure(bool toneMapping, bool useEnvMap);
 }
 

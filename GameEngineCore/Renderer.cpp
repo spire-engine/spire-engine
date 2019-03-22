@@ -99,16 +99,27 @@ namespace GameEngine
 		RefPtr<SceneResource> sceneRes;
 		RefPtr<ViewResource> mainView;
 		RefPtr<RendererServiceImpl> renderService;
-		RefPtr<IRenderProcedure> renderProcedure;
+		IRenderProcedure* currentRenderProcedure = nullptr;
 		EnumerableDictionary<uint32_t, int> worldRenderPassIds;
 		List<RefPtr<WorldRenderPass>> worldRenderPasses;
 		List<RefPtr<PostRenderPass>> postRenderPasses;
+        List<String> renderProcedureNames;
+        Dictionary<String, RefPtr<IRenderProcedure>> renderProcedures;
 		HardwareRenderer * hardwareRenderer = nullptr;
 		Level* level = nullptr;
 		int uniformBufferAlignment = 256;
 		int storageBufferAlignment = 32;
 		int defaultEnvMapId = -1;
 	private:
+        void RegisterRenderProcedure(IRenderProcedure* proc)
+        {
+            auto name = proc->GetName();
+            renderProcedures.Add(name, proc);
+            renderProcedureNames.Add(name);
+            if (currentRenderProcedure == nullptr)
+                currentRenderProcedure = proc;
+            proc->Init(this, mainView.Ptr());
+        }
 		void RunRenderProcedure()
 		{
 			if (!level) return;
@@ -123,7 +134,8 @@ namespace GameEngine
 			else
 				params.view = View();
 			params.rendererService = renderService.Ptr();
-			renderProcedure->Run(params);
+            if (currentRenderProcedure)
+			    currentRenderProcedure->Run(params);
 		}
 	public:
         CoreLib::RefPtr<ComputeTaskManager> computeTaskManager;
@@ -147,8 +159,8 @@ namespace GameEngine
 			mainView = new ViewResource(hardwareRenderer);
 			mainView->Resize(1024, 1024);
 			
-			renderProcedure = CreateStandardRenderProcedure(true, true);
-			renderProcedure->Init(this, mainView.Ptr());
+			RegisterRenderProcedure(CreateStandardRenderProcedure(true, true));
+            RegisterRenderProcedure(CreateLightmapDebugViewRenderProcedure());
 
 			// Fetch uniform buffer alignment requirements
 			uniformBufferAlignment = hardwareRenderer->UniformBufferAlignment();
@@ -164,14 +176,23 @@ namespace GameEngine
 			for (auto & postPass : postRenderPasses)
 				postPass = nullptr;
 
-			renderProcedure = nullptr;
+            renderProcedures = decltype(renderProcedures)();
             cubemapRenderProc = nullptr;
 			mainView = nullptr;
 			sceneRes = nullptr;
 			sharedRes.Destroy();
             computeTaskManager = nullptr;
 		}
-
+        virtual ArrayView<String> GetDebugViews() override
+        {
+            return renderProcedureNames.GetArrayView();
+        }
+        virtual void SetDebugView(String viewName) override
+        {
+            RefPtr<IRenderProcedure> proc;
+            renderProcedures.TryGetValue(viewName, proc);
+            currentRenderProcedure = proc.Ptr();
+        }
 		virtual void Wait() override
 		{
 			hardwareRenderer->Wait();
@@ -207,7 +228,8 @@ namespace GameEngine
                 Wait();
                 sceneRes->deviceLightmapSet = new DeviceLightmapSet();
                 sceneRes->deviceLightmapSet->Init(hardwareRenderer, lightmapSet);
-                renderProcedure->UpdateSceneResourceBinding(sceneRes.Ptr());
+                for (auto proc : renderProcedures)
+                    proc.Value->UpdateSceneResourceBinding(sceneRes.Ptr());
                 cubemapRenderProc->UpdateSceneResourceBinding(sceneRes.Ptr());
             }
         }
@@ -269,17 +291,16 @@ namespace GameEngine
             cubemapRenderProc->UpdateSceneResourceBinding(sceneRes.Ptr());
 			defaultEnvMapId = -1;
 			UpdateLightProbes();
-			renderProcedure->UpdateSharedResourceBinding();
-            renderProcedure->UpdateSceneResourceBinding(sceneRes.Ptr());
+            for (auto proc : renderProcedures)
+            {
+                proc.Value->UpdateSharedResourceBinding();
+                proc.Value->UpdateSceneResourceBinding(sceneRes.Ptr());
+            }
 			RunRenderProcedure();
 			hardwareRenderer->TransferBarrier(DynamicBufferLengthMultiplier);
 			RenderFrame();
 			Wait();
 			sharedRes.renderStats.Clear();
-		}
-		virtual void TakeSnapshot() override
-		{
-			
 		}
 		virtual RenderStat & GetStats() override
 		{
@@ -321,8 +342,8 @@ namespace GameEngine
 		}
 		Texture2D * GetRenderedImage()
 		{
-			if (renderProcedure)
-				return renderProcedure->GetOutput()->Texture.Ptr();
+			if (currentRenderProcedure)
+				return currentRenderProcedure->GetOutput()->Texture.Ptr();
 			return nullptr;
 		}
 		virtual void DestroyContext() override

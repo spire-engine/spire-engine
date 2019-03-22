@@ -26,11 +26,12 @@ namespace GameEngine
 		virtual void UpdateLightProbes() = 0;
 		virtual void DestroyContext() = 0;
 		virtual void InitializeLevel(Level * level) = 0;
-		virtual void TakeSnapshot() = 0;
 		virtual RenderStat& GetStats() = 0;
 		virtual void RenderFrame() = 0;
 		virtual void Resize(int w, int h) = 0;
 		virtual void Wait() = 0;
+        virtual CoreLib::ArrayView<CoreLib::String> GetDebugViews() = 0;
+        virtual void SetDebugView(CoreLib::String viewName) = 0;
         virtual ComputeTaskManager* GetComputeTaskManager() = 0;
 		virtual SceneResource * GetSceneResource() = 0;
 		virtual RendererSharedResource * GetSharedResource() = 0;

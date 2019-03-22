@@ -8,7 +8,6 @@
     <ClCompile Include="DynamicVariable.cpp" />
     <ClCompile Include="InputDispatcher.cpp" />
     <ClCompile Include="TextureCompressor.cpp" />
-    <ClCompile Include="TextureTool\LibSquish.cpp" />
     <ClCompile Include="CatmullSpline.cpp" />
     <ClCompile Include="MeshBuilder.cpp" />
     <ClCompile Include="Actor.cpp">
@@ -199,9 +198,17 @@
     <ClCompile Include="ComputeTaskManager.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="SSAOActor.cpp" />
     <ClCompile Include="AnimationSynthesizer.cpp">
       <Filter>Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="SSAOActor.cpp">
+      <Filter>Actors</Filter>
+    </ClCompile>
+    <ClCompile Include="LightmapDebugViewRenderProcedure.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="LightmapDebugViewRenderPass.cpp">
+      <Filter>Renderer\WorldPasses</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -212,7 +219,6 @@
     <ClInclude Include="Engine.h" />
     <ClInclude Include="InputDispatcher.h" />
     <ClInclude Include="TextureCompressor.h" />
-    <ClInclude Include="TextureTool\LibSquish.h" />
     <ClInclude Include="CatmullSpline.h" />
     <ClInclude Include="MeshBuilder.h" />
     <ClInclude Include="Actor.h">
@@ -314,9 +320,6 @@
       <Filter>Actors</Filter>
     </ClInclude>
     <ClInclude Include="RenderProcedure.h" />
-    <ClInclude Include="LightBinningPass.h">
-      <Filter>Renderer\ComputePasses</Filter>
-    </ClInclude>
     <ClInclude Include="LightingData.h">
       <Filter>Renderer</Filter>
     </ClInclude>
@@ -436,6 +439,9 @@
     <ClInclude Include="AnimationSynthesizer.h">
       <Filter>Animation</Filter>
     </ClInclude>
+    <ClInclude Include="ImageBarrierHelper.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Actors">
@@ -458,9 +464,6 @@
     </Filter>
     <Filter Include="Renderer\WorldPasses">
       <UniqueIdentifier>{c2fc1eaf-971a-4e07-b1d7-27f38f9412b7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\ComputePasses">
-      <UniqueIdentifier>{4c10def7-e5db-4883-9e2e-704af2063de5}</UniqueIdentifier>
     </Filter>
     <Filter Include="Shaders">
       <UniqueIdentifier>{d5ba9b7e-8244-4b5b-afcc-6fea450e3b94}</UniqueIdentifier>
@@ -536,7 +539,6 @@
     <None Include="..\EngineContent\Shaders\LightTiling.slang">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\EngineContent\Shaders\LuminanceHistogram.slang" />
     <None Include="..\EngineContent\Shaders\BuildHistogram.slang">
       <Filter>Shaders</Filter>
     </None>
@@ -550,6 +552,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="..\EngineContent\Shaders\SSAOComposite.slang">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\EngineContent\Shaders\LuminanceHistogram.slang">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
