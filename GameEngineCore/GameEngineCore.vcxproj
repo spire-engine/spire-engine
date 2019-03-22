@@ -201,6 +201,8 @@
     <ClCompile Include="LightmapSet.cpp" />
     <ClCompile Include="LightmapUVGeneration.cpp" />
     <ClCompile Include="LightProbeRenderer.cpp" />
+    <ClCompile Include="LightProbeRenderPass.cpp" />
+    <ClCompile Include="LightProbeRenderProcedure.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="MeshBuilder.cpp" />

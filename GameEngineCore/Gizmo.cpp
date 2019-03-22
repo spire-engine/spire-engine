@@ -62,6 +62,8 @@ namespace GameEngine
 			{
 				if (gizmoStyle == GizmoStyle::Editor && !params.IsEditorMode)
 					return;
+                if (params.IsBaking)
+                    return;
 				if (modelInstance.IsEmpty())
 					modelInstance = model->GetDrawableInstance(params);
 				if (transformUpdated)

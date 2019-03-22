@@ -320,7 +320,7 @@ namespace GameEngine
 		RefPtr<SkeletalAnimation> result = nullptr;
 		if (!Animations.TryGetValue(fileName, result))
 		{
-			auto actualName = Engine::Instance()->FindFile(fileName, ResourceType::Mesh);
+			auto actualName = Engine::Instance()->FindFile(fileName, ResourceType::Animation);
 			if (actualName.Length())
 			{
 				result = new SkeletalAnimation();

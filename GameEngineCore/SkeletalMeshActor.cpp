@@ -149,6 +149,8 @@ namespace GameEngine
 
     void SkeletalMeshActor::GetDrawables(const GetDrawablesParameter & params)
 	{
+        if (params.IsBaking)
+            return;
 		if (model && modelInstance.IsEmpty())
 			modelInstance = model->GetDrawableInstance(params);
 		if (!model || nextPose.Transforms.Count() == 0)

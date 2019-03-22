@@ -100,6 +100,7 @@ namespace GameEngine
 		RefPtr<ViewResource> mainView;
 		RefPtr<RendererServiceImpl> renderService;
 		IRenderProcedure* currentRenderProcedure = nullptr;
+        IRenderProcedure* lightProbeRenderProcedure = nullptr;
 		EnumerableDictionary<uint32_t, int> worldRenderPassIds;
 		List<RefPtr<WorldRenderPass>> worldRenderPasses;
 		List<RefPtr<PostRenderPass>> postRenderPasses;
@@ -160,7 +161,13 @@ namespace GameEngine
 			mainView->Resize(1024, 1024);
 			
 			RegisterRenderProcedure(CreateStandardRenderProcedure(true, true));
+            lightProbeRenderProcedure = CreateLightProbeRenderProcedure();
+            RegisterRenderProcedure(lightProbeRenderProcedure);
             RegisterRenderProcedure(CreateLightmapDebugViewRenderProcedure());
+
+            cubemapRenderView = new ViewResource(hardwareRenderer);
+            cubemapRenderView->Resize(EnvMapSize, EnvMapSize);
+            lightProbeRenderProcedure->Init(this, cubemapRenderView.Ptr());
 
 			// Fetch uniform buffer alignment requirements
 			uniformBufferAlignment = hardwareRenderer->UniformBufferAlignment();
@@ -177,7 +184,6 @@ namespace GameEngine
 				postPass = nullptr;
 
             renderProcedures = decltype(renderProcedures)();
-            cubemapRenderProc = nullptr;
 			mainView = nullptr;
 			sceneRes = nullptr;
 			sharedRes.Destroy();
@@ -230,15 +236,13 @@ namespace GameEngine
                 sceneRes->deviceLightmapSet->Init(hardwareRenderer, lightmapSet);
                 for (auto proc : renderProcedures)
                     proc.Value->UpdateSceneResourceBinding(sceneRes.Ptr());
-                cubemapRenderProc->UpdateSceneResourceBinding(sceneRes.Ptr());
             }
         }
 		RefPtr<ViewResource> cubemapRenderView;
-		RefPtr<IRenderProcedure> cubemapRenderProc;
 		virtual void UpdateLightProbes() override
 		{
 			if (!level) return;
-			LightProbeRenderer lpRenderer(this, renderService.Ptr(), cubemapRenderProc.Ptr(), cubemapRenderView.Ptr());
+			LightProbeRenderer lpRenderer(this, renderService.Ptr(), lightProbeRenderProcedure, cubemapRenderView.Ptr());
 			int lightProbeCount = 0;
 			for (auto & actor : level->Actors)
 			{
@@ -284,18 +288,13 @@ namespace GameEngine
 			level = pLevel;
             TryLoadLightmap();
 
-			cubemapRenderView = new ViewResource(hardwareRenderer);
-			cubemapRenderView->Resize(EnvMapSize, EnvMapSize);
-			cubemapRenderProc = CreateStandardRenderProcedure(false, false);
-			cubemapRenderProc->Init(this, cubemapRenderView.Ptr());
-            cubemapRenderProc->UpdateSceneResourceBinding(sceneRes.Ptr());
 			defaultEnvMapId = -1;
-			UpdateLightProbes();
             for (auto proc : renderProcedures)
             {
                 proc.Value->UpdateSharedResourceBinding();
                 proc.Value->UpdateSceneResourceBinding(sceneRes.Ptr());
             }
+			UpdateLightProbes();
 			RunRenderProcedure();
 			hardwareRenderer->TransferBarrier(DynamicBufferLengthMultiplier);
 			RenderFrame();

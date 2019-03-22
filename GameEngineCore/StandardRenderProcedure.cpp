@@ -19,26 +19,6 @@ using namespace VectorMath;
 
 namespace GameEngine
 {
-    class LightUniforms
-    {
-    public:
-        VectorMath::Vec3 lightDir; float pad0 = 0.0f;
-        VectorMath::Vec3 lightColor;
-        float ambient = 0.2f;
-        int shadowMapId = -1;
-        int numCascades = 0;
-        int padding2 = 0, pad3 = 0;
-        VectorMath::Matrix4 lightMatrix[MaxShadowCascades];
-        float zPlanes[MaxShadowCascades];
-        LightUniforms()
-        {
-            lightDir.SetZero();
-            lightColor.SetZero();
-            for (int i = 0; i < MaxShadowCascades; i++)
-                zPlanes[i] = 0.0f;
-        }
-    };
-
     struct BuildTiledLightListUniforms
     {
         VectorMath::Matrix4 invProjMatrix;

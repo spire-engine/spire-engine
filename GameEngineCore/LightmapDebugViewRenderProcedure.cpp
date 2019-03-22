@@ -215,7 +215,7 @@ namespace GameEngine
             GetDrawablesParameter getDrawableParam;
             getDrawableParam.CameraDir = params.view.GetDirection();
             getDrawableParam.IsEditorMode = params.isEditorMode;
-
+            getDrawableParam.IsBaking = true;
             getDrawableParam.CameraPos = params.view.Position;
             getDrawableParam.rendererService = params.rendererService;
             getDrawableParam.sink = &sink;

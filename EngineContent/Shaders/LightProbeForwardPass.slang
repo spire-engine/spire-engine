@@ -92,6 +92,6 @@ float4 ps_main(VSOutput vsOut)
     SPECIALIZATION_TYPE_2.MaterialPattern pattern = gMaterial.evalPattern(vin, vattribs, gView);
     if (!pattern.alphaTest())
         discard;
-    return pattern.computeForwardLighting<1>(gLighting, vin, gView, gWorldTransform.getLightmapId(), vattribs.uvSet.getUV(1),
+    return pattern.computeForwardLighting<0>(gLighting, vin, gView, gWorldTransform.getLightmapId(), vattribs.uvSet.getUV(1),
         vsOut.projPos);
 }

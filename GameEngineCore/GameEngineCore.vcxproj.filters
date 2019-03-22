@@ -47,9 +47,6 @@
     <ClCompile Include="RenderPassRegistry.h">
       <Filter>Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="StandardRenderProcedure.cpp">
-      <Filter>Renderer</Filter>
-    </ClCompile>
     <ClCompile Include="DeviceMemory.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
@@ -204,11 +201,20 @@
     <ClCompile Include="SSAOActor.cpp">
       <Filter>Actors</Filter>
     </ClCompile>
-    <ClCompile Include="LightmapDebugViewRenderProcedure.cpp">
-      <Filter>Renderer</Filter>
-    </ClCompile>
     <ClCompile Include="LightmapDebugViewRenderPass.cpp">
       <Filter>Renderer\WorldPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="LightProbeRenderPass.cpp">
+      <Filter>Renderer\WorldPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="StandardRenderProcedure.cpp">
+      <Filter>Renderer\RenderProcedure</Filter>
+    </ClCompile>
+    <ClCompile Include="LightProbeRenderProcedure.cpp">
+      <Filter>Renderer\RenderProcedure</Filter>
+    </ClCompile>
+    <ClCompile Include="LightmapDebugViewRenderProcedure.cpp">
+      <Filter>Renderer\RenderProcedure</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -319,7 +325,6 @@
     <ClInclude Include="ArcBallCameraController.h">
       <Filter>Actors</Filter>
     </ClInclude>
-    <ClInclude Include="RenderProcedure.h" />
     <ClInclude Include="LightingData.h">
       <Filter>Renderer</Filter>
     </ClInclude>
@@ -442,6 +447,9 @@
     <ClInclude Include="ImageBarrierHelper.h">
       <Filter>Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="RenderProcedure.h">
+      <Filter>Renderer\RenderProcedure</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Actors">
@@ -479,6 +487,9 @@
     </Filter>
     <Filter Include="LightmapBaking">
       <UniqueIdentifier>{00f671f8-688c-415a-8049-97fe129e2d2f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Renderer\RenderProcedure">
+      <UniqueIdentifier>{4f8eb815-cd2c-44e6-bb48-4e38a72dacc7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -30,6 +30,7 @@ namespace GameEngine
 		VectorMath::Vec3 CameraPos, CameraDir;
 		bool IsEditorMode = false;
 		bool UseSkeleton = true;
+        bool IsBaking = false;
 	};
 
 	class Level;

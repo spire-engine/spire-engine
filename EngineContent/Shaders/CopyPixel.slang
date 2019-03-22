@@ -25,5 +25,9 @@ struct CopyParams
 ParameterBlock<CopyParams> params;
 float4 ps_main(VertexOut vin) 
 {
-    return params.srcTex.Sample(params.nearestSampler, vin.vertUV);
+    float4 rs = params.srcTex.Sample(params.nearestSampler, vin.vertUV);
+    if (isnan(rs.x) || rs.x < 0.0 || isnan(rs.y) || rs.y < 0.0f || isnan(rs.z) || rs.z < 0.0f)
+        return float4(0.0);
+    else
+        return rs;
 }

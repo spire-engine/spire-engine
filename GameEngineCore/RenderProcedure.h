@@ -29,6 +29,7 @@ namespace GameEngine
 	};
 
     IRenderProcedure * CreateLightmapDebugViewRenderProcedure();
+    IRenderProcedure * CreateLightProbeRenderProcedure();
     IRenderProcedure * CreateWorldNormalViewRenderProcedure();
 	IRenderProcedure * CreateStandardRenderProcedure(bool toneMapping, bool useEnvMap);
 }

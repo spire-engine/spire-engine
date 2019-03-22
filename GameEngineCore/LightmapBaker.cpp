@@ -320,6 +320,7 @@ namespace GameEngine
             {
                 if (ray.Dir.y > 0.0f)
                     return staticScene->ambientColor;
+                return VectorMath::Vec3::Create(0.0f);
             }
         }
 

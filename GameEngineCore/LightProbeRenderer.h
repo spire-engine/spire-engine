@@ -4,6 +4,7 @@
 #include "RenderContext.h"
 #include "ViewResource.h"
 #include "RenderProcedure.h"
+#include "ShaderCompiler.h"
 
 namespace GameEngine
 {
@@ -17,6 +18,8 @@ namespace GameEngine
 		RendererService * renderService;
 		IRenderProcedure* renderProc;
 		ViewResource * viewRes = nullptr;
+        ShaderSet copyShaderSet;
+        ShaderSet prefilterShaderSet;
 		CoreLib::RefPtr<TextureCube> tempEnv;
         CoreLib::RefPtr<Fence> fence;
 	public:

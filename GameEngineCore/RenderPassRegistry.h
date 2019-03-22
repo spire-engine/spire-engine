@@ -16,7 +16,8 @@ namespace GameEngine
 	DECLARE_WORLD_RENDER_PASS(Shadow);
     DECLARE_WORLD_RENDER_PASS(CustomDepth);
     DECLARE_WORLD_RENDER_PASS(LightmapDebugView);
-	
+    DECLARE_WORLD_RENDER_PASS(LightProbe);
+
 	DECLARE_POST_RENDER_PASS(DeferredLighting);
 	DECLARE_POST_RENDER_PASS(Atmosphere);
 	DECLARE_POST_RENDER_PASS(ToneMapping);
