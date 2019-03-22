@@ -53,12 +53,15 @@ namespace GameEngine
             {
                 if (auto smActor = actor.Value.As<StaticMeshActor>())
                 {
-                    auto transformMatrix = smActor->LocalTransform.GetValue();
-                    float scale = Math::Max(transformMatrix.m[0][0], transformMatrix.m[1][1], transformMatrix.m[2][2]);
-                    auto size = sqrt(smActor->GetMesh()->GetSurfaceArea()) * scale;
-                    int resolution = Math::Clamp(1 << Math::Log2Ceil((int)(size * settings.ResolutionScale)), settings.MinResolution, settings.MaxResolution);
-                    lightmaps.ActorLightmapIds[actor.Value.Ptr()] = mapResolutions.Count();
-                    mapResolutions.Add(resolution);
+                    if (smActor->IncludeInBaking.GetValue())
+                    {
+                        auto transformMatrix = smActor->LocalTransform.GetValue();
+                        float scale = Math::Max(transformMatrix.m[0][0], transformMatrix.m[1][1], transformMatrix.m[2][2]);
+                        auto size = sqrt(smActor->GetMesh()->GetSurfaceArea()) * scale;
+                        int resolution = Math::Clamp(1 << Math::Log2Ceil((int)(size * settings.ResolutionScale)), settings.MinResolution, settings.MaxResolution);
+                        lightmaps.ActorLightmapIds[actor.Value.Ptr()] = mapResolutions.Count();
+                        mapResolutions.Add(resolution);
+                    }
                 }
             }
             maps.SetSize(mapResolutions.Count());
@@ -315,7 +318,8 @@ namespace GameEngine
             }
             else
             {
-                return staticScene->ambientColor;
+                if (ray.Dir.y > 0.0f)
+                    return staticScene->ambientColor;
             }
         }
 

@@ -170,8 +170,11 @@ namespace GameEngine
         {
             if (auto smActor = actor.Value.As<StaticMeshActor>())
             {
-                AddMeshInstance(faces, smActor->GetMesh(), smActor->LocalTransform.GetValue(), id, smActor->CastShadow.GetValue());
-                id++;
+                if (smActor->IncludeInBaking.GetValue())
+                {
+                    AddMeshInstance(faces, smActor->GetMesh(), smActor->LocalTransform.GetValue(), id, smActor->CastShadow.GetValue());
+                    id++;
+                }
             }
         }
         Bvh_Build<StaticFace> bvhBuild;

@@ -166,7 +166,7 @@ namespace GameEngine
 
 	void StaticMeshActor::GetDrawables(const GetDrawablesParameter & params)
 	{
-		if (model && isVisible)
+		if (model && Visible.GetValue())
 		{
 			GetDrawablesParameter newParams = params;
 			newParams.UseSkeleton = false;

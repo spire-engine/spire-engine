@@ -13,7 +13,6 @@ namespace GameEngine
 	{
 	private:
 		bool useInlineMaterial = false;
-        bool isVisible = true;
 		CoreLib::String inlineMeshSpec;
 		Mesh * mesh = nullptr;
 	protected:
@@ -32,11 +31,9 @@ namespace GameEngine
         PROPERTY_ATTRIB(CoreLib::String, MeshFile, "resource(Mesh, mesh)");
 		PROPERTY_ATTRIB(CoreLib::String, MaterialFile, "resource(Material, material)");
 		PROPERTY_ATTRIB(CoreLib::String, ModelFile, "resource(Mesh, model)");
+        PROPERTY_DEF(bool, IncludeInBaking, true);
+        PROPERTY_DEF(bool, Visible, true);
 		Material * MaterialInstance;
-        void SetVisible(bool visible) 
-        {
-            isVisible = visible;
-        }
         Mesh* GetMesh();
 		virtual void OnLoad() override;
 		virtual void OnUnload() override;
