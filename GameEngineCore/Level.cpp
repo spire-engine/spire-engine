@@ -101,6 +101,12 @@ namespace GameEngine
 				HiddenSections.Add(text.SubString(beginPos.Pos, endPos.Pos + 1 - beginPos.Pos));
 				continue;
 			}
+            else if (parser.LookAhead("lightmap"))
+            {
+                parser.ReadToken();
+                LightmapFileName = parser.ReadStringLiteral();
+                continue;
+            }
             auto actorClass = parser.NextToken().Content;
 			auto actor = Engine::Instance()->ParseActor(this, parser);
 			if (!actor)
@@ -146,6 +152,8 @@ namespace GameEngine
 	void Level::SaveToFile(CoreLib::String fileName)
 	{
 		StringBuilder sb;
+        if (LightmapFileName.Length())
+            sb << "lightmap " << CoreLib::Text::EscapeStringLiteral(LightmapFileName) << "\"\n";
 		for (auto & actor : Actors)
 			actor.Value->SerializeToText(sb);
 		for (auto & sect : HiddenSections)

@@ -265,8 +265,6 @@ namespace GameEngine
                 if (!light.IncludeDirectLighting)
                     dynamicDirectLighting += lighting;
             }
-            if (isnan(result.x) || isnan(result.y) || isnan(result.z))
-                result.SetZero();
             return result;
         }
 
@@ -357,6 +355,7 @@ namespace GameEngine
                 VectorMath::Vec3::Create(0.0f, 0.0f, 1.0f),
                 VectorMath::Vec3::Create(0.0f, 0.0f, -1.0f)
             };
+            int completedMaps = 0;
             for (auto & map : maps)
             {
                 int imageSize = map.diffuseMap.Width * map.diffuseMap.Height;
@@ -401,13 +400,15 @@ namespace GameEngine
                         map.positionMap.SetPixel(x, y, VectorMath::Vec4::Create(biasedPos, posPixel.w));
                     }
                 }
+
+                completedMaps++;
+                ProgressChanged(LightmapBakerProgressChangedEventArgs(completedMaps, maps.Count()));
             }
         }
 
         void ComputeLightmaps_Direct()
         {
-            static int iteration = 0;
-            iteration++;
+            int completedMaps = 0;
             for (auto & map : maps)
             {
                 if (isCancelled) return;
@@ -439,6 +440,8 @@ namespace GameEngine
                         map.dynamicDirectLighting.SetPixel(x, y, VectorMath::Vec4::Create(dynamicDirectLighting, 1.0f));
                     }
                 }
+                completedMaps++;
+                ProgressChanged(LightmapBakerProgressChangedEventArgs(completedMaps, maps.Count()));
             }
         }
         static const int MaxLightmapBlockSize = 16;
@@ -468,15 +471,10 @@ namespace GameEngine
                     positions[i] = pos;
                     normals[i] = normal;
                     lighting = VectorMath::Vec4::Create(ComputeIndirectLighting(threadRandom, pos, normal, sampleCount, posPixel.w*2.0f, isInvalidRegion), 1.0f);
-                    if (isnan(lighting.x) || isnan(lighting.y) || isnan(lighting.z) || isnan(lighting.w))
-                        lighting.SetZero();
-                    else
+                    if (sampleCount >= settings.SampleCount && isInvalidRegion)
                     {
-                        if (sampleCount >= settings.SampleCount && isInvalidRegion)
-                        {
-                            map.validPixels.Remove(pixelIdx);
-                            valid[i] = false;
-                        }
+                        map.validPixels.Remove(pixelIdx);
+                        valid[i] = false;
                     }
                     resultMap.SetPixel(x, y, lighting);
                     result[i] = lighting;
@@ -871,18 +869,28 @@ namespace GameEngine
 
             AllocLightmaps();
             if (isCancelled) goto computeThreadEnd;
+            #pragma omp parallel sections
+            {
+                #pragma omp section
+                {
+                    StatusChanged("Building BVH...");
+                    ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
 
-
-            Engine::Instance()->GetRenderer()->GetHardwareRenderer()->ThreadInit(1);
-            StatusChanged("Initializing lightmaps...");
-            BakeLightmapGBuffers();
-
-            StatusChanged("Building BVH...");
-            ProgressChanged(LightmapBakerProgressChangedEventArgs(0, 100));
-
-            staticScene = BuildStaticScene(level);
+                    staticScene = BuildStaticScene(level);
+                }
+                #pragma omp section
+                {
+                    Engine::Instance()->GetRenderer()->GetHardwareRenderer()->ThreadInit(1);
+                    StatusChanged("Initializing lightmaps...");
+                    BakeLightmapGBuffers();                    
+                }
+            }
+            
             if (isCancelled) goto computeThreadEnd;
+
+            StatusChanged("Refining G-Buffer...");
             BiasGBufferPositions();
+
             if (isCancelled) goto computeThreadEnd;
 
             StatusChanged("Computing direct lighting...");

@@ -30,6 +30,7 @@ namespace GameEngine
 		CoreLib::List<CoreLib::String> HiddenSections;
         CoreLib::ObjPtr<CameraActor> CurrentCamera;
 		CoreLib::String FileName;
+        CoreLib::String LightmapFileName;
 		void LoadFromText(CoreLib::String text);
 		void SaveToFile(CoreLib::String fileName);
 		Level(const CoreLib::String & fileName);

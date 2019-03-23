@@ -358,6 +358,7 @@
     <None Include="..\EngineContent\Shaders\LightmapGBufferGen.slang" />
     <None Include="..\EngineContent\Shaders\ForwardBasePass.slang" />
     <None Include="..\EngineContent\Shaders\Gizmo.slang" />
+    <None Include="..\EngineContent\Shaders\LightProbeForwardPass.slang" />
     <None Include="..\EngineContent\Shaders\LightProbePrefilter.slang" />
     <None Include="..\EngineContent\Shaders\LightTiling.slang" />
     <None Include="..\EngineContent\Shaders\Outline.slang" />
