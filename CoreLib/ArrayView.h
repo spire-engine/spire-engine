@@ -11,9 +11,9 @@ namespace CoreLib
 		class ArrayView
 		{
 		private:
-			T * _buffer;
-			int _count;
-			int stride;
+			T * _buffer = nullptr;
+			int _count = 0;
+			int stride = 0;
 		public:
 			T* begin() const
 			{
@@ -24,11 +24,7 @@ namespace CoreLib
 				return (T*)((char*)_buffer + _count*stride);
 			}
 		public:
-			ArrayView()
-			{
-				_buffer = 0;
-				_count = 0;
-			}
+			ArrayView() = default;
 			ArrayView(const T & singleObj)
 			{
 				SetData((T*)&singleObj, 1, sizeof(T));
@@ -62,7 +58,7 @@ namespace CoreLib
 				if (id >= _count || id < 0)
 					throw IndexOutofRangeException("Operator[]: Index out of Range.");
 #endif
-				return *(T*)((char*)_buffer+id*stride);
+				return *(T*)((char*)_buffer+(uint64_t)id*stride);
 			}
 
 			inline T* Buffer() const

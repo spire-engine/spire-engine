@@ -138,8 +138,8 @@ namespace CoreLib
 				if (str)
 				{
 					length = (int)strlen(str);
-					buffer = new char[length + 1];
-					memcpy(buffer.Ptr(), str, length + 1);
+					buffer = new char[(uint64_t)length + 1];
+					memcpy(buffer.Ptr(), str, (uint64_t)length + 1);
 				}
 			}
             String(const char * str, int len)
@@ -147,7 +147,7 @@ namespace CoreLib
                 if (str)
                 {
                     length = len;
-                    buffer = new char[length + 1];
+                    buffer = new char[(uint64_t)length + 1];
                     memcpy(buffer.Ptr(), str, length);
                     buffer[length] = 0;
                 }
@@ -166,7 +166,7 @@ namespace CoreLib
 			{
 				this->operator=(str);
 			}
-			String(String&& other)
+			String(String&& other) noexcept
 			{
 				this->operator=(static_cast<String&&>(other));
 			}
@@ -187,7 +187,7 @@ namespace CoreLib
 				}
 				return *this;
 			}
-			String & operator=(String&& other)
+			String & operator=(String&& other) noexcept
 			{
 				if (this != &other)
 				{
@@ -237,8 +237,8 @@ namespace CoreLib
 					endIndex--;
 				String res;
 				res.length = endIndex + 1;
-				res.buffer = new char[endIndex + 2];
-				strncpy_s(res.buffer.Ptr(), endIndex + 2, buffer.Ptr(), endIndex + 1);
+				res.buffer = new char[(uint64_t)endIndex + 2];
+				strncpy_s(res.buffer.Ptr(), (uint64_t)endIndex + 2, buffer.Ptr(), (uint64_t)endIndex + 1);
 				return res;
 			}
 
@@ -277,9 +277,9 @@ namespace CoreLib
 					throw "SubString: length less than zero.";
 #endif
 				String res;
-				res.buffer = new char[len + 1];
+				res.buffer = new char[(uint64_t)len + 1];
 				res.length = len;
-				strncpy_s(res.buffer.Ptr(), len + 1, buffer + id, len);
+				strncpy_s(res.buffer.Ptr(), (uint64_t)len + 1, buffer + id, len);
 				res.buffer[len] = 0;
 				return res;
 			}
@@ -546,10 +546,10 @@ namespace CoreLib
 			{
 				if (bufferSize < size)
 				{
-					char * newBuffer = new char[size + 1];
+					char * newBuffer = new char[(uint64_t)size + 1];
 					if (buffer)
 					{
-						strcpy_s(newBuffer, size + 1, buffer);
+						strcpy_s(newBuffer, (uint64_t)size + 1, buffer);
 						delete[] buffer;
 					}
 					buffer = newBuffer;
@@ -710,9 +710,9 @@ namespace CoreLib
 			String GetSubString(int start, int count)
 			{
 				String rs;
-				rs.buffer = new char[count + 1];
+				rs.buffer = new char[(uint64_t)count + 1];
 				rs.length = count;
-				strncpy_s(rs.buffer.Ptr(), count + 1, buffer + start, count);
+				strncpy_s(rs.buffer.Ptr(), (uint64_t)count + 1, buffer + start, count);
 				rs.buffer[count] = 0;
 				return rs;
 			}

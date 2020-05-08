@@ -17,8 +17,7 @@ namespace CoreLib
 		public:
 			TKey Key;
 			TValue Value;
-			KeyValuePair()
-			{}
+			KeyValuePair() = default;
 			KeyValuePair(const TKey & key, const TValue & value)
 			{
 				Key = key;
@@ -43,7 +42,7 @@ namespace CoreLib
 			{
 				operator=(_Move(_that));
 			}
-			KeyValuePair & operator=(KeyValuePair<TKey, TValue> && that)
+			KeyValuePair & operator=(KeyValuePair<TKey, TValue> && that) noexcept
 			{
 				Key = _Move(that.Key);
 				Value = _Move(that.Value);
@@ -463,7 +462,7 @@ namespace CoreLib
 					hashMap[i] = other.hashMap[i];
 				return *this;
 			}
-			Dictionary<TKey, TValue> & operator = (Dictionary<TKey, TValue> && other)
+			Dictionary<TKey, TValue> & operator = (Dictionary<TKey, TValue> && other) noexcept
 			{
 				if (this == &other)
 					return *this;

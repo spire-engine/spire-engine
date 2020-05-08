@@ -3,6 +3,7 @@
 
 #include "LibMath.h"
 #include <string.h>
+#include <type_traits>
 
 namespace CoreLib
 {

@@ -81,7 +81,6 @@ namespace GameEngine
 		{
 			Matrix4 viewMatrix;
 			Matrix4::CreateIdentityMatrix(viewMatrix);
-			Matrix4 mm1, mm2;
 			switch (f)
 			{
 			case 0:

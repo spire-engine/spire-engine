@@ -139,7 +139,7 @@ namespace CoreLib
 					return String("");
 				}
 
-				char * buffer = new char[len+1];
+				char * buffer = new char[(uint64_t)len + 1];
 				try
 				{
 					Throw(stream->Read(buffer, len));

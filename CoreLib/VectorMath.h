@@ -548,8 +548,7 @@ namespace VectorMath
 	{
 	public:
 		__m128 vec;
-		Vec4_M128()
-		{}
+		Vec4_M128() = default;
 		Vec4_M128(__m128 v)
 		{
 			vec = v;
@@ -613,7 +612,7 @@ namespace VectorMath
 					rs.m[i][j] = dot;
 				}
 		}
-		Matrix3() {}
+		Matrix3() = default;
 		Matrix3(float v)
 		{
 			for (int i = 0; i < 9; i++)
@@ -648,8 +647,7 @@ namespace VectorMath
 					_41, _42, _43, _44;
 			} mr;
 		};
-		Matrix4()
-		{}
+		Matrix4() = default;
 		Matrix4(float v)
 		{
 			for (int i = 0; i<16; i++)
@@ -1603,8 +1601,7 @@ namespace VectorMath
 	{
 	public:
 		__m128 x, y, z, w;
-		SSEVec4()
-		{};
+		SSEVec4() = default;
 		SSEVec4(const __m128 & x, const __m128 & y, const __m128 & z, const __m128 & w)
 			:x(x), y(y), z(z), w(w)
 		{
@@ -1713,8 +1710,7 @@ namespace VectorMath
 	{
 	public:
 		__m128 values[16];
-		SSEMatrix4()
-		{}
+		SSEMatrix4() = default;
 		SSEMatrix4(const Matrix4 & mat)
 		{
 			for (int i = 0; i<16; i++)

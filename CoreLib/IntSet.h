@@ -22,11 +22,11 @@ namespace CoreLib
 			{
 				buffer = other.buffer;
 			}
-			IntSet(IntSet && other)
+			IntSet(IntSet && other) noexcept
 			{
 				*this = (_Move(other));
 			}
-			IntSet & operator = (IntSet && other)
+			IntSet & operator = (IntSet && other) noexcept
 			{
 				buffer = _Move(other.buffer);
 				return *this;
@@ -70,7 +70,7 @@ namespace CoreLib
 				int oldBufferSize = buffer.Count();
 				buffer.SetSize((size+31)>>5);
 				if (buffer.Count() > oldBufferSize)
-					memset(buffer.Buffer()+oldBufferSize, 0, (buffer.Count()-oldBufferSize) * sizeof(int));
+					memset(buffer.Buffer()+oldBufferSize, 0, ((size_t)buffer.Count()-oldBufferSize) * sizeof(int));
 			}
 			void Clear()
 			{
@@ -126,7 +126,7 @@ namespace CoreLib
 			void IntersectWith(const IntSet & set)
 			{
 				if (set.buffer.Count() < buffer.Count())
-					memset(buffer.Buffer() + set.buffer.Count(), 0, (buffer.Count()-set.buffer.Count())*sizeof(int));
+					memset(buffer.Buffer() + set.buffer.Count(), 0, ((size_t)buffer.Count()-set.buffer.Count())*sizeof(int));
 				for (int i = 0; i<Math::Min(set.buffer.Count(), buffer.Count()); i++)
 				{
 					buffer[i] &= set.buffer[i];

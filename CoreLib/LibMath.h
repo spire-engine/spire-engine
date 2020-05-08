@@ -194,8 +194,7 @@ namespace CoreLib
 		private:
 			unsigned int seed;
 		public:
-            Random()
-            {}
+			Random() = default;
 			Random(int seed)
 			{
 				this->seed = seed;

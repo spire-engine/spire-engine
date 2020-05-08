@@ -13,7 +13,7 @@
 #include "WinForm/WinForm.h"
 #include "WinForm/WinApp.h"
 #include "WinForm/WinTextBox.h"
-#include "FBX_SDK/include/fbxsdk.h"
+#include "fbxsdk.h"
 
 using namespace CoreLib;
 using namespace CoreLib::IO;
@@ -461,7 +461,7 @@ endOfSkeletonExport:
 				auto srcIndices = mesh->GetPolygonVertices();
 				auto srcVerts = mesh->GetControlPoints();
 				mesh->GenerateNormals();
-				mesh->GenerateTangentsData(0);
+				mesh->GenerateTangentsData(0, false, false);
 				int mvptr = startVertId;
 				int vertexId = 0;
 				List<int> vertexIdToControlPointIndex;
