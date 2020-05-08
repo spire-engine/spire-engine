@@ -71,9 +71,9 @@ namespace GameEngine
 
     void Drawable::UpdateLightmapIndex(uint32_t lightmapIndex)
     {
-        if (lightmapId != lightmapIndex)
+        if (type == DrawableType::Static)
         {
-            if (!skeleton)
+            if (lightmapId != lightmapIndex)
             {
                 lightmapId = lightmapIndex;
                 for (int i = 0; i < DynamicBufferLengthMultiplier; i++)

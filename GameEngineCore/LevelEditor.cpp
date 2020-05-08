@@ -206,7 +206,11 @@ namespace GameEngine
                     if (!isCancelled)
                     {
                         if (UpdateLightmap(lightmapBaker->GetLightmapSet()))
-                            lightmapBaker->GetLightmapSet().SaveToFile(level, Path::ReplaceExt(level->FileName, "lightmap"));
+                        {
+                            auto lightmapFileName = Path::ReplaceExt(level->FileName, "lightmap");
+                            lightmapBaker->GetLightmapSet().SaveToFile(level, lightmapFileName);
+                            level->LightmapFileName = Path::GetRelativePath(lightmapFileName, Engine::Instance()->GetDirectory(false, ResourceType::Level));
+                        }
                     }
                     statusPanel->SetText("Ready.");
                     progressPanel->SetProgress(0, 0);

@@ -568,6 +568,9 @@
     <None Include="..\EngineContent\Shaders\LuminanceHistogram.slang">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="..\EngineContent\Shaders\LightProbeForwardPass.slang">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="core.natvis" />

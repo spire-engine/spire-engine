@@ -263,7 +263,11 @@ namespace GameEngine
 		}
         void TryLoadLightmap()
         {
-            auto lightmapFile = Engine::Instance()->FindFile(Path::ReplaceExt(level->FileName, "lightmap"), ResourceType::Level);
+            auto lightmapFile = level->LightmapFileName;
+            if (lightmapFile.Length())
+                lightmapFile = Engine::Instance()->FindFile(lightmapFile, ResourceType::Level);
+            if (lightmapFile.Length() == 0)
+                lightmapFile = Engine::Instance()->FindFile(Path::ReplaceExt(level->FileName, "lightmap"), ResourceType::Level);
             sceneRes->deviceLightmapSet = nullptr;
             if (lightmapFile.Length())
             {
