@@ -610,6 +610,10 @@ endOfSkeletonExport:
 									break; // other reference modes not shown here!
 								}
 							}
+                            else if (leNormal->GetMappingMode() == FbxGeometryElement::eByControlPoint)
+                            {
+                                vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(controlPointIndex));
+                            }
 						}
 
 						for (int l = 0; l < mesh->GetElementTangentCount(); ++l)
