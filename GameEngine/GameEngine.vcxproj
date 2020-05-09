@@ -63,7 +63,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalIncludeDirectories>../;../GameEngineCore/</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
-      <DisableSpecificWarnings>26451,26439,26495,26812,6011</DisableSpecificWarnings>
+      <DisableSpecificWarnings>26451;26439;26495;26812;6011</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -88,7 +88,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>../;../GameEngineCore/</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
-      <DisableSpecificWarnings>26451,26439,26495,26812,6011</DisableSpecificWarnings>
+      <DisableSpecificWarnings>26451;26439;26495;26812;6011</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

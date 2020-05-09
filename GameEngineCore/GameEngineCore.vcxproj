@@ -61,7 +61,7 @@
       <AdditionalIncludeDirectories>../CoreLib/;../;../CoreLib/LibGL/</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <OpenMPSupport>true</OpenMPSupport>
-      <DisableSpecificWarnings>26451,26439,26495,26812,6011</DisableSpecificWarnings>
+      <DisableSpecificWarnings>26451;26439;26495;26812;6011</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -82,7 +82,7 @@
       <AdditionalIncludeDirectories>../CoreLib/;../;../CoreLib/LibGL/</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <OpenMPSupport>true</OpenMPSupport>
-      <DisableSpecificWarnings>26451,26439,26495,26812,6011</DisableSpecificWarnings>
+      <DisableSpecificWarnings>26451;26439;26495;26812;6011</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

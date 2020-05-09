@@ -64,7 +64,7 @@
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <DisableSpecificWarnings>26451,26439,26495,26812,6011</DisableSpecificWarnings>
+      <DisableSpecificWarnings>26451;26439;26495;26812;6011</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -88,7 +88,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;WINDOWS_PLATFORM;%(PreprocessorDefinitions);GLEW_STATIC</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
-      <DisableSpecificWarnings>26451,26439,26495,26812,6011</DisableSpecificWarnings>
+      <DisableSpecificWarnings>26451;26439;26495;26812;6011</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
