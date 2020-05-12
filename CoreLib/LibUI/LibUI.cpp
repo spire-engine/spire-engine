@@ -1492,8 +1492,8 @@ namespace GraphicsUI
 		btnClose = new Control(this);
 		lblTitle = new Label(this);
 		lblClose = new Label(this);
-		lblClose->SetText("\x72");
 		lblClose->SetFont(GetEntry()->defaultSymbolFont.Ptr());
+		lblClose->SetText("\x72");
 		btnClose->Visible = false;
 		lblTitle->Visible = false;
 		lblClose->Visible = false;
@@ -1612,7 +1612,7 @@ namespace GraphicsUI
 	{
 		int titleHeight = GetTitleBarHeight();
 		btnClose->Posit(Width- titleHeight, 3, titleHeight - 4, titleHeight - 4);
-		lblClose->Posit(Width- titleHeight + 2, 3, titleHeight - 4, titleHeight - 4);
+		lblClose->Posit(Width- titleHeight + 2, (titleHeight - lblClose->TextHeight)/2, titleHeight - 4, titleHeight - 4);
 		Control::SizeChanged();
 		OnResize.Invoke(this);
 		ArrangeControls(Rect(1, 1 + titleHeight, Width - 2, Height - 2 - titleHeight));

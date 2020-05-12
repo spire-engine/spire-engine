@@ -63,9 +63,8 @@ namespace GameEngine
         BakedText* prev = (BakedText*)previous;
         auto prevBuffer = (prev ? prev->textBuffer : nullptr);
         system->WaitForDrawFence();
-        auto imageData = rasterizer->RasterizeText(text, options);
         BakedText* result = prev;
-        if (!prevBuffer || imageData.ImageData != prevBuffer)
+        if (!prevBuffer)
             result = new BakedText();
         result->font = this;
         result->options = options;

@@ -33,10 +33,27 @@ namespace GameEngine
         List<unsigned char> tmpBitmap;
         stbtt_fontinfo fontinfo;
         List<unsigned char> fontBuffer;
+        List<unsigned char> underlineCharBuffer; // one dimensional buffer for the underline char
+        int underlineCharY0, underlineCharY1;
         float fontScale = 0.0f;
         bool drawUnderline = false;
         int fontAscent = 0, fontDescent = 0, fontLineGap = 0;
     public:
+        void BuildUnderlineCharBuffer()
+        {
+            int advanceWidth = 0, leftSideBearing = 0;
+            stbtt_GetCodepointHMetrics(&fontinfo, '_', &advanceWidth, &leftSideBearing);
+            int x0, y0, x1, y1;
+            stbtt_GetCodepointBitmapBox(&fontinfo, '_', fontScale, fontScale, &x0, &y0, &x1, &y1);
+            tmpBitmap.SetSize((x1 - x0) * (y1 - y0));
+            memset(tmpBitmap.Buffer(), 0, tmpBitmap.Count());
+            stbtt_MakeCodepointBitmap(&fontinfo, tmpBitmap.Buffer(), x1 - x0, y1 - y0, x1 - x0, fontScale, fontScale, '_');
+            underlineCharY0 = y0;
+            underlineCharY1 = y1;
+            underlineCharBuffer.SetSize(y1 - y0);
+            for (int i = 0; i < y1 - y0; i++)
+                underlineCharBuffer[i] = tmpBitmap[i * (x1 - x0) + (x1 - x0) / 2];
+        }
         // Set the font style of this label
         virtual void SetFont(const Font& Font, int dpi) override
         {
@@ -53,6 +70,7 @@ namespace GameEngine
             fontScale = stbtt_ScaleForMappingEmToPixels(&fontinfo, (float)pixelHeight);
             stbtt_GetFontVMetrics(&fontinfo, &fontAscent, &fontDescent, &fontLineGap);
             drawUnderline = Font.Underline;
+            BuildUnderlineCharBuffer();
         }
 
         List<unsigned> StringToCodePointList(const CoreLib::String& text)
@@ -148,11 +166,22 @@ namespace GameEngine
                     int newBpX = bpX;
                     if (codePoint)
                         newBpX = DrawChar(codePoint, textSize, bpX, bpY, isBeginOfLine);
-                    if (drawUnderline && codePoint != 0x2381)
+                    if (drawUnderline || charUnderline)
                     {
                         charUnderline = false;
                         // draw underline
-                        DrawChar('_', textSize, bpX, bpY, isBeginOfLine);
+                        for (int y = bpY + underlineCharY0; y < bpY + underlineCharY1; y++)
+                        {
+                            if (y < 0) continue;
+                            if (y > textSize.y) break;
+                            auto underlineCharVal = underlineCharBuffer[y - (bpY + underlineCharY0)];
+                            for (int x = bpX; x < newBpX; x++)
+                            {
+                                auto& dstValue = monochromeBuffer[y * textSize.x + x];
+                                dstValue = dstValue * (255 - underlineCharVal) / 255 + underlineCharVal;
+                            }
+                        }
+                        
                     }
                     bpX = newBpX;
                     isBeginOfLine = false;
