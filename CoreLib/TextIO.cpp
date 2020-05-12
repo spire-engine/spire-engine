@@ -1,10 +1,5 @@
 #include "TextIO.h"
-#if 0
-#ifdef _WIN32
-#include <Windows.h>
-#define CONVERT_END_OF_LINE
-#endif
-#endif
+
 namespace CoreLib
 {
 	namespace IO

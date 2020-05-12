@@ -1,7 +1,5 @@
 #include "Camera.h"
-#ifdef _WIN32
-#include <Windows.h>
-#endif
+
 using namespace VectorMath;
 
 namespace CoreLib
@@ -96,101 +94,5 @@ namespace CoreLib
 			view.CamDir = dir;
 			view.CamUp = up;
 		}
-
-#ifdef _WIN32
-		void CameraController::HandleCameraKeys(Camera & camera, Matrix4 & transform, float dtime, float /*minSpeed*/, float maxSpeed, bool flipYZ)
-		{
-			const float CameraMaxSpeed = maxSpeed;
-			const float CameraAcceleration = CameraMaxSpeed;
-			const float CameraTurnAngle = 3.14159f/4.0f;
-
-			static Vec3 speed = Vec3::Create(0.0f, 0.0f, 0.0f);
-			Vec3 force;
-			Vec3 left;
-			force.SetZero();
-			left.x=cos(camera.alpha);	left.y=0;	left.z=-sin(camera.alpha);
-			if (GetAsyncKeyState('W') != 0)
-			{
-				force += camera.dir;
-			}
-			else if (GetAsyncKeyState('S') != 0 && GetAsyncKeyState(VK_CONTROL) == 0)
-			{
-				force -= camera.dir;
-			}
-			if (GetAsyncKeyState('A') != 0)
-			{
-				force += left;
-			}
-			else if (GetAsyncKeyState('D') != 0)
-			{
-				force -= left;
-			}
-			float forceLen = force.Length();
-			if (forceLen > 0.0f)
-			{
-				force *= 1.0f/forceLen;
-			}
-			float accelLen = CameraAcceleration * dtime;
-			float spdLen = speed.Length2();
-			if (spdLen < accelLen * accelLen * 16.0f)
-			{
-				speed = Vec3::Create(0.0f,0.0f,0.0f);
-			}
-			else if (spdLen>0.0f)
-			{
-				Vec3 spdDir;
-				Vec3::Normalize(spdDir, speed);
-				speed -= spdDir * accelLen * 4.0f;
-			}
-				
-			speed += force * accelLen * 5.0f;
-			spdLen = speed.Length2();
-
-			if (spdLen > CameraMaxSpeed*CameraMaxSpeed)
-			{
-				Vec3::Normalize(speed, speed);
-				speed *= CameraMaxSpeed;
-			}
-
-			if (GetAsyncKeyState(VK_SHIFT))
-				dtime *= 0.1f;
-
-			float lturn = 0.0f;
-			float uturn = 0.0f;
-			if (GetAsyncKeyState(VK_LEFT))
-			{
-				lturn = CameraTurnAngle * dtime;
-			}
-			if (GetAsyncKeyState(VK_RIGHT))
-			{
-				lturn = -CameraTurnAngle * dtime;
-			}
-
-			if (GetAsyncKeyState(VK_UP))
-			{
-				uturn = CameraTurnAngle * dtime;
-			}
-			if (GetAsyncKeyState(VK_DOWN))
-			{
-				uturn = -CameraTurnAngle * dtime;
-			}
-			camera.pos += speed*dtime;
-			camera.TurnLeft(lturn);
-			camera.TurnUp(uturn);
-			camera.GetTransform(transform);
-			if (flipYZ)
-			{
-				Matrix4 flip;
-				Matrix4::CreateIdentityMatrix(flip);
-				flip.m[1][1] = 0.0f;
-				flip.m[1][2] = -1.0f;
-				flip.m[2][1] = 1.0f;
-				flip.m[2][2] = 0.0f;
-				Matrix4 flipped;
-				Matrix4::Multiply(flipped, transform, flip);
-				transform = flipped;
-			}
-		}
-#endif
 	}
 }

@@ -5159,7 +5159,7 @@ namespace GraphicsUI
 			{
 				if (item->Selected)
 				{
-					if (item->SubMenu && item->SubMenu && item->SubMenu->Count())
+					if (item->SubMenu && item->SubMenu->Count())
 					{
 						if (style == Menu::msMainMenu)
 						{

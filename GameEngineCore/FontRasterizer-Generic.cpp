@@ -1,7 +1,6 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
-#include <Windows.h>
 #include "OS.h"
 #include "Engine.h"
 #include "CoreLib/LibIO.h"

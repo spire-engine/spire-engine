@@ -23,14 +23,6 @@ namespace CoreLib
 			void Reset();
 			void GetInverseRotationMatrix(float rot[9]);
 		};
-
-#ifdef _WIN32
-		class CameraController
-		{
-		public:
-			static void HandleCameraKeys(Camera & camera, VectorMath::Matrix4 & transform, float dtime, float minSpeed, float maxSpeed, bool flipYZ);
-		};
-#endif
 	}
 }
 #endif
