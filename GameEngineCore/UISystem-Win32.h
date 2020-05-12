@@ -15,10 +15,9 @@ namespace GameEngine
 	class Win32UISystem : public UISystemBase
 	{
 	private:
-        bool isWindows81OrGreater = false;
-    private:
-		int GetCurrentDpi(HWND windowHandle);
+        static bool isWindows81OrGreater;
 	public:
+		static int GetCurrentDpi(HWND windowHandle);
 		virtual void SetClipboardText(const CoreLib::String & text) override;
 		virtual CoreLib::String GetClipboardText() override;
 		virtual GraphicsUI::IFont * LoadDefaultFont(GraphicsUI::UIWindowContext * ctx, GraphicsUI::DefaultFontType dt = GraphicsUI::DefaultFontType::Content) override;
@@ -26,7 +25,6 @@ namespace GameEngine
 		void UpdateCompositionWindowPos(HIMC hIMC, int x, int y);
 	public:
         Win32UISystem(HardwareRenderer * ctx);
-        virtual GraphicsUI::IFont * LoadFont(UIWindowContext * ctx, const Font & f) override;
 		int HandleSystemMessage(SystemWindow* window, UINT message, WPARAM &wParam, LPARAM &lParam);
 	};
 }

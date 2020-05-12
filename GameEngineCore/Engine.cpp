@@ -705,6 +705,9 @@ namespace GameEngine
 		case ResourceType::ExtTools:
 			subDirName = "ExtTools";
 			break;
+		case ResourceType::Font:
+			subDirName = "Fonts";
+			break;
 		}
 		if (useEngineDir)
 			return Path::Combine(engineDir, subDirName);

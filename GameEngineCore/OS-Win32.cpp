@@ -12,6 +12,10 @@
 
 namespace GameEngine
 {
+    // Implemented in FontRasterizer-Win32.cpp
+    OsFontRasterizer* CreateWin32FontRasterizer();
+    OsFontRasterizer* CreateGenericFontRasterizer();
+
     GraphicsUI::ISystemInterface* OsApplication::CreateUISystemInterface(HardwareRenderer * renderer)
     {
         return new Win32UISystem(renderer);
@@ -126,6 +130,11 @@ namespace GameEngine
     OsTimer* OsApplication::CreateTimer()
     {
         return new OsTimerImpl();
+    }
+
+    OsFontRasterizer* OsApplication::CreateFontRasterizer()
+    {
+        return CreateWin32FontRasterizer();
     }
 
     Font::Font()

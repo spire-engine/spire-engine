@@ -15,24 +15,53 @@ namespace GameEngine
 {
     class GLUIRenderer;
     class UISystemBase;
-    class WindowsFont;
 
     const int TextBufferSize = 6 * 1024 * 1024;
     const int TextPixelBits = 4;
     const int Log2TextPixelsPerByte = CoreLib::Math::Log2Floor(8 / TextPixelBits);
     const int Log2TextBufferBlockSize = 6;
 
+    class SystemFont : public GraphicsUI::IFont
+    {
+    public:
+        CoreLib::RefPtr<OsFontRasterizer> rasterizer;
+        UISystemBase* system;
+        SystemWindow* window = nullptr;
+        Font fontDesc;
+    public:
+        SystemFont(UISystemBase* ctx, SystemWindow* associatedWindow, const Font& font)
+        {
+            system = ctx;
+            window = associatedWindow;
+            fontDesc = font;
+            rasterizer = OsApplication::CreateFontRasterizer();
+            UpdateFontContext(associatedWindow->GetCurrentDpi());
+        }
+        void UpdateFontContext(int dpi)
+        {
+            rasterizer->SetFont(fontDesc, dpi);
+        }
+        SystemWindow* GetAssociatedWindow()
+        {
+            return window;
+        }
+        virtual GraphicsUI::Rect MeasureString(const CoreLib::String& text, GraphicsUI::DrawTextOptions options) override;
+        virtual GraphicsUI::Rect MeasureString(const CoreLib::List<unsigned int>& text, GraphicsUI::DrawTextOptions options) override;
+        virtual GraphicsUI::IBakedText* BakeString(const CoreLib::String& text, GraphicsUI::IBakedText* previous, GraphicsUI::DrawTextOptions options) override;
+    };
+
     class BakedText : public GraphicsUI::IBakedText
     {
     public:
-        UISystemBase* system;
-        unsigned char * textBuffer;
-        WindowsFont * font;
+        UISystemBase* system = nullptr;
+        unsigned char * textBuffer = nullptr;
+        SystemFont* font = nullptr;
         CoreLib::String textContent;
         int64_t lastUse = 0;
-        int BufferSize;
+        int BufferSize = 0;
         GraphicsUI::DrawTextOptions options;
-        int Width, Height;
+        int Width = 0, Height = 0;
+    public:
         void Rebake();
         virtual int GetWidth() override
         {
@@ -75,7 +104,7 @@ namespace GameEngine
     {
     protected:
         unsigned char * textBuffer = nullptr;
-        CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::RefPtr<GraphicsUI::IFont>> fonts;
+        CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::RefPtr<SystemFont>> fonts;
         CoreLib::RefPtr<Buffer> textBufferObj;
         CoreLib::MemoryPool textBufferPool;
         VectorMath::Vec4 ColorToVec(GraphicsUI::Color c);
@@ -108,7 +137,7 @@ namespace GameEngine
         FrameBuffer * CreateFrameBuffer(Texture2D * texture);
         CoreLib::RefPtr<UIWindowContext> CreateWindowContext(SystemWindow* handle, int w, int h, int log2BufferSize);
         void UnregisterWindowContext(UIWindowContext * ctx);
-        virtual GraphicsUI::IFont * LoadFont(UIWindowContext * ctx, const Font & f) = 0;
+        GraphicsUI::IFont * LoadFont(UIWindowContext * ctx, const Font & f);
     };
 }
 

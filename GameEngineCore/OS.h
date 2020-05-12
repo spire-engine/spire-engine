@@ -48,6 +48,7 @@ namespace GameEngine
         virtual void Hide() = 0;
         virtual void Invoke(const CoreLib::Event<> & func) = 0;
         virtual void InvokeAsync(const CoreLib::Event<> & func) = 0;
+        virtual int GetCurrentDpi() = 0;
         virtual DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags = MessageBoxFlags::OKOnly) = 0;
     };
 
@@ -104,6 +105,33 @@ namespace GameEngine
         }
     };
 
+    // ==============================================
+    // Interface for text rasterization.
+ 
+    struct TextSize
+    {
+        int x, y;
+    };
+
+    class TextRasterizationResult
+    {
+    public:
+        TextSize Size;
+        unsigned char* ImageData;
+    };
+
+    class OsFontRasterizer : public CoreLib::RefObject
+    {
+    public:
+        virtual void SetFont(const Font& Font, int dpi) = 0;
+        virtual TextRasterizationResult RasterizeText(const CoreLib::String& text, const GraphicsUI::DrawTextOptions& options) = 0;
+        virtual TextSize GetTextSize(const CoreLib::String& text, const GraphicsUI::DrawTextOptions& options) = 0;
+        virtual TextSize GetTextSize(const CoreLib::List<unsigned int>& text, const GraphicsUI::DrawTextOptions& options) = 0;
+    };
+
+    // ===============================================
+    // System timer.
+
     class OsTimer : public CoreLib::RefObject
     {
     public:
@@ -113,12 +141,16 @@ namespace GameEngine
         virtual void SetInterval(int val) = 0;
     };
 
+    // ===============================================
+    // Main context that serves as entry point to all OS APIs.
+
     class OsApplication
     {
     public:
         static GraphicsUI::ISystemInterface* CreateUISystemInterface(HardwareRenderer * renderer);
         static SystemWindow* CreateSystemWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize);
         static OsTimer* CreateTimer();
+        static OsFontRasterizer* CreateFontRasterizer();
         static FileDialog* CreateFileDialog(SystemWindow* parent);
         static void SetMainLoopEventHandler(CoreLib::Procedure<> handler);
         static DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags = MessageBoxFlags::OKOnly);

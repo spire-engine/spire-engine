@@ -117,6 +117,8 @@
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="EngineActorClasses.cpp" />
     <ClCompile Include="EnvMapActor.cpp" />
+    <ClCompile Include="FontRasterizer-Generic.cpp" />
+    <ClCompile Include="FontRasterizer-Win32.cpp" />
     <ClCompile Include="ForwardBaseRenderPass.cpp" />
     <ClCompile Include="FrameIdDisplayActor.cpp" />
     <ClCompile Include="FreeRoamCameraController.cpp" />
@@ -262,6 +264,7 @@
     <ClInclude Include="StaticMeshActor.h" />
     <ClInclude Include="StaticScene.h" />
     <ClInclude Include="StaticSceneRenderer.h" />
+    <ClInclude Include="stb_truetype.h" />
     <ClInclude Include="SystemWindow-Win32.h" />
     <ClInclude Include="TerrainActor.h" />
     <ClInclude Include="TextureCompressor.h" />

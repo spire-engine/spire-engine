@@ -216,6 +216,12 @@
     <ClCompile Include="LightmapDebugViewRenderProcedure.cpp">
       <Filter>Renderer\RenderProcedure</Filter>
     </ClCompile>
+    <ClCompile Include="FontRasterizer-Win32.cpp">
+      <Filter>OS\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="FontRasterizer-Generic.cpp">
+      <Filter>OS\Linux</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -450,6 +456,9 @@
     <ClInclude Include="RenderProcedure.h">
       <Filter>Renderer\RenderProcedure</Filter>
     </ClInclude>
+    <ClInclude Include="stb_truetype.h">
+      <Filter>OS\Linux</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Actors">
@@ -490,6 +499,9 @@
     </Filter>
     <Filter Include="Renderer\RenderProcedure">
       <UniqueIdentifier>{4f8eb815-cd2c-44e6-bb48-4e38a72dacc7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OS\Linux">
+      <UniqueIdentifier>{0748a16c-0d71-4ec2-b3a0-ee3348ccd891}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

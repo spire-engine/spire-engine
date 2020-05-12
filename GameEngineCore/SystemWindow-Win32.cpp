@@ -27,6 +27,11 @@ namespace GameEngine
     {
         return uiContext->uiEntry.Ptr();
     }
+
+    int Win32SystemWindow::GetCurrentDpi()
+    {
+        return Win32UISystem::GetCurrentDpi(handle);
+    }
    
     void Win32SystemWindow::Create()
     {

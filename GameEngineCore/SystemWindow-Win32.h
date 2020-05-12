@@ -109,6 +109,7 @@ namespace GameEngine
         {
             BaseForm::SetVisible(false);
         }
+        virtual int GetCurrentDpi() override;
         virtual void Invoke(const Event<>& f) override
         {
             BaseForm::Invoke(f);

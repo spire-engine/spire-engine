@@ -38,6 +38,80 @@ namespace GameEngine
         };
     };
 
+    GraphicsUI::Rect SystemFont::MeasureString(const CoreLib::String& text, GraphicsUI::DrawTextOptions options)
+    {
+        GraphicsUI::Rect rs;
+        auto size = rasterizer->GetTextSize(text, options);
+        rs.x = rs.y = 0;
+        rs.w = size.x;
+        rs.h = size.y;
+        return rs;
+    }
+
+    GraphicsUI::Rect SystemFont::MeasureString(const List<unsigned int>& text, GraphicsUI::DrawTextOptions options)
+    {
+        GraphicsUI::Rect rs;
+        auto size = rasterizer->GetTextSize(text, options);
+        rs.x = rs.y = 0;
+        rs.w = size.x;
+        rs.h = size.y;
+        return rs;
+    }
+
+    GraphicsUI::IBakedText* SystemFont::BakeString(const CoreLib::String& text, GraphicsUI::IBakedText* previous, GraphicsUI::DrawTextOptions options)
+    {
+        BakedText* prev = (BakedText*)previous;
+        auto prevBuffer = (prev ? prev->textBuffer : nullptr);
+        system->WaitForDrawFence();
+        auto imageData = rasterizer->RasterizeText(text, options);
+        BakedText* result = prev;
+        if (!prevBuffer || imageData.ImageData != prevBuffer)
+            result = new BakedText();
+        result->font = this;
+        result->options = options;
+        result->textContent = text;
+        result->system = system;
+        result->Rebake();
+        system->bakedTexts.Add(result);
+        return result;
+    }
+
+    void BakedText::Rebake()
+    {
+        auto imageData = font->rasterizer->RasterizeText(textContent, this->options);
+        Width = imageData.Size.x;
+        Height = imageData.Size.y;
+        // Allocate GPU text buffer.
+        int pixelCount = (Width * Height);
+        int bytes = pixelCount >> Log2TextPixelsPerByte;
+        int textPixelMask = (1 << TextPixelBits) - 1;
+        if (pixelCount & ((1 << Log2TextPixelsPerByte) - 1))
+            bytes++;
+        bytes = Math::RoundUpToAlignment(bytes, 1 << Log2TextBufferBlockSize);
+        if (bytes > BufferSize)
+        {
+            if (textBuffer)
+                system->FreeTextBuffer(textBuffer, BufferSize);
+            textBuffer = system->AllocTextBuffer(bytes);
+            BufferSize = bytes;
+        }
+        // Store compressed text data in the allocated GPU buffer.
+        const float valScale = ((1 << TextPixelBits) - 1) / 255.0f;
+        for (int i = 0; i < Height; i++)
+        {
+            for (int j = 0; j < Width; j++)
+            {
+                int idx = i * Width + j;
+                auto val = imageData.ImageData[idx];
+                auto packedVal = Math::FastFloor(val * valScale + 0.5f);
+                int addr = idx >> Log2TextPixelsPerByte;
+                int mod = idx & ((1 << Log2TextPixelsPerByte) - 1);
+                int mask = textPixelMask << (mod * TextPixelBits);
+                textBuffer[addr] = (unsigned char)((textBuffer[addr] & (~mask)) | (packedVal << (mod * TextPixelBits)));
+            }
+        }
+    }
+
     BakedText::~BakedText()
     {
         system->bakedTexts.Remove(this);
@@ -60,6 +134,18 @@ namespace GameEngine
         Matrix4::CreateOrthoMatrix(orthoMatrix, 0.0f, (float)screenWidth, 0.0f, (float)screenHeight, 1.0f, -1.0f);
         uniformBuffer->SetData(&orthoMatrix, sizeof(orthoMatrix));
         hwRenderer->Wait();
+    }
+
+    GraphicsUI::IFont* UISystemBase::LoadFont(UIWindowContext* ctx, const Font& f)
+    {
+        auto identifier = f.ToString() + "_" + String((long long)(void*)ctx->window->GetNativeHandle());
+        RefPtr<SystemFont> font;
+        if (!fonts.TryGetValue(identifier, font))
+        {
+            font = new SystemFont(this, ctx->window, f);
+            fonts[identifier] = font;
+        }
+        return font.Ptr();
     }
 
     UIWindowContext::UIWindowContext()
@@ -415,7 +501,7 @@ namespace GameEngine
                 {
                     text->Rebake();
                     // kick out last used text from cache
-                    if (!text->textBuffer && text->Height > 0)
+                    if (!text->textBuffer && text->Height > 0 && text->Width > 0)
                     {
                         BakedText* victim = nullptr;
                         int64_t minTimeStamp = 0xFFFFFFFFFFFF;
@@ -438,7 +524,7 @@ namespace GameEngine
                         victim->textBuffer = nullptr;
                         victim->BufferSize = 0;
                     }
-                } while (!text->textBuffer && text->Height > 0);
+                } while (!text->textBuffer && text->Height > 0 && text->Width > 0);
             }
             text->lastUse = useStamp;
             indexStream.Add(vertexStream.Count());
