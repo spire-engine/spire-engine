@@ -889,7 +889,7 @@ namespace GraphicsUI
 	{
 	protected:
 		int HighLightID = -1;
-		int ItemHeight;
+		int ItemHeight = 0;
 		bool Selecting = false;
 		bool HotTrack;
 		int SelOriX,SelOriY;

@@ -25,21 +25,100 @@ namespace GameEngine
         return Engine::Instance()->FindFile(fontFileName, ResourceType::Font);
     }
 
+    struct GlyphCacheItem
+    {
+        unsigned codePoint;
+        bool isValid = false;
+        int x0, x1, y0, y1;
+        int advanceWidth;
+        int leftSideBearing;
+        List<unsigned char> bitmap;
+        GlyphCacheItem* next;
+        GlyphCacheItem* previous;
+    };
+    class GlyphCache
+    {
+    private:
+        GlyphCacheItem* head = nullptr;
+        GlyphCacheItem* tail = nullptr;
+        Dictionary<unsigned, GlyphCacheItem*> map;
+        List<GlyphCacheItem> cacheItemPool;
+        int cacheItemAllocIndex = 0;
+    public:
+        const int MaxCacheSize = 128;
+        GlyphCache()
+        {
+            cacheItemPool.SetSize(MaxCacheSize);
+        }
+        GlyphCacheItem* Find(unsigned codePoint)
+        {
+            GlyphCacheItem* cacheItem = nullptr;
+            if (map.TryGetValue(codePoint, cacheItem))
+            {
+                if (cacheItem == head)
+                    return cacheItem;
+                if (cacheItem->previous)
+                    cacheItem->previous->next = cacheItem->next;
+                if (cacheItem->next)
+                    cacheItem->next->previous = cacheItem->previous;
+                if (cacheItem == tail) tail = cacheItem->previous;
+                cacheItem->next = head;
+                head->previous = cacheItem;
+                cacheItem->previous = nullptr;
+                head = cacheItem;
+                return cacheItem;
+            }
+            else
+            {
+                if (cacheItemAllocIndex >= MaxCacheSize)
+                {
+                    auto newTail = tail->previous;
+                    newTail->next = nullptr;
+                    tail->next = head;
+                    tail->previous = nullptr;
+                    head->previous = tail;
+                    head = tail;
+                    tail = newTail;
+                    map.Remove(head->codePoint);
+                }
+                else
+                {
+                    auto newHead = &cacheItemPool[cacheItemAllocIndex];
+                    cacheItemAllocIndex++;
+                    newHead->next = head;
+                    if (head)
+                    {
+                        head->previous = newHead;
+                    }
+                    head = newHead;
+                    if (!tail) tail = head;
+                }
+                head->codePoint = codePoint;
+                head->isValid = false;
+                head->bitmap.Clear();
+                map[codePoint] = head;
+                return head;
+            }
+        }
+    };
+
     class GenericFontRasterizer : public OsFontRasterizer
     {
     private:
         List<unsigned char> monochromeBuffer;
-        List<unsigned char> tmpBitmap;
         stbtt_fontinfo fontinfo;
-        List<unsigned char> fontBuffer;
-        List<unsigned char> underlineCharBuffer; // one dimensional buffer for the underline char
+        List<unsigned char> fontBuffer; // buffer for the true type font file
+        List<unsigned char> underlineCharBuffer; // one dimensional (y only) buffer for the underline char
         int underlineCharY0, underlineCharY1;
         float fontScale = 0.0f;
         bool drawUnderline = false;
         int fontAscent = 0, fontDescent = 0, fontLineGap = 0;
+        GlyphCache glyphCache;
+        bool fontInitialized = false;
     public:
         void BuildUnderlineCharBuffer()
         {
+            List<unsigned char> tmpBitmap;
             int advanceWidth = 0, leftSideBearing = 0;
             stbtt_GetCodepointHMetrics(&fontinfo, '_', &advanceWidth, &leftSideBearing);
             int x0, y0, x1, y1;
@@ -61,6 +140,7 @@ namespace GameEngine
             {
                 Engine::Print("Error: no fonts found!\n");
                 fontBuffer.Clear();
+                fontInitialized = false;
                 return;
             }
             fontBuffer = CoreLib::IO::File::ReadAllBytes(fontFileName);
@@ -70,6 +150,7 @@ namespace GameEngine
             stbtt_GetFontVMetrics(&fontinfo, &fontAscent, &fontDescent, &fontLineGap);
             drawUnderline = Font.Underline;
             BuildUnderlineCharBuffer();
+            fontInitialized = true;
         }
 
         List<unsigned> StringToCodePointList(const CoreLib::String& text)
@@ -92,17 +173,25 @@ namespace GameEngine
 
         int DrawChar(unsigned codePoint, TextSize bufferSize, int bpX, int bpY, bool isBeginOfLine)
         {
-            int advanceWidth = 0, leftSideBearing = 0;
-            stbtt_GetCodepointHMetrics(&fontinfo, codePoint, &advanceWidth, &leftSideBearing);
-            int x0, y0, x1, y1;
-            stbtt_GetCodepointBitmapBox(&fontinfo, codePoint, fontScale, fontScale, &x0, &y0, &x1, &y1);
-            tmpBitmap.SetSize((x1 - x0) * (y1 - y0));
-            memset(tmpBitmap.Buffer(), 0, tmpBitmap.Count());
-            stbtt_MakeCodepointBitmap(&fontinfo, tmpBitmap.Buffer(), x1 - x0, y1 - y0, x1 - x0, fontScale, fontScale, codePoint);
-            if (isBeginOfLine && leftSideBearing < 0)
+            auto glyph = glyphCache.Find(codePoint);
+            if (!glyph->isValid)
             {
-                bpX -= (int)(leftSideBearing * fontScale);
+                stbtt_GetCodepointHMetrics(&fontinfo, codePoint, &glyph->advanceWidth, &glyph->leftSideBearing);
+                stbtt_GetCodepointBitmapBox(&fontinfo, codePoint, fontScale, fontScale, &glyph->x0, &glyph->y0, &glyph->x1, &glyph->y1);
+                glyph->bitmap.SetSize((glyph->x1 - glyph->x0) * (glyph->y1 - glyph->y0));
+                memset(glyph->bitmap.Buffer(), 0, glyph->bitmap.Count());
+                stbtt_MakeCodepointBitmap(&fontinfo, glyph->bitmap.Buffer(), glyph->x1 - glyph->x0, glyph->y1 - glyph->y0, glyph->x1 - glyph->x0, 
+                    fontScale, fontScale, codePoint);
+                glyph->isValid = true;
             }
+            if (isBeginOfLine && glyph->leftSideBearing < 0)
+            {
+                bpX -= (int)(glyph->leftSideBearing * fontScale);
+            }
+            int x0 = glyph->x0;
+            int x1 = glyph->x1;
+            int y0 = glyph->y0;
+            int y1 = glyph->y1;
             // Blit tmpBitmap to monochromeBuffer
             for (int y = y0; y < y1; y++)
                 for (int x = x0; x < x1; x++)
@@ -112,13 +201,13 @@ namespace GameEngine
                     if (dstY > 0 && dstY < bufferSize.y && dstX > 0 && dstX < bufferSize.x)
                     {
                         int dstVal = monochromeBuffer[dstY * bufferSize.x + dstX];
-                        int targetVal = tmpBitmap[(x - x0) + (y - y0) * (x1 - x0)];
-                        dstVal = dstVal * (255 - targetVal) / 255 + tmpBitmap[(x - x0) + (y - y0) * (x1 - x0)];
+                        int targetVal = glyph->bitmap[(x - x0) + (y - y0) * (x1 - x0)];
+                        dstVal = dstVal * (255 - targetVal) / 255 + glyph->bitmap[(x - x0) + (y - y0) * (x1 - x0)];
                         if (dstVal > 255) dstVal = 255;
                         monochromeBuffer[dstY * bufferSize.x + dstX] = (unsigned char)dstVal;
                     }
                 }
-            return bpX + (int)(advanceWidth * fontScale);
+            return bpX + (int)(glyph->advanceWidth * fontScale);
         }
 
         // Set the text that is going to be displayed.
@@ -126,6 +215,16 @@ namespace GameEngine
         {
             auto codePoints = StringToCodePointList(text);
             auto textSize = GetTextSize(codePoints, options);
+
+            if (!fontInitialized)
+            {
+                TextRasterizationResult emptyRs;
+                monochromeBuffer.SetSize(textSize.x * textSize.y);
+                memset(monochromeBuffer.Buffer(), 0, monochromeBuffer.Count());
+                emptyRs.ImageData = monochromeBuffer.Buffer();
+                emptyRs.Size = textSize;
+                return emptyRs;
+            }
             
             monochromeBuffer.SetSize(textSize.x * textSize.y);
             memset(monochromeBuffer.Buffer(), 0, monochromeBuffer.Count());
@@ -200,6 +299,10 @@ namespace GameEngine
 
         virtual TextSize GetTextSize(const CoreLib::List<unsigned int>& text, const DrawTextOptions& options) override
         {
+            if (!fontInitialized)
+            {
+                return TextSize{ text.Count() * 8, 16 };
+            }
             int width = 0;
             int maxWidth = 0;
             int height = (int)((fontAscent - fontDescent) * fontScale);

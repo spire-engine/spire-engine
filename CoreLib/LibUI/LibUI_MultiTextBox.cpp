@@ -720,7 +720,7 @@ namespace GraphicsUI
 			if (font)
 			{
 				int fontLineHeight = this->font->MeasureString("X", DrawTextOptions(false, false, true)).h;
-				lineHeight = (int)(fontLineHeight * 1.1f);
+				lineHeight = Math::Max((int)(fontLineHeight * 1.1f), 1);
 				CreateLineLabels(Height / lineHeight + 1);
 			}
 			hScroll->SmallChange = lineHeight;

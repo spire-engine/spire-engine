@@ -2330,7 +2330,7 @@ namespace GraphicsUI
 
 	void UIEntry::DoDpiChanged()
 	{
-		int nLineHeight = font->MeasureString("M", DrawTextOptions(true, true, false)).h;
+		int nLineHeight = Math::Max(1, font->MeasureString("M", DrawTextOptions(true, true, false)).h);
 		if (lineHeight != 0)
 			dpiScale = nLineHeight / (float)lineHeight;
 		Global::DeviceLineHeight = lineHeight = nLineHeight;
@@ -4104,7 +4104,7 @@ namespace GraphicsUI
 	{
 		ItemHeight = 18;
 		if (font)
-			ItemHeight = (int)(font->MeasureString("M", DrawTextOptions(false, false, true)).h * 1.1f);
+			ItemHeight = Math::Max(1, (int)(font->MeasureString("M", DrawTextOptions(false, false, true)).h * 1.1f));
 		Container::DoDpiChanged();
 	}
 

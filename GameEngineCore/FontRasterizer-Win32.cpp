@@ -226,7 +226,6 @@ namespace GameEngine
             {
                 for (int j = 0; j < TextWidth; j++)
                 {
-                    int idx = i * TextWidth + j;
                     auto val = 255 - (Bit->ScanLine[i][j * 3 + 2] + Bit->ScanLine[i][j * 3 + 1] + Bit->ScanLine[i][j * 3]) / 3;
                     monochromeBuffer[i * TextWidth + j] = (unsigned char)val;
                 }
