@@ -13,5 +13,5 @@ GameEngine
     link "slang-glslang"
     include "GameEngineCore/"
     include "./"
-    cflags "-std=c++14 -fpermissive -msse4.1"
+    cflags "-std=c++14 -msse4.1"
 }
