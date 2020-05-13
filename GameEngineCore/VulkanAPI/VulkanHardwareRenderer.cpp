@@ -57,7 +57,7 @@ namespace VK
 				printf("Device ID:      %d\n", deviceProperties.deviceID);
 				printf("Driver Version: %d\n", deviceProperties.driverVersion);
 				printf("Device Name:    %s\n", deviceProperties.deviceName);
-				printf("Device Type:    %d\n", deviceProperties.deviceType);
+				printf("Device Type:    %d\n", static_cast<int>(deviceProperties.deviceType));
 				printf("API Version:    %d.%d.%d\n",
 					VK_VERSION_MAJOR(deviceProperties.apiVersion),
 					VK_VERSION_MINOR(deviceProperties.apiVersion),
@@ -89,7 +89,7 @@ namespace VK
 				{
 					auto heap = memoryProperties.memoryHeaps[j];
 					printf("(Heap %zu)\n", j);
-					printf("\tsize: %llu MB\n", heap.size / 1024 / 1024);
+					printf("\tsize: %u MB\n", static_cast<unsigned>(heap.size / 1024 / 1024));
 					printf("\tflags:%s\n", to_string(heap.flags).c_str());
 					printf("\n");
 				}

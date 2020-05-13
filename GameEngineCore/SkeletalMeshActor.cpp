@@ -175,14 +175,14 @@ namespace GameEngine
 	void SkeletalMeshActor::OnLoad()
 	{
 		model = level->LoadModel(*ModelFile);
-		if (RetargetFile.GetValue().Length())
-			retargetFile = level->LoadRetargetFile(*RetargetFile);
+		if (RetargetFileName.GetValue().Length())
+			retargetFile = level->LoadRetargetFile(*RetargetFileName);
 		
 		LocalTransform.OnChanging.Bind(this, &SkeletalMeshActor::LocalTransform_Changing);
 		UpdateStates();
 
         ModelFile.OnChanging.Bind(this, &SkeletalMeshActor::ModelFileName_Changing);
-        RetargetFile.OnChanging.Bind(this, &SkeletalMeshActor::RetargetFileName_Changing);
+        RetargetFileName.OnChanging.Bind(this, &SkeletalMeshActor::RetargetFileName_Changing);
 	}
 
 	void SkeletalMeshActor::OnUnload()

@@ -228,7 +228,13 @@ namespace GameEngine
 		{
 			static char printBuffer[32768];
 			static CoreLib::Diagnostics::TimePoint lastUIUpdate;
+#if __GNUC__
+#pragma GCC diagnostic ignored "-Wformat-security"
+#endif
 			snprintf(printBuffer, 32768, message, args...);
+#if __GNUC__
+#pragma GCC diagnostic pop
+#endif
 			if (instance && instance->uiCommandForm)
 			{
 				instance->uiCommandForm->Write(printBuffer);
@@ -241,7 +247,13 @@ namespace GameEngine
 			}
 			else
 			{
+#if __GNUC__
+#pragma GCC diagnostic ignored "-Wformat-security"
+#endif
 				printf(message, args...);
+#if __GNUC__
+#pragma GCC diagnostic pop
+#endif
 			}
             OsApplication::DebugPrint(printBuffer);
 		}
