@@ -75,7 +75,7 @@ namespace GameEngine
         {
             return "Outline.slang";
         }
-        virtual char * GetName() override
+        virtual const char * GetName() override
         {
             return "Outline";
         }

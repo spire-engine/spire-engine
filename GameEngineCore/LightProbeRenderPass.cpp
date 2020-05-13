@@ -26,7 +26,7 @@ namespace GameEngine
 			state.blendMode = BlendMode::AlphaBlend;
 			state.DepthCompareFunc = CompareFunc::LessEqual;
 		}
-		virtual char * GetName() override
+		virtual const char * GetName() override
 		{
 			return "LightProbeForward";
 		}

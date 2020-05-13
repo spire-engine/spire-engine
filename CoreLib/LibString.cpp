@@ -85,18 +85,20 @@ namespace CoreLib
 
 		String String::FromWString(const wchar_t * wstr)
 		{
-			if (sizeof(wchar_t) == 2)
-				return CoreLib::IO::Encoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
-			else
-				return CoreLib::IO::Encoding::UTF32->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+#ifdef _WIN32
+			return CoreLib::IO::Encoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+#else
+			return CoreLib::IO::Encoding::UTF32->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+#endif
 		}
 
 		String String::FromWChar(const wchar_t ch)
 		{
-			if (sizeof(wchar_t) == 2)
-				return CoreLib::IO::Encoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
-			else
-				return CoreLib::IO::Encoding::UTF32->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+#ifdef _WIN32
+			return CoreLib::IO::Encoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+#else
+			return CoreLib::IO::Encoding::UTF32->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+#endif
 		}
 
 		String String::FromUnicodePoint(unsigned int codePoint)
@@ -124,11 +126,11 @@ namespace CoreLib
 					return wcharBuffer;
 				}
 				List<char> buf;
-				if (sizeof(wchar_t) == 2)
+#ifdef _WIN32
 					CoreLib::IO::Encoding::UTF16->GetBytes(buf, *this);
-				else
+#else
 					CoreLib::IO::Encoding::UTF32->GetBytes(buf, *this);
-
+#endif
 				if (len)
 					*len = buf.Count() / sizeof(wchar_t);
 				buf.Add(0);

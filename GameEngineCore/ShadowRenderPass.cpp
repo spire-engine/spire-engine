@@ -21,7 +21,7 @@ namespace GameEngine
 		{
 			return "ShadowPass.slang";
 		}
-		virtual char * GetName() override
+		virtual const char * GetName() override
 		{
 			return "ShadowPass";
 		}

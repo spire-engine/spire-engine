@@ -57,7 +57,7 @@ namespace GameEngine
 		{
 			return "ToneMapping.slang";
 		}
-		virtual char * GetName() override
+		virtual const char * GetName() override
 		{
 			return "ToneMappingPostPass";
 		}

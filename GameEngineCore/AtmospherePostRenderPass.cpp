@@ -119,7 +119,7 @@ namespace GameEngine
 		{
 			return "Atmosphere.slang";
 		}
-		virtual char * GetName() override
+		virtual const char * GetName() override
 		{
 			return "Atmosphere";
 		}

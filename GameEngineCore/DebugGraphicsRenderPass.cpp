@@ -27,7 +27,7 @@ namespace GameEngine
             state.DepthCompareFunc = CompareFunc::LessEqual;
             state.cullMode = CullMode::Disabled;
         }
-        virtual char * GetName() override
+        virtual const char * GetName() override
         {
             return "DebugGraphics";
         }

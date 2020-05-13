@@ -6,6 +6,10 @@
 #include "CoreLib/Imaging/Bitmap.h"
 #include "CoreLib/CommandLineParser.h"
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 using namespace GameEngine;
 
 #define COMMAND false
@@ -35,6 +39,7 @@ int __stdcall wWinMain(
 )
 {
 #endif
+	OsApplication::Init(0, nullptr);
 	{
 		EngineInitArguments args;
 		auto & appParams = args.LaunchParams;
