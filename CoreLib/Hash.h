@@ -73,7 +73,7 @@ namespace CoreLib
 			template<typename TKey>
 			static int GetHashCode(TKey key)
 			{
-				return (int)((CoreLib::PtrInt)key);
+				return static_cast<int>((CoreLib::PtrInt)key);
 			}
 		};
 		template<>

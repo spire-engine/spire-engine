@@ -17,7 +17,7 @@ namespace GameEngine
         {
             return "CustomDepthPass.slang";
         }
-        virtual char * GetName() override
+        virtual const char * GetName() override
         {
             return "CustomDepthPass";
         }

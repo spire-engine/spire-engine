@@ -12,7 +12,7 @@ namespace CoreLib
                 : Exception(message)
             {}
         };
-        void CoreLib::Diagnostics::DynamicAssert(const char * message, bool condition)
+        void DynamicAssert(const char * message, bool condition)
         {
             if (!condition)
                 throw AssertException(message);

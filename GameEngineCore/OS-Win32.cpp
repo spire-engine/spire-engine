@@ -16,6 +16,13 @@ namespace GameEngine
     OsFontRasterizer* CreateWin32FontRasterizer();
     OsFontRasterizer* CreateGenericFontRasterizer();
 
+    CoreLib::Text::CommandLineParser OsApplication::commandlineParser;
+
+    void OsApplication::Init(int /*argc*/, const char** /*argv*/)
+    {
+        WinForm::Application::Init();
+        commandlineParser.Parse(WinForm::Application::GetCommandLine());
+    }
     GraphicsUI::ISystemInterface* OsApplication::CreateUISystemInterface(HardwareRenderer * renderer)
     {
         return new Win32UISystem(renderer);

@@ -274,7 +274,7 @@ namespace CoreLib
 		void LoadObjMaterialLib(ObjModel & mdl, const String & filename, Dictionary<String, int> & matLookup)
 		{
 			FILE * f = 0;
-			_wfopen_s(&f, filename.ToWString(), L"rt");
+			fopen_s(&f, filename.Buffer(), "rt");
 			if (!f)
 			{
 				printf("Error loading obj material library \'%S\'", filename.ToWString());
@@ -353,7 +353,7 @@ namespace CoreLib
 				}
 				else if (_stricmp(buf, "map_d") == 0)
 				{
-					fgets(buf, 199, f);
+					if (!fgets(buf, 199, f)) break;
 					String name = buf;
 					name = RemoveLineBreakAndQuote(name);
 					if (curMat)

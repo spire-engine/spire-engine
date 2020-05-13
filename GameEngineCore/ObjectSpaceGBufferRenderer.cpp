@@ -123,9 +123,9 @@ namespace GameEngine
             for (int k = 0; k < 3; k++)
             {
                 FixedFunctionPipelineStates fixStates;
-                fixStates.CullMode = CullMode::Disabled;
+                fixStates.cullMode = CullMode::Disabled;
                 fixStates.DepthCompareFunc = CompareFunc::Less;
-                fixStates.BlendMode = BlendMode::Replace;
+                fixStates.blendMode = BlendMode::Replace;
                 fixStates.ConsevativeRasterization = false;
                 switch (k)
                 {

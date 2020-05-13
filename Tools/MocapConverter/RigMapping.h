@@ -2,7 +2,7 @@
 #define RIG_MAPPING_H
 
 #include "CoreLib/Basic.h"
-#include "VectorMath.h"
+#include "CoreLib/VectorMath.h"
 
 namespace GameEngine
 {

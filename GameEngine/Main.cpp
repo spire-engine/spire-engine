@@ -1,19 +1,17 @@
 ﻿#include "CoreLib/Basic.h"
 #include "CoreLib/PerformanceCounter.h"
-#include "CoreLib/WinForm/WinForm.h"
-#include "CoreLib/WinForm/WinApp.h"
 #include "CoreLib/CommandLineParser.h"
 #include "HardwareRenderer.h"
 #include "Engine.h"
 #include "CoreLib/Imaging/Bitmap.h"
+#include "CoreLib/CommandLineParser.h"
 
 using namespace GameEngine;
-using namespace CoreLib::WinForm;
 
 #define COMMAND false
 #define WINDOWED !COMMAND
 
-String RemoveQuote(String dir)
+CoreLib::String RemoveQuote(CoreLib::String dir)
 {
 	if (dir.StartsWith("\""))
 		return dir.SubString(1, dir.Length() - 2);
@@ -24,8 +22,10 @@ void RegisterTestUserActor();
 
 #include "FrustumCulling.h"
 
-#if COMMAND
-int __stdcall wmain(int /*argc*/, const wchar_t ** /*argv*/)
+#if COMMAND || !defined(_WIN32)
+int main(int argc, const char ** argv)
+{
+	OsApplication::Init(argc, argv);
 #elif WINDOWED
 int __stdcall wWinMain(
 	_In_ HINSTANCE /*hInstance*/,
@@ -33,9 +33,8 @@ int __stdcall wWinMain(
 	_In_ LPWSTR     /*lpCmdLine*/,
 	_In_ int       /*nCmdShow*/
 )
-#endif
 {
-	Application::Init();
+#endif
 	{
 		EngineInitArguments args;
 		auto & appParams = args.LaunchParams;
@@ -48,7 +47,7 @@ int __stdcall wWinMain(
 			args.GpuId = 0;
 			args.RecompileShaders = false;
 
-			CommandLineParser parser(Application::GetCommandLine());
+			auto& parser = OsApplication::GetCommandLineParser();
 			if (parser.OptionExists("-vk"))
 				args.API = RenderAPI::Vulkan;
 			if (parser.OptionExists("-dir"))
@@ -116,11 +115,11 @@ int __stdcall wWinMain(
 			}
 			Engine::Run();
 		}
-		catch (const Exception & e)
+		catch (const CoreLib::Exception & e)
 		{
-			MessageBoxW(NULL, e.Message.ToWString(), NULL, NULL);
+			OsApplication::ShowMessage(e.Message, "Error");
 		}
 		Engine::Destroy();
 	}
-	Application::Dispose();
+	OsApplication::Dispose();
 }

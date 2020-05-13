@@ -482,7 +482,7 @@ namespace CoreLib
 				return StartsWith(str.buffer.Ptr());
 			}
 
-			bool EndsWith(char * str)  const // String str
+			bool EndsWith(const char * str)  const // String str
 			{
 				if (!buffer)
 					return false;

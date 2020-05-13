@@ -3,6 +3,7 @@
 
 #include "../VectorMath.h"
 #include "../LibMath.h"
+#include <float.h>
 
 namespace CoreLib
 {

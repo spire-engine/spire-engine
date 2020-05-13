@@ -48,7 +48,7 @@ namespace VK
 			void*                      pUserData);
 
 		// VkDebug Implementation
-		inline void VkDebug::PrintDeviceInfo(const std::vector<vk::PhysicalDevice>& physicalDevices)
+		void PrintDeviceInfo(const std::vector<vk::PhysicalDevice>& physicalDevices)
 		{
 			for (uint32_t i = 0; i < physicalDevices.size(); i++)
 			{
@@ -113,7 +113,7 @@ namespace VK
 			}
 		}
 
-		VKAPI_ATTR VkBool32 VKAPI_CALL VkDebug::DebugCallback(
+		VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 			VkDebugReportFlagsEXT      flags,
 			VkDebugReportObjectTypeEXT objectType,
 			uint64_t                   object,
@@ -1621,7 +1621,7 @@ namespace VK
 				.setBufferImageHeight(0)
 				.setImageSubresource(vk::ImageSubresourceLayers().setAspectMask(aspectFlags).setMipLevel(mipLevel).setBaseArrayLayer(arrayLayer).setLayerCount(1))
 				.setImageOffset(vk::Offset3D())
-				.setImageExtent(vk::Extent3D(max(1, width >> mipLevel), max(1, height >> mipLevel), 1));
+				.setImageExtent(vk::Extent3D(Math::Max(1, width >> mipLevel), Math::Max(1, height >> mipLevel), 1));
 
 			// Create command buffer
 			//TODO: Use CommandBuffer class?
@@ -1807,9 +1807,9 @@ namespace VK
 
 				vk::ImageBlit blitRegion;
 				blitRegion.setSrcSubresource(vk::ImageSubresourceLayers().setAspectMask(aspectFlags).setMipLevel(i - 1).setBaseArrayLayer(0).setLayerCount(arrayLayers))
-					.setSrcOffsets(std::array<vk::Offset3D, 2>{vk::Offset3D(0, 0, 0), vk::Offset3D(max(1, width >> (i - 1)), max(1, height >> (i - 1)), max(1, depth >> (i - 1)))})
+					.setSrcOffsets(std::array<vk::Offset3D, 2>{vk::Offset3D(0, 0, 0), vk::Offset3D(Math::Max(1, width >> (i - 1)), Math::Max(1, height >> (i - 1)), Math::Max(1, depth >> (i - 1)))})
 					.setDstSubresource(vk::ImageSubresourceLayers().setAspectMask(aspectFlags).setMipLevel(i).setBaseArrayLayer(0).setLayerCount(arrayLayers))
-					.setDstOffsets(std::array<vk::Offset3D, 2>{vk::Offset3D(0, 0, 0), vk::Offset3D(max(1, width >> i), max(1, height >> i), max(1, depth >> i))});
+					.setDstOffsets(std::array<vk::Offset3D, 2>{vk::Offset3D(0, 0, 0), vk::Offset3D(Math::Max(1, width >> i), Math::Max(1, height >> i), Math::Max(1, depth >> i))});
 				// Blit texture to each mip level
 				transferCommandBuffer.blitImage(
 					image, vk::ImageLayout::eTransferSrcOptimal,
@@ -3450,7 +3450,7 @@ namespace VK
 			.setDepthClampEnable(VK_FALSE)
 			.setRasterizerDiscardEnable(VK_FALSE)
 			.setPolygonMode(TranslatePolygonMode(pipelineBuilder->FixedFunctionStates.PolygonFillMode))
-			.setCullMode(TranslateCullMode(pipelineBuilder->FixedFunctionStates.CullMode))
+			.setCullMode(TranslateCullMode(pipelineBuilder->FixedFunctionStates.cullMode))
 			.setFrontFace(vk::FrontFace::eClockwise)
 			.setDepthBiasEnable(pipelineBuilder->FixedFunctionStates.EnablePolygonOffset)
 			.setDepthBiasConstantFactor(pipelineBuilder->FixedFunctionStates.PolygonOffsetUnits)
@@ -3509,12 +3509,12 @@ namespace VK
 		{
 			colorBlendAttachments.Add(
 				vk::PipelineColorBlendAttachmentState()
-				.setBlendEnable(pipelineBuilder->FixedFunctionStates.BlendMode != BlendMode::Replace)
-				.setSrcColorBlendFactor(pipelineBuilder->FixedFunctionStates.BlendMode == BlendMode::AlphaBlend ? vk::BlendFactor::eSrcAlpha : vk::BlendFactor::eOne)
-				.setDstColorBlendFactor(pipelineBuilder->FixedFunctionStates.BlendMode == BlendMode::AlphaBlend ? vk::BlendFactor::eOneMinusSrcAlpha : vk::BlendFactor::eZero)
+				.setBlendEnable(pipelineBuilder->FixedFunctionStates.blendMode != BlendMode::Replace)
+				.setSrcColorBlendFactor(pipelineBuilder->FixedFunctionStates.blendMode == BlendMode::AlphaBlend ? vk::BlendFactor::eSrcAlpha : vk::BlendFactor::eOne)
+				.setDstColorBlendFactor(pipelineBuilder->FixedFunctionStates.blendMode == BlendMode::AlphaBlend ? vk::BlendFactor::eOneMinusSrcAlpha : vk::BlendFactor::eZero)
 				.setColorBlendOp(vk::BlendOp::eAdd)
-				.setSrcAlphaBlendFactor(pipelineBuilder->FixedFunctionStates.BlendMode == BlendMode::AlphaBlend ? vk::BlendFactor::eSrcAlpha : vk::BlendFactor::eOne)
-				.setDstAlphaBlendFactor(pipelineBuilder->FixedFunctionStates.BlendMode == BlendMode::AlphaBlend ? vk::BlendFactor::eSrcAlpha : vk::BlendFactor::eZero)
+				.setSrcAlphaBlendFactor(pipelineBuilder->FixedFunctionStates.blendMode == BlendMode::AlphaBlend ? vk::BlendFactor::eSrcAlpha : vk::BlendFactor::eOne)
+				.setDstAlphaBlendFactor(pipelineBuilder->FixedFunctionStates.blendMode == BlendMode::AlphaBlend ? vk::BlendFactor::eSrcAlpha : vk::BlendFactor::eZero)
 				.setAlphaBlendOp(vk::BlendOp::eAdd)
 				.setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA)
 			);

@@ -49,17 +49,17 @@ namespace GraphicsUI
 	class Pen
 	{
 	public:
-		Color Color;
+		Color color;
 		float Width;
 		int DashPattern = -1;
 		Pen(const GraphicsUI::Color & c)
 		{
-			this->Color = c;
+			this->color = c;
 			Width = 1.0f;
 		}
 		Pen()
 		{
-			Color = GraphicsUI::Color(0, 0, 0);
+			color = GraphicsUI::Color(0, 0, 0);
 			Width = 1.0f;
 		}
 	};

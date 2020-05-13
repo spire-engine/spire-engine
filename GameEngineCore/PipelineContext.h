@@ -156,7 +156,7 @@ namespace GameEngine
 		}
 		void SetCullMode(CullMode mode)
 		{
-			fixedFunctionStates.CullMode = mode;
+			fixedFunctionStates.cullMode = mode;
 		}
 		void PushModuleInstance(ModuleInstance * module)
 		{

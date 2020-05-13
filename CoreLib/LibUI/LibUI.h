@@ -896,7 +896,7 @@ namespace GraphicsUI
 		int ContentPadding;
 		bool DownInItem;
 		int lastSelIdx = -1;
-		ScrollBar *ScrollBar;
+		ScrollBar* scrollBar;
 		void ListChanged();
 		void SelectionChanged();
 		virtual Control* FindControlAtPosition(int x, int y) override
@@ -953,16 +953,16 @@ namespace GraphicsUI
 		ComboBox(Container * parent);
         ~ComboBox();
 	public:
-		TextBox *TextBox;
-		Button *btnDrop;
+		TextBox* textBox;
+		Button* btnDrop;
 		int ButtonWidth;
 		void SetText(const CoreLib::String & pText)
 		{
-			TextBox->SetText(pText);
+			textBox->SetText(pText);
 		}
 		CoreLib::String GetText()
 		{
-			return TextBox->GetText();
+			return textBox->GetText();
 		}
 		virtual void Posit(int left, int top, int width, int height) override;
 		virtual void Draw(int absX, int absY) override;

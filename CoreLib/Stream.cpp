@@ -94,8 +94,8 @@ namespace CoreLib
 			default:
 				break;
 			}
-			int shFlag = _SH_DENYWR;
 #ifdef _WIN32
+			int shFlag = _SH_DENYWR;
 			switch (share)
 			{
 			case CoreLib::IO::FileShare::None:

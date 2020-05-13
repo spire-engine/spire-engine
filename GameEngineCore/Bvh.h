@@ -149,166 +149,7 @@ namespace GameEngine
             bounds.Init();
         }
     };
-
-    template<typename T, typename CostEvaluator>
-    BvhNode_Build<T> * ConstructBvhNode(Bvh_Build<T> & tree, BuildData<T>* elements, int elementCount, int & elementListSize, int & nodeCount, CostEvaluator & eval, int depth)
-    {
-        BvhNode_Build<T> * node = new BvhNode_Build<T>();
-
-        nodeCount = 1;
-        elementListSize = 0;
-        if (elementCount == 1 || depth == 61)
-        {
-            node->Bounds = elements->Bounds;
-            node->AllocElements(1);
-            node->Elements[0] = elements->Element;
-            elementListSize = 1;
-            return node;
-        }
-        else
-        {
-            CoreLib::Graphics::BBox centroidBounds;
-            CoreLib::Graphics::BBox bbox;
-            centroidBounds.Init();
-            bbox.Init();
-            for (int i = 0; i < elementCount; i++)
-            {
-                centroidBounds.Union(elements[i].Center);
-                bbox.Union(elements[i].Bounds);
-            }
-            node->Bounds = bbox;
-            int dim = centroidBounds.MaxDimension();
-
-            if (centroidBounds.Min[dim] == centroidBounds.Max[dim])
-            {
-                node->Bounds = bbox;
-                node->AllocElements((int)elementCount);
-                for (int i = 0; i < (int)elementCount; i++)
-                {
-                    node->Elements[i] = elements[i].Element;
-                }
-                elementListSize = elementCount;
-                return node;
-            }
-
-            BucketInfo buckets[nBuckets];
-            if (elementCount > (2 << 12))
-            {
-                const int processorCount = 16;
-                BucketInfo buckets_proc[processorCount][nBuckets];
-                int blockSize = (int)(elementCount / processorCount);
-                #pragma omp parallel for
-                for (int procId = 0; procId < processorCount; procId++)
-                {
-                    int end;
-                    if (procId == processorCount - 1)
-                        end = (int)elementCount;
-                    else
-                        end = (procId + 1)*blockSize;
-                    for (int i = procId * blockSize; i < end; i++)
-                    {
-                        int b = (int)(nBuckets *
-                            ((elements[i].Center[dim] - centroidBounds.Min[dim]) / (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
-                        if (b == nBuckets) b = nBuckets - 1;
-                        buckets_proc[procId][b].count++;
-                        buckets_proc[procId][b].bounds.Union(elements[i].Bounds);
-                    }
-                }
-                for (int i = 0; i < nBuckets; i++)
-                {
-                    for (int j = 0; j < processorCount; j++)
-                    {
-                        buckets[i].count += buckets_proc[j][i].count;
-                        buckets[i].bounds.Union(buckets_proc[j][i].bounds);
-                    }
-                }
-            }
-            else
-            {
-                for (int i = 0; i < elementCount; i++)
-                {
-                    int b = (int)(nBuckets *
-                        ((elements[i].Center[dim] - centroidBounds.Min[dim]) / (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
-                    if (b == nBuckets) b = nBuckets - 1;
-                    buckets[b].count++;
-                    buckets[b].bounds.Union(elements[i].Bounds);
-                }
-            }
-
-            CoreLib::Graphics::BBox bounds1[nBuckets - 1];
-            bounds1[nBuckets - 2] = buckets[nBuckets - 1].bounds;
-            for (int i = nBuckets - 3; i >= 0; i--)
-            {
-                bounds1[i].Init();
-                bounds1[i].Union(buckets[i + 1].bounds);
-                bounds1[i].Union(bounds1[i + 1]);
-            }
-            CoreLib::Graphics::BBox b0;
-            b0.Init();
-            int count0 = 0;
-            float minCost = FLT_MAX;
-            int minCostSplit = 0;
-            for (int i = 0; i < nBuckets - 1; i++)
-            {
-                b0.Union(buckets[i].bounds);
-                count0 += buckets[i].count;
-                int count1 = (int)elementCount - count0;
-                float cost = eval.EvalCost(count0, SurfaceArea(b0), count1, SurfaceArea(bounds1[i]), SurfaceArea(bbox));
-                if (cost < minCost)
-                {
-                    minCost = cost;
-                    minCostSplit = i;
-                }
-            }
-
-            if (elementCount > CostEvaluator::ElementsPerNode ||
-                minCost < elementCount)
-            {
-                BuildData<T> *pmid = std::partition(elements,
-                    elements + elementCount,
-                    [&](const BuildData<T> &p)
-                {
-                    int b = (int)(nBuckets * ((p.Center[dim] - centroidBounds.Min[dim]) /
-                        (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
-                    if (b == nBuckets) b = nBuckets - 1;
-                    return b <= minCostSplit;
-                });
-                node->Axis = dim;
-                int listSize1, listSize2;
-                int nodeCount1, nodeCount2;
-                if (depth > 8)
-                {
-                    node->Children[0] = ConstructBvhNodeNonRec<T, CostEvaluator>(elements, (int)(pmid - elements), listSize1, nodeCount1, eval);
-                    node->Children[1] = ConstructBvhNodeNonRec<T, CostEvaluator>(pmid, (int)(elements + elementCount - pmid), listSize2, nodeCount2, eval);
-                }
-                else
-                {
-                    #pragma omp parallel sections
-                    {
-                        #pragma omp section
-                        node->Children[0] = ConstructBvhNode<T, CostEvaluator>(tree, elements, (int)(pmid - elements), listSize1, nodeCount1, eval, depth + 1);
-
-                        #pragma omp section
-                        node->Children[1] = ConstructBvhNode<T, CostEvaluator>(tree, pmid, (int)(elements + elementCount - pmid), listSize2, nodeCount2, eval, depth + 1);
-                    }
-                }
-                node->ElementCount = (int)(elementListSize = listSize1 + listSize2);
-                nodeCount += nodeCount1 + nodeCount2;
-            }
-            else
-            {
-                node->AllocElements((int)elementCount);
-                node->Bounds = bbox;
-                for (int i = 0; i < (int)elementCount; i++)
-                {
-                    node->Elements[i] = elements[i].Element;
-                }
-                elementListSize = elementCount;
-            }
-            return node;
-        }
-    }
-
+    
     template<typename T, typename CostEvaluator>
     BvhNode_Build<T> * ConstructBvhNodeNonRec(BuildData<T>* elements, int elementCount, int & elementListSize, int & nodeCount, CostEvaluator & eval)
     {
@@ -475,6 +316,165 @@ namespace GameEngine
             }
         }
         return rs;
+    }
+
+    template<typename T, typename CostEvaluator>
+    BvhNode_Build<T> * ConstructBvhNode(Bvh_Build<T> & tree, BuildData<T>* elements, int elementCount, int & elementListSize, int & nodeCount, CostEvaluator & eval, int depth)
+    {
+        BvhNode_Build<T> * node = new BvhNode_Build<T>();
+
+        nodeCount = 1;
+        elementListSize = 0;
+        if (elementCount == 1 || depth == 61)
+        {
+            node->Bounds = elements->Bounds;
+            node->AllocElements(1);
+            node->Elements[0] = elements->Element;
+            elementListSize = 1;
+            return node;
+        }
+        else
+        {
+            CoreLib::Graphics::BBox centroidBounds;
+            CoreLib::Graphics::BBox bbox;
+            centroidBounds.Init();
+            bbox.Init();
+            for (int i = 0; i < elementCount; i++)
+            {
+                centroidBounds.Union(elements[i].Center);
+                bbox.Union(elements[i].Bounds);
+            }
+            node->Bounds = bbox;
+            int dim = centroidBounds.MaxDimension();
+
+            if (centroidBounds.Min[dim] == centroidBounds.Max[dim])
+            {
+                node->Bounds = bbox;
+                node->AllocElements((int)elementCount);
+                for (int i = 0; i < (int)elementCount; i++)
+                {
+                    node->Elements[i] = elements[i].Element;
+                }
+                elementListSize = elementCount;
+                return node;
+            }
+
+            BucketInfo buckets[nBuckets];
+            if (elementCount > (2 << 12))
+            {
+                const int processorCount = 16;
+                BucketInfo buckets_proc[processorCount][nBuckets];
+                int blockSize = (int)(elementCount / processorCount);
+                #pragma omp parallel for
+                for (int procId = 0; procId < processorCount; procId++)
+                {
+                    int end;
+                    if (procId == processorCount - 1)
+                        end = (int)elementCount;
+                    else
+                        end = (procId + 1)*blockSize;
+                    for (int i = procId * blockSize; i < end; i++)
+                    {
+                        int b = (int)(nBuckets *
+                            ((elements[i].Center[dim] - centroidBounds.Min[dim]) / (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
+                        if (b == nBuckets) b = nBuckets - 1;
+                        buckets_proc[procId][b].count++;
+                        buckets_proc[procId][b].bounds.Union(elements[i].Bounds);
+                    }
+                }
+                for (int i = 0; i < nBuckets; i++)
+                {
+                    for (int j = 0; j < processorCount; j++)
+                    {
+                        buckets[i].count += buckets_proc[j][i].count;
+                        buckets[i].bounds.Union(buckets_proc[j][i].bounds);
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < elementCount; i++)
+                {
+                    int b = (int)(nBuckets *
+                        ((elements[i].Center[dim] - centroidBounds.Min[dim]) / (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
+                    if (b == nBuckets) b = nBuckets - 1;
+                    buckets[b].count++;
+                    buckets[b].bounds.Union(elements[i].Bounds);
+                }
+            }
+
+            CoreLib::Graphics::BBox bounds1[nBuckets - 1];
+            bounds1[nBuckets - 2] = buckets[nBuckets - 1].bounds;
+            for (int i = nBuckets - 3; i >= 0; i--)
+            {
+                bounds1[i].Init();
+                bounds1[i].Union(buckets[i + 1].bounds);
+                bounds1[i].Union(bounds1[i + 1]);
+            }
+            CoreLib::Graphics::BBox b0;
+            b0.Init();
+            int count0 = 0;
+            float minCost = FLT_MAX;
+            int minCostSplit = 0;
+            for (int i = 0; i < nBuckets - 1; i++)
+            {
+                b0.Union(buckets[i].bounds);
+                count0 += buckets[i].count;
+                int count1 = (int)elementCount - count0;
+                float cost = eval.EvalCost(count0, SurfaceArea(b0), count1, SurfaceArea(bounds1[i]), SurfaceArea(bbox));
+                if (cost < minCost)
+                {
+                    minCost = cost;
+                    minCostSplit = i;
+                }
+            }
+
+            if (elementCount > CostEvaluator::ElementsPerNode ||
+                minCost < elementCount)
+            {
+                BuildData<T> *pmid = std::partition(elements,
+                    elements + elementCount,
+                    [&](const BuildData<T> &p)
+                {
+                    int b = (int)(nBuckets * ((p.Center[dim] - centroidBounds.Min[dim]) /
+                        (centroidBounds.Max[dim] - centroidBounds.Min[dim])));
+                    if (b == nBuckets) b = nBuckets - 1;
+                    return b <= minCostSplit;
+                });
+                node->Axis = dim;
+                int listSize1, listSize2;
+                int nodeCount1, nodeCount2;
+                if (depth > 8)
+                {
+                    node->Children[0] = ConstructBvhNodeNonRec<T, CostEvaluator>(elements, (int)(pmid - elements), listSize1, nodeCount1, eval);
+                    node->Children[1] = ConstructBvhNodeNonRec<T, CostEvaluator>(pmid, (int)(elements + elementCount - pmid), listSize2, nodeCount2, eval);
+                }
+                else
+                {
+                    #pragma omp parallel sections
+                    {
+                        #pragma omp section
+                        node->Children[0] = ConstructBvhNode<T, CostEvaluator>(tree, elements, (int)(pmid - elements), listSize1, nodeCount1, eval, depth + 1);
+
+                        #pragma omp section
+                        node->Children[1] = ConstructBvhNode<T, CostEvaluator>(tree, pmid, (int)(elements + elementCount - pmid), listSize2, nodeCount2, eval, depth + 1);
+                    }
+                }
+                node->ElementCount = (int)(elementListSize = listSize1 + listSize2);
+                nodeCount += nodeCount1 + nodeCount2;
+            }
+            else
+            {
+                node->AllocElements((int)elementCount);
+                node->Bounds = bbox;
+                for (int i = 0; i < (int)elementCount; i++)
+                {
+                    node->Elements[i] = elements[i].Element;
+                }
+                elementListSize = elementCount;
+            }
+            return node;
+        }
     }
 
     template<typename T, typename CostEvaluator>

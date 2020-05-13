@@ -90,7 +90,7 @@ namespace CoreLib
 				pixels = stbi_load_from_file(f, &width, &height, &channel, 4);
 			fclose(f);
 #else
-			pixels = stbi_load(fileName.ToMultiByteString(), &width, &height, &channel, 4);
+			pixels = stbi_load(fileName.Buffer(), &width, &height, &channel, 4);
 #endif
 			isTransparent = (channel == 4);
 			if (!pixels)
@@ -145,17 +145,17 @@ namespace CoreLib
 			bmpinfoheader[10] = (unsigned char)(       Height>>16);
 			bmpinfoheader[11] = (unsigned char)(       Height>>24);
 
-			_wfopen_s(&f, fileName.ToWString(), L"wb");
+			CoreLib::IO::BinaryWriter writer(new CoreLib::IO::FileStream(fileName, IO::FileMode::Create));
+
 			if (f)
 			{
-				fwrite(bmpfileheader,1,14,f);
-				fwrite(bmpinfoheader,1,40,f);
+				writer.Write(bmpfileheader, 14);
+				writer.Write(bmpinfoheader, 40);
 				for(int i=0; i<Height; i++)
 				{
-					fwrite(img.Buffer()+(Width*i*3),3,Width,f);
-					fwrite(bmppad,1,(4-(Width*3)%4)%4,f);
+					writer.Write(img.Buffer()+(Width*i*3),3*Width);
+					writer.Write(bmppad,(4-(Width*3)%4)%4);
 				}
-				fclose(f);
 			}
 			else
 			{

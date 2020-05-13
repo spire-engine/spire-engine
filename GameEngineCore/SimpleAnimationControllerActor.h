@@ -2,7 +2,7 @@
 #define GAME_ENGINE_SIMPLE_ANIMATION_CONTROLLER_ACTOR
 
 #include "AnimationControllerActor.h"
-#include "VectorMath.h"
+#include "CoreLib/VectorMath.h"
 
 namespace GameEngine
 {

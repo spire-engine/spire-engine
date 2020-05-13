@@ -3,6 +3,13 @@
 
 #include "CoreLib/LibUI/UISystemInterface.h"
 #include "CoreLib/LibUI/LibUI.h"
+#include "CoreLib/CommandLineParser.h"
+
+#if defined(_WIN32)
+#include "Win32VirtualKeys.h"
+#elif defined(__linux)
+#include "LinuxVirtualKeys.h"
+#endif
 
 namespace GameEngine
 {
@@ -146,6 +153,8 @@ namespace GameEngine
 
     class OsApplication
     {
+    private:
+        static CoreLib::Text::CommandLineParser commandlineParser;
     public:
         static GraphicsUI::ISystemInterface* CreateUISystemInterface(HardwareRenderer * renderer);
         static SystemWindow* CreateSystemWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize);
@@ -156,14 +165,25 @@ namespace GameEngine
         static DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags = MessageBoxFlags::OKOnly);
         static void Run(SystemWindow* mainWindow);
         static void DoEvents();
+        static void Init(int argc, const char** argv);
         static void Dispose();
         static void DebugPrint(const char * buffer);
+        static CoreLib::Text::CommandLineParser& GetCommandLineParser()
+        {
+            return commandlineParser;
+        }
         static void DebugWriteLine(const char * buffer)
         {
             DebugPrint(buffer);
             DebugPrint("\n");
         }
     };
+
+    template<typename T>
+    inline bool TestKey(T key, VirtualKeys vkey)
+    {
+        return key == static_cast<T>(vkey);
+    }
 }
 
 #endif

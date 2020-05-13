@@ -1,6 +1,6 @@
 #include "ObjectSpaceMapSet.h"
 #include "CoreLib/Basic.h"
-#include "VectorMath.h"
+#include "CoreLib/VectorMath.h"
 #include "CoreLib/Imaging/Bitmap.h"
 
 using namespace CoreLib;

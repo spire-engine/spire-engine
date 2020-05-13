@@ -701,18 +701,18 @@ namespace GraphicsUI
 
 			contextMenu = new Menu(this);
 			auto mnUndo = new MenuItem(contextMenu, "&Undo", "Ctrl+Z");
-			mnUndo->OnClick.Bind([this](auto) {Undo(); });
+			mnUndo->OnClick.Bind([this](auto) { this->Undo(); });
 			auto mnRedo = new MenuItem(contextMenu, "&Redo", "Ctrl+Y");
-			mnRedo->OnClick.Bind([this](auto) {Redo(); });
+			mnRedo->OnClick.Bind([this](auto) { this->Redo(); });
 			new MenuItem(contextMenu);
 			auto mnCut = new MenuItem(contextMenu, "C&ut", "Ctrl+X");
-			mnCut->OnClick.Bind([this](auto) {Cut(); });
+			mnCut->OnClick.Bind([this](auto) { this->Cut(); });
 			auto mnCopy = new MenuItem(contextMenu, "&Copy", "Ctrl+C");
-			mnCopy->OnClick.Bind([this](auto) {Copy(); });
+			mnCopy->OnClick.Bind([this](auto) { this->Copy(); });
 			auto mnPaste = new MenuItem(contextMenu, "&Paste", "Ctrl+V");
-			mnPaste->OnClick.Bind([this](auto) {Paste(); });
+			mnPaste->OnClick.Bind([this](auto) { this->Paste(); });
 			auto mnSelAll = new MenuItem(contextMenu, "&Select All", "Ctrl+A");
-			mnSelAll->OnClick.Bind([this](auto) {SelectAll(); });
+			mnSelAll->OnClick.Bind([this](auto) { this->SelectAll(); });
 		}
 		virtual void DoDpiChanged() override
 		{

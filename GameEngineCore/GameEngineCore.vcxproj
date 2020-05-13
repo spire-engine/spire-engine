@@ -126,6 +126,7 @@
     <ClCompile Include="Gizmo.cpp" />
     <ClCompile Include="GizmoActor.cpp" />
     <ClCompile Include="GraphicsSettings.cpp" />
+    <ClCompile Include="HardwareInputInterface-Linux.cpp" />
     <ClCompile Include="HardwareInputInterface-Win32.cpp" />
     <ClCompile Include="InputDispatcher.cpp" />
     <ClCompile Include="Level.cpp" />
@@ -146,6 +147,7 @@
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ObjectSpaceGBufferRenderer.cpp" />
     <ClCompile Include="ObjectSpaceMapSet.cpp" />
+    <ClCompile Include="OS-Linux.cpp" />
     <ClCompile Include="OS-Win32.cpp" />
     <ClCompile Include="OutlinePostRenderPass.cpp" />
     <ClCompile Include="Physics.cpp" />
@@ -168,10 +170,12 @@
     <ClCompile Include="StaticMeshActor.cpp" />
     <ClCompile Include="StaticScene.cpp" />
     <ClCompile Include="StaticSceneRenderer.cpp" />
+    <ClCompile Include="SystemWindow-Linux.cpp" />
     <ClCompile Include="SystemWindow-Win32.cpp" />
     <ClCompile Include="TerrainActor.cpp" />
     <ClCompile Include="TextureCompressor.cpp" />
     <ClCompile Include="ToneMappingActor.cpp" />
+    <ClCompile Include="UISystem-Linux.cpp" />
     <ClCompile Include="UISystemBase.cpp" />
     <ClCompile Include="UISystem-Win32.cpp" />
     <ClCompile Include="VideoEncoder.cpp" />
@@ -233,6 +237,7 @@
     <ClInclude Include="LightmapSet.h" />
     <ClInclude Include="LightmapUVGeneration.h" />
     <ClInclude Include="LightProbeRenderer.h" />
+    <ClInclude Include="LinuxVirtualKeys.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="MeshBuilder.h" />
@@ -265,6 +270,7 @@
     <ClInclude Include="StaticScene.h" />
     <ClInclude Include="StaticSceneRenderer.h" />
     <ClInclude Include="stb_truetype.h" />
+    <ClInclude Include="SystemWindow-Linux.h" />
     <ClInclude Include="SystemWindow-Win32.h" />
     <ClInclude Include="TerrainActor.h" />
     <ClInclude Include="TextureCompressor.h" />
@@ -274,6 +280,7 @@
     </ClCompile>
     <ClInclude Include="ToneMapping.h" />
     <ClInclude Include="ToneMappingActor.h" />
+    <ClInclude Include="UISystem-Linux.h" />
     <ClInclude Include="UISystemBase.h" />
     <ClInclude Include="UISystem-Win32.h" />
     <ClInclude Include="VideoEncoder.h" />
@@ -282,6 +289,7 @@
     <ClInclude Include="VulkanAPI\volk.h" />
     <ClInclude Include="VulkanAPI\vulkan.h" />
     <ClInclude Include="VulkanAPI\vulkan.hpp" />
+    <ClInclude Include="Win32VirtualKeys.h" />
     <ClInclude Include="WorldRenderPass.h" />
   </ItemGroup>
   <ItemGroup>

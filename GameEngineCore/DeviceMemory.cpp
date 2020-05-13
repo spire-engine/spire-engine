@@ -1,6 +1,6 @@
 #include "DeviceMemory.h"
 #include "HardwareRenderer.h"
-#include "LibMath.h"
+#include "CoreLib/LibMath.h"
 
 namespace GameEngine
 {

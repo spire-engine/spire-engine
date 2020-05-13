@@ -168,25 +168,6 @@ namespace GameEngine
     {
     private:
         GameEngine::HardwareRenderer * rendererApi;
-        // Read all bytes from a file
-        CoreLib::List<unsigned char> ReadAllBytes(String fileName)
-        {
-            CoreLib::List<unsigned char> result;
-
-            FILE * f;
-            _wfopen_s(&f, fileName.ToWString(), L"rb");
-            while (!feof(f))
-            {
-                unsigned char c;
-                if (fread(&c, 1, 1, f))
-                    result.Add(c);
-            }
-            fclose(f);
-
-            return result;
-        };
-
-
     private:
         RefPtr<Shader> uberVs, uberFs;
         RefPtr<Pipeline> pipeline;
@@ -239,9 +220,9 @@ namespace GameEngine
             pipeBuilder->SetBindingLayout(MakeArrayView(descLayout.Ptr()));
             pipeBuilder->FixedFunctionStates.PrimitiveRestartEnabled = true;
             pipeBuilder->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
-            pipeBuilder->FixedFunctionStates.BlendMode = BlendMode::AlphaBlend;
+            pipeBuilder->FixedFunctionStates.blendMode = BlendMode::AlphaBlend;
             pipeBuilder->FixedFunctionStates.DepthCompareFunc = CompareFunc::Disabled;
-            pipeBuilder->FixedFunctionStates.CullMode = CullMode::Disabled;
+            pipeBuilder->FixedFunctionStates.cullMode = CullMode::Disabled;
 
 
             Array<AttachmentLayout, 1> frameBufferLayout;

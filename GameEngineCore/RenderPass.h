@@ -20,7 +20,7 @@ namespace GameEngine
 			return renderTargetLayout.Ptr();
 		}
 		virtual int GetShaderId() = 0;
-		virtual char * GetName() = 0;
+		virtual const char * GetName() = 0;
 	};
 }
 

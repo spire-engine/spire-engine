@@ -101,7 +101,7 @@ namespace GameEngine
 		const int poseMatrixSize = skeleton->Bones.Count() * sizeof(Matrix4);
 
 		// ensure allocated transform buffer is sufficient 
-		_ASSERT(transformModule->BufferLength >= poseMatrixSize);
+		assert(transformModule->BufferLength >= poseMatrixSize);
 
 		List<Matrix4> matrices;
 		pose.GetMatrices(skeleton, matrices, true, retarget);

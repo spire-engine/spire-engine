@@ -4,7 +4,7 @@
 #include "ObjectSpaceMapSet.h"
 #include "Level.h"
 #include "StaticMeshActor.h"
-#include "VectorMath.h"
+#include "CoreLib/VectorMath.h"
 #include "Engine.h"
 #include "CameraActor.h"
 #include "CoreLib/Threading.h"
@@ -813,8 +813,8 @@ namespace GameEngine
             }
         }
     public:
-        std::atomic<bool> isCancelled = false;
-        std::atomic<bool> started = false;
+        std::atomic<bool> isCancelled;
+        std::atomic<bool> started;
         CoreLib::Threading::Thread computeThread;
         void StatusChanged(String status)
         {
@@ -971,6 +971,8 @@ namespace GameEngine
         {
             auto computeTaskManager = Engine::GetComputeTaskManager();
             lightmapComrpessionKernel = computeTaskManager->LoadKernel("BC6Compression.slang", "cs_main");
+            isCancelled = false;
+            started = false;
         }
     };
     LightmapBaker * CreateLightmapBaker()

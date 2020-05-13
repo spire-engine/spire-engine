@@ -15,7 +15,7 @@ namespace CoreLib
 {
 	typedef int64_t Int64;
 	typedef unsigned short Word;
-#ifdef _M_X64
+#if defined(_M_X64) || defined(__LP64__)
 	typedef int64_t PtrInt;
 #else
 	typedef int PtrInt;

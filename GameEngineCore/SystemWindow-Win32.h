@@ -1,6 +1,8 @@
 #ifndef GAME_ENGINE_SYSTEM_WINDOW_H
 #define GAME_ENGINE_SYSTEM_WINDOW_H
 
+#if defined(_WIN32)
+
 #include "CoreLib/WinForm/WinForm.h"
 #include "CoreLib/LibUI/LibUI.h"
 #include "UISystemBase.h"
@@ -126,5 +128,7 @@ namespace GameEngine
         }
     };
 }
+
+#endif
 
 #endif

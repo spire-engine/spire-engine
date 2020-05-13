@@ -213,7 +213,7 @@ namespace GameEngine
 			unsigned char * ptr = (unsigned char *)&value;
 			for (int i = 0; i < (int)sizeof(value); i++)
 			{
-				auto ch = String((unsigned int)(ptr[i]), 16);
+				auto ch = CoreLib::String((unsigned int)(ptr[i]), 16);
 				if (ch.Length() == 1)
 					sb << "0";
 				sb << ch;

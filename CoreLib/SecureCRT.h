@@ -3,6 +3,7 @@
 #define CORE_LIB_SECURE_CRT_H
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <wchar.h>
 

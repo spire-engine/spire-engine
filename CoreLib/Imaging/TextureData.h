@@ -7,6 +7,7 @@
 #include "Bitmap.h"
 #include "../Graphics/TextureFile.h"
 #include <math.h>
+#include <cmath>
 
 #define TEXTURE_ACCESS_DUMP
 
@@ -481,14 +482,14 @@ namespace CoreLib
 		template<typename ColorType>
 		inline void NeareastSampling(Vec4 * result, TextureData<ColorType> * texture, Vec2 uv)
 		{
-			if (_finite(uv.x) && _finite(uv.y))
+			if (finite(uv.x) && finite(uv.y))
 				SampleTextureLevel_Neareast(result, texture, 0, uv);
 		}
 
 		template<typename ColorType>
 		inline void LinearSampling(Vec4 * result, TextureData<ColorType> * texture, Vec2 uv)
 		{
-			if (_finite(uv.x) && _finite(uv.y))
+			if (finite(uv.x) && finite(uv.y))
 				SampleTextureLevel(result, texture, 0, uv);
 		}
 
@@ -509,7 +510,7 @@ namespace CoreLib
 		template<typename ColorType>
 		inline void TrilinearSampling(Vec4 * result, TextureData<ColorType> * texture, float du, float dv, Vec2 & uv, int minLod = 0)
 		{
-			if (_finite(du) && _finite(dv) && _finite(uv.x) && _finite(uv.y))
+			if (finite(du) && finite(dv) && finite(uv.x) && finite(uv.y))
 			{
 				du *= texture->Width;
 				dv *= texture->Height;

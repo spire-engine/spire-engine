@@ -29,7 +29,7 @@
  *     POSSIBILITY OF SUCH DAMAGE.
  *
  */
-
+#ifdef _WIN32
 #include <windows.h>
 
 /////////////////////////////////////////////////////////////////////////////
@@ -41,3 +41,4 @@ BOOL WINAPI DllEntryPoint (HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserve
   }
   return TRUE;
 }
+#endif

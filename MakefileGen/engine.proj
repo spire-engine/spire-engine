@@ -1,0 +1,17 @@
+GameEngine
+{
+    cppblob "GameEngine/"
+    cppblob "GameEngineCore/"
+    cppblob "GameEngineCore/VulkanAPI/"
+    cppblob "GameEngineCore/H264Encoder/src/"
+    cppblob "CoreLib/"
+    cppblob "CoreLib/Graphics/"
+    cppblob "CoreLib/Imaging/"
+    cppblob "CoreLib/LibUI/"
+    libdir "ExternalLibs/Slang/bin/linux-x64/release"
+    link "slang"
+    link "slang-glslang"
+    include "GameEngineCore/"
+    include "./"
+    cflags "-std=c++14 -fpermissive -msse4.1"
+}

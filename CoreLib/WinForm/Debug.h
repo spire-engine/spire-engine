@@ -2,8 +2,9 @@
 #define GX_WIN_DEBUG_H
 
 #include "../Basic.h"
+#ifdef _WIN32
 #include <Windows.h>
-
+#endif
 namespace CoreLib
 {
 	namespace Diagnostics
@@ -14,18 +15,26 @@ namespace CoreLib
 		public:
 			static void Write(const String & text)
 			{
+#ifdef _WIN32
 				if (IsDebuggerPresent() != 0)
 				{
 					OutputDebugStringW(text.ToWString());
 				}
+#else
+				printf("%s", text.Buffer());
+#endif
 			}
 			static void WriteLine(const String & text)
 			{
+#ifdef _WIN32
 				if (IsDebuggerPresent() != 0)
 				{
 					OutputDebugStringW(text.ToWString());
 					OutputDebugStringW(L"\n");
 				}
+#else
+				printf("%s\n", text.Buffer());
+#endif
 			}
 		};
 

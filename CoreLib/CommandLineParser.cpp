@@ -6,7 +6,19 @@ namespace CoreLib
 	{
 		CommandLineParser::CommandLineParser(const String & cmdLine)
 		{
+			Parse(cmdLine);	
+		}
+
+		void CommandLineParser::Parse(const String& cmdLine)
+		{
 			stream = Split(cmdLine, L' ');
+		}
+
+		void CommandLineParser::SetArguments(int argc, const char ** argv)
+		{
+			stream.Clear();
+			for (int i = 0; i < argc; i++)
+				stream.Add(String(argv[i]));
 		}
 
 		String CommandLineParser::GetFileName()

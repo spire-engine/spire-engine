@@ -2907,20 +2907,20 @@ namespace GraphicsUI
 		auto mnSelAll = new MenuItem(menu, "Select All", "Ctrl+A");
 		mnCut->OnClick.Bind([this](auto) 
 		{
-			CopyToClipBoard();
-			DeleteSelectionText();
+			this->CopyToClipBoard();
+			this->DeleteSelectionText();
 		});
 		mnCopy->OnClick.Bind([this](auto)
 		{
-			CopyToClipBoard();
+			this->CopyToClipBoard();
 		});
 		mnPaste->OnClick.Bind([this](auto)
 		{
-			PasteFromClipBoard();
+			this->PasteFromClipBoard();
 		});
 		mnSelAll->OnClick.Bind([this](auto)
 		{
-			SelectAll();
+			this->SelectAll();
 		});
 		time = CoreLib::Diagnostics::PerformanceCounter::Start();
 		CursorPos = 0;
@@ -3926,9 +3926,9 @@ namespace GraphicsUI
 		FontColor = Global::Colors.ControlFontColor;
 		UnfocusedSelectionColor = Global::Colors.UnfocusedSelectionColor;
 		HighLightColor = Global::Colors.HighlightColor;
-		ScrollBar = new GraphicsUI::ScrollBar(this);
-		ScrollBar->SetOrientation(SO_VERTICAL);
-		ScrollBar->Visible = false;
+		scrollBar = new GraphicsUI::ScrollBar(this);
+		scrollBar->SetOrientation(SO_VERTICAL);
+		scrollBar->Visible = false;
 		ContentPadding = 2;
 		DoDpiChanged();
 	}
@@ -3948,12 +3948,12 @@ namespace GraphicsUI
 		SelectedIndex = ClampInt(index, -1, Items.Count() - 1);
 		if (SelectedIndex != -1)
 		{
-			if (SelectedIndex - this->ScrollBar->GetPosition() + 1 > Height / ItemHeight)
+			if (SelectedIndex - this->scrollBar->GetPosition() + 1 > Height / ItemHeight)
 			{
-				this->ScrollBar->SetPosition(Math::Clamp(SelectedIndex + 1 - Height / ItemHeight, 0, this->ScrollBar->GetMax()));
+				this->scrollBar->SetPosition(Math::Clamp(SelectedIndex + 1 - Height / ItemHeight, 0, this->scrollBar->GetMax()));
 			}
-			if (SelectedIndex < this->ScrollBar->GetPosition())
-				this->ScrollBar->SetPosition(SelectedIndex);
+			if (SelectedIndex < this->scrollBar->GetPosition())
+				this->scrollBar->SetPosition(SelectedIndex);
 		}
 		SelectionChanged();
 	}
@@ -3964,12 +3964,12 @@ namespace GraphicsUI
 		if (!Visible) return;
 		absX+=Left;absY+=Top;
 		int ShowCount = Height / ItemHeight +1;
-		int bdr = (ScrollBar->Visible?ScrollBar->GetWidth():0);
+		int bdr = (scrollBar->Visible?scrollBar->GetWidth():0);
 		auto entry = GetEntry();
 		entry->ClipRects->AddRect(Rect(absX+ContentPadding, absY + ContentPadding, Width-ContentPadding*2 - bdr, Height-ContentPadding*2));
 		bool focused = IsFocused();
 		auto & graphics = entry->DrawCommands;
-		for (int i=ScrollBar->GetPosition();i<=ScrollBar->GetPosition()+ShowCount && i<Items.Count();i++)
+		for (int i=scrollBar->GetPosition();i<=scrollBar->GetPosition()+ShowCount && i<Items.Count();i++)
 		{
 			Control *CurItem = Items[i];
 			if (i==HighLightID)
@@ -3989,7 +3989,7 @@ namespace GraphicsUI
 				CurItem->BackColor = BackColor;
 				CurItem->FontColor = FontColor;
 			}
-			CurItem->Posit(ContentPadding,ContentPadding+(i-ScrollBar->GetPosition())*ItemHeight,Width-ContentPadding*2-bdr, ItemHeight);
+			CurItem->Posit(ContentPadding,ContentPadding+(i-scrollBar->GetPosition())*ItemHeight,Width-ContentPadding*2-bdr, ItemHeight);
 			graphics.SolidBrushColor = CurItem->BackColor;
 			graphics.FillRectangle(absX + ContentPadding, absY + CurItem->Top, absX + Width - ContentPadding, absY + CurItem->Top + CurItem->GetHeight());
 			CurItem->Draw(absX,absY);
@@ -3999,21 +3999,21 @@ namespace GraphicsUI
 			int FID =SelectedIndex;
 			if (FID==-1) FID =0;
 			bdr = ContentPadding*2;
-			if (ScrollBar->Visible)	bdr += ScrollBar->GetWidth()+1;
+			if (scrollBar->Visible)	bdr += scrollBar->GetWidth()+1;
 			int RectX1 = ContentPadding+absX;
 			int RectX2 = RectX1 + Width - bdr;
-			int RectY1 = (FID-ScrollBar->GetPosition())*ItemHeight+absY+ContentPadding-1;
+			int RectY1 = (FID-scrollBar->GetPosition())*ItemHeight+absY+ContentPadding-1;
 			int RectY2 = RectY1+ItemHeight+1;
 			graphics.PenColor = Global::Colors.FocusRectColor;
 			graphics.DrawRectangle(RectX1, RectY1, RectX2, RectY2);
 		}
 		entry->ClipRects->PopRect();
-		ScrollBar->Draw(absX,absY);
+		scrollBar->Draw(absX,absY);
 	}
 
 	void ListBox::SizeChanged()
 	{
-		ScrollBar->Posit(Width - Global::SCROLLBAR_BUTTON_SIZE - ContentPadding, ContentPadding, Global::SCROLLBAR_BUTTON_SIZE, Height - ContentPadding*2);
+		scrollBar->Posit(Width - Global::SCROLLBAR_BUTTON_SIZE - ContentPadding, ContentPadding, Global::SCROLLBAR_BUTTON_SIZE, Height - ContentPadding*2);
 		ListChanged();
 	}
 
@@ -4027,17 +4027,17 @@ namespace GraphicsUI
 		Selecting = false;
 		DownInItem = false;
 		auto hitTest = Container::FindControlAtPosition(X, Y);
-		for (int i=ScrollBar->GetPosition();i<=ScrollBar->GetPosition()+ShowCount && i<Items.Count();i++)
+		for (int i=scrollBar->GetPosition();i<=scrollBar->GetPosition()+ShowCount && i<Items.Count();i++)
 		{
 			Control *CurItem = Items[i];
 			if (hitTest == CurItem || (hitTest && hitTest->IsChildOf((Container*)CurItem)))
 				CurItem->DoMouseDown(X-CurItem->Left, Y-CurItem->Top, Shift);
 		}
-		if (ScrollBar->Visible)
+		if (scrollBar->Visible)
 		{
-			if (hitTest == ScrollBar)
-				ScrollBar->DoMouseDown(X-hitTest->Left, Y-hitTest->Top, Shift);
-			bdr = ScrollBar->GetWidth();
+			if (hitTest == scrollBar)
+				scrollBar->DoMouseDown(X-hitTest->Left, Y-hitTest->Top, Shift);
+			bdr = scrollBar->GetWidth();
 		}
 		if (X < Width-bdr)
 		{
@@ -4048,10 +4048,10 @@ namespace GraphicsUI
 			{
 				Selecting = true;
 				SelOriX = X;
-				SelOriY = Y+ScrollBar->GetPosition()*ItemHeight+ContentPadding;
+				SelOriY = Y+scrollBar->GetPosition()*ItemHeight+ContentPadding;
 			}
 		}
-		if (hitTest != ScrollBar)
+		if (hitTest != scrollBar)
 			Global::MouseCaptureControl = this;
 		return true;
 	}
@@ -4062,7 +4062,7 @@ namespace GraphicsUI
 		if (!Enabled || !Visible)
 			return false;
 		int ShowCount=Height/ItemHeight;
-		for (int i = ScrollBar->GetPosition();i <= ScrollBar->GetPosition()+ShowCount && i < Items.Count();i++)
+		for (int i = scrollBar->GetPosition();i <= scrollBar->GetPosition()+ShowCount && i < Items.Count();i++)
 		{
 			Control *CurItem =Items[i];
 			CurItem->DoKeyDown(Key,Shift);
@@ -4081,14 +4081,14 @@ namespace GraphicsUI
 				SelectionChanged();
 					
 			}
-			int sy =(SelectedIndex-ScrollBar->GetPosition())*ItemHeight+ContentPadding-1;
+			int sy =(SelectedIndex-scrollBar->GetPosition())*ItemHeight+ContentPadding-1;
 			if (sy<=5)
 			{
-				ScrollBar->SetPosition(ClampInt(SelectedIndex,0,ScrollBar->GetMax()));
+				scrollBar->SetPosition(ClampInt(SelectedIndex,0,scrollBar->GetMax()));
 			}
 			else if (sy>Height-ItemHeight-5)
 			{
-				ScrollBar->SetPosition(ClampInt(SelectedIndex-Height / ItemHeight +1,0,ScrollBar->GetMax()));
+				scrollBar->SetPosition(ClampInt(SelectedIndex-Height / ItemHeight +1,0,scrollBar->GetMax()));
 			}
 		}
 		return false;
@@ -4096,7 +4096,7 @@ namespace GraphicsUI
 
 	bool ListBox::DoMouseLeave()
 	{
-		this->ScrollBar->DoMouseLeave();
+		this->scrollBar->DoMouseLeave();
 		return false;
 	}
 
@@ -4114,13 +4114,13 @@ namespace GraphicsUI
 		if (!Enabled || !Visible)
 			return false;
 		auto hitTest = Container::FindControlAtPosition(X, Y);
-		int bdr = ScrollBar->Visible?ScrollBar->GetWidth():0;
-		if (ScrollBar->Visible && hitTest == ScrollBar)
-			ScrollBar->DoMouseMove(X - hitTest->Left, Y - hitTest->Top);
+		int bdr = scrollBar->Visible?scrollBar->GetWidth():0;
+		if (scrollBar->Visible && hitTest == scrollBar)
+			scrollBar->DoMouseMove(X - hitTest->Left, Y - hitTest->Top);
 		else
-			ScrollBar->DoMouseLeave();
+			scrollBar->DoMouseLeave();
 		int ShowCount=Height/ItemHeight;
-		for (int i = ScrollBar->GetPosition(); i <= ScrollBar->GetPosition() + ShowCount && i<Items.Count(); i++)
+		for (int i = scrollBar->GetPosition(); i <= scrollBar->GetPosition() + ShowCount && i<Items.Count(); i++)
 		{
 			Control *CurItem = Items[i];
 			if (hitTest == CurItem || (hitTest && hitTest->IsChildOf((Container*)CurItem)))
@@ -4131,7 +4131,7 @@ namespace GraphicsUI
 			Selection.Clear();
 			int cX,cY;
 			cX = X;
-			cY = Y - ContentPadding + ScrollBar->GetPosition()*ItemHeight;
+			cY = Y - ContentPadding + scrollBar->GetPosition()*ItemHeight;
 			if (SelOriY>cY)
 			{
 				int tmpY = cY;
@@ -4156,17 +4156,17 @@ namespace GraphicsUI
 			auto newSelIdx = HitTest(X, Y);
 			SelectedIndex = newSelIdx;
 		}
-		if (DownInItem && ScrollBar->Visible)
+		if (DownInItem && scrollBar->Visible)
 		{
 			if (Y>=Height)
 			{
-				if (ScrollBar->GetPosition()<ScrollBar->GetMax())
-					ScrollBar->SetPosition(ScrollBar->GetPosition()+1);
+				if (scrollBar->GetPosition()<scrollBar->GetMax())
+					scrollBar->SetPosition(scrollBar->GetPosition()+1);
 			}
 			else if (Y<0)
 			{
-				if (ScrollBar->GetPosition()>ScrollBar->GetMin())
-					ScrollBar->SetPosition(ScrollBar->GetPosition()-1);
+				if (scrollBar->GetPosition()>scrollBar->GetMin())
+					scrollBar->SetPosition(scrollBar->GetPosition()-1);
 			}
 		}
 		if (HotTrack && X>0 && X<Width - bdr &&Y>0 && Y<Height)
@@ -4182,9 +4182,9 @@ namespace GraphicsUI
 
 	bool ListBox::DoMouseWheel(int delta, SHIFTSTATE /*Shift*/)
 	{
-		if (Visible && Enabled && ScrollBar->Visible)
+		if (Visible && Enabled && scrollBar->Visible)
 		{
-			ScrollBar->SetPosition(Math::Clamp(ScrollBar->GetPosition() + (delta > 0 ? -1 : 1) * 3, 0, ScrollBar->GetMax()));
+			scrollBar->SetPosition(Math::Clamp(scrollBar->GetPosition() + (delta > 0 ? -1 : 1) * 3, 0, scrollBar->GetMax()));
 			return true;
 		}
 		return false;
@@ -4197,7 +4197,7 @@ namespace GraphicsUI
 			return false;
 		int ShowCount=Height/ItemHeight;
 		auto hitTest = Container::FindControlAtPosition(X, Y);
-		for (int i = ScrollBar->GetPosition(); i <= ScrollBar->GetPosition() + ShowCount && i<Items.Count(); i++)
+		for (int i = scrollBar->GetPosition(); i <= scrollBar->GetPosition() + ShowCount && i<Items.Count(); i++)
 		{
 			Control *CurItem = Items[i];
 			if (hitTest == CurItem || (hitTest && hitTest->IsChildOf((Container*)CurItem)))
@@ -4205,8 +4205,8 @@ namespace GraphicsUI
 		}
 		DownInItem = false;
 		Selecting = false;
-		if (ScrollBar->Visible && hitTest == ScrollBar)
-			ScrollBar->DoMouseUp(X - hitTest->Left, Y - hitTest->Top,Shift);
+		if (scrollBar->Visible && hitTest == scrollBar)
+			scrollBar->DoMouseUp(X - hitTest->Left, Y - hitTest->Top,Shift);
 		if (lastSelIdx != SelectedIndex || (Items.Count() && Items[0]->Type == CT_CHECKBOX))
 		{
 			SelectionChanged();
@@ -4288,20 +4288,20 @@ namespace GraphicsUI
 
 	void ListBox::ListChanged()
 	{
-		int PageSize; //µ±Ç°ListBoxµÄ´óÐ¡ÄÜÍ¬Ê±ÏÔÊ¾µÄÏîÄ¿¸öÊý
+		int PageSize; //ï¿½ï¿½Ç°ListBoxï¿½Ä´ï¿½Ð¡ï¿½ï¿½Í¬Ê±ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½
 		PageSize = Height / ItemHeight;
 		if (PageSize<1) PageSize=1;
 		if (PageSize>=Items.Count())
 		{
-			//ÎÞÐèÏÔÊ¾¹ö¶¯Ìõ
-			ScrollBar->Visible = false;
-			ScrollBar->SetValue(0, 1, 0, 1);
+			//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+			scrollBar->Visible = false;
+			scrollBar->SetValue(0, 1, 0, 1);
 		}
 		else
 		{
-			//ÐèÒªÏÔÊ¾¹ö¶¯Ìõ
-			ScrollBar->Visible = true;
-			ScrollBar->SetValue(0,Items.Count(),(SelectedIndex==-1)?0:ClampInt(SelectedIndex,0,Items.Count()-PageSize), PageSize);
+			//ï¿½ï¿½Òªï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+			scrollBar->Visible = true;
+			scrollBar->SetValue(0,Items.Count(),(SelectedIndex==-1)?0:ClampInt(SelectedIndex,0,Items.Count()-PageSize), PageSize);
 		}
 	}
 
@@ -4327,7 +4327,7 @@ namespace GraphicsUI
 
 	int ListBox::HitTest(int , int Y)
 	{
-		int rs = Y/ItemHeight + ScrollBar->GetPosition();
+		int rs = Y/ItemHeight + scrollBar->GetPosition();
 		if (rs>=Items.Count())
 			rs = -1;
 		return rs;
@@ -4350,12 +4350,12 @@ namespace GraphicsUI
 		btnDrop->SetFont(GetEntry()->defaultSymbolFont.Ptr());
 		btnDrop->SetText("6");
 		btnDrop->BorderColor.A = 0;
-		TextBox = new GraphicsUI::TextBox(this);
+		textBox = new GraphicsUI::TextBox(this);
 		BorderStyle = BS_FLAT_;
-		TextBox->BorderStyle = BS_NONE;
-		TextBox->BackColor.A = 0;
-		TextBox->AcceptsFocus = false;
-		TextBox->TabStop = false;
+		textBox->BorderStyle = BS_NONE;
+		textBox->BackColor.A = 0;
+		textBox->AcceptsFocus = false;
+		textBox->TabStop = false;
 		ShowList = false;
 		HotTrack = true;
 		HighLightColor = SelectionColor;
@@ -4402,7 +4402,7 @@ namespace GraphicsUI
 
 	void ComboBox::SizeChanged()
 	{
-		TextBox->Posit(ContentPadding, 0, Width - Global::SCROLLBAR_BUTTON_SIZE - ContentPadding * 2, Height);
+		textBox->Posit(ContentPadding, 0, Width - Global::SCROLLBAR_BUTTON_SIZE - ContentPadding * 2, Height);
 		btnDrop->Posit(Width - Global::SCROLLBAR_BUTTON_SIZE - ContentPadding, ContentPadding, Global::SCROLLBAR_BUTTON_SIZE, Height - ContentPadding * 2);
 	}
 	void ComboBox::Draw(int absX, int absY)
@@ -4411,7 +4411,7 @@ namespace GraphicsUI
 		absX += Left; absY += Top;
 		if (!Visible)
 			return;
-		TextBox->Draw(absX, absY);
+		textBox->Draw(absX, absY);
 		btnDrop->Checked = ShowList;
 		btnDrop->Draw(absX, absY);
 		if (IsFocused())
@@ -4468,10 +4468,10 @@ namespace GraphicsUI
 		if (id != -1)
 		{
 			if (Items[id]->Type != CT_CHECKBOX)
-				TextBox->SetText(((Label *)Items[id])->GetText());
+				textBox->SetText(((Label *)Items[id])->GetText());
 		}
 		else
-			TextBox->SetText("");
+			textBox->SetText("");
 		SelectedIndex = id;
 	}
 
@@ -4579,7 +4579,7 @@ namespace GraphicsUI
 		{
 			BeginListBoxFunctions();
 			bool PosInItem;
-			int bdr = ScrollBar->Visible ? ScrollBar->GetWidth() : 0;
+			int bdr = scrollBar->Visible ? scrollBar->GetWidth() : 0;
 			PosInItem = X<ListLeft + Width - bdr && X>ListLeft && Y > ListTop && Y < ListTop + ListHeight;
 			if (PosInItem)
 			{
@@ -4625,14 +4625,14 @@ namespace GraphicsUI
 			}
 			else
 			{
-				int sy = (HighLightID - ScrollBar->GetPosition())*ItemHeight + ContentPadding - 1;
+				int sy = (HighLightID - scrollBar->GetPosition())*ItemHeight + ContentPadding - 1;
 				if (sy < 0)
 				{
-					ScrollBar->SetPosition(ClampInt(HighLightID, 0, ScrollBar->GetMax()));
+					scrollBar->SetPosition(ClampInt(HighLightID, 0, scrollBar->GetMax()));
 				}
 				else if (sy > ListHeight - ItemHeight - 1)
 				{
-					ScrollBar->SetPosition(ClampInt(HighLightID - ListHeight / ItemHeight + 1, 0, ScrollBar->GetMax()));
+					scrollBar->SetPosition(ClampInt(HighLightID - ListHeight / ItemHeight + 1, 0, scrollBar->GetMax()));
 				}
 			}
 		}

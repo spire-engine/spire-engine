@@ -1874,7 +1874,7 @@ namespace GLL
 			settings.StencilReference = FixedFunctionStates.StencilReference;
 			settings.CullMode = FixedFunctionStates.CullMode;
 
-			settings.BlendMode = FixedFunctionStates.BlendMode;
+			settings.blendMode = FixedFunctionStates.blendMode;
 			settings.enablePolygonOffset = FixedFunctionStates.EnablePolygonOffset;
 			settings.polygonOffsetFactor = FixedFunctionStates.PolygonOffsetFactor;
 			settings.polygonOffsetUnits = FixedFunctionStates.PolygonOffsetUnits;
@@ -2616,8 +2616,8 @@ namespace GLL
 							}
 							if (pipelineSettings.DepthCompareFunc != currentFixedFuncState.DepthCompareFunc)
 								SetZTestMode(pipelineSettings.DepthCompareFunc);
-							if (pipelineSettings.BlendMode != currentFixedFuncState.BlendMode)
-								SetBlendMode(pipelineSettings.BlendMode);
+							if (pipelineSettings.blendMode != currentFixedFuncState.blendMode)
+								SetBlendMode(pipelineSettings.blendMode);
 							if (pipelineSettings.StencilCompareFunc != currentFixedFuncState.StencilCompareFunc ||
 								pipelineSettings.StencilDepthFailOp != currentFixedFuncState.StencilDepthFailOp ||
 								pipelineSettings.StencilDepthPassOp != currentFixedFuncState.StencilDepthPassOp ||

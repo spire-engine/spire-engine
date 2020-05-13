@@ -11,9 +11,12 @@
 #ifndef DWORD
 typedef unsigned long DWORD;
 #endif
+
+#ifdef _WIN32
 extern "C" {
 	_declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
 }
+#endif
 
 namespace GameEngine
 {

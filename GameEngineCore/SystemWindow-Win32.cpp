@@ -1,3 +1,5 @@
+#if defined(_WIN32)
+
 #include "SystemWindow-Win32.h"
 #include "UISystem-Win32.h"
 #include "Engine.h"
@@ -74,3 +76,5 @@ namespace GameEngine
     }
 
 }
+
+#endif

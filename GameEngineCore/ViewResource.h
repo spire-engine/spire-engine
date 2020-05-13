@@ -2,6 +2,7 @@
 #define GAME_ENGINE_VIEW_RESOURCE_H
 
 #include "HardwareRenderer.h"
+#include "CoreLib/Basic.h"
 #include "CoreLib/Events.h"
 
 namespace GameEngine
@@ -56,8 +57,8 @@ namespace GameEngine
 		template<typename ...TRenderTargets>
 		RenderOutput * CreateRenderOutput(RenderTargetLayout * renderTargetLayout, TRenderTargets ... renderTargets)
 		{
-			RefPtr<RenderOutput> result = new RenderOutput();
-			typename FirstType<TRenderTargets...>::type targets[] = { renderTargets... };
+			CoreLib::Basic::RefPtr<RenderOutput> result = new RenderOutput();
+			typename CoreLib::FirstType<TRenderTargets...>::type targets[] = { renderTargets... };
 			for (auto & target : targets)
 			{
 				result->bindings.Add(target);

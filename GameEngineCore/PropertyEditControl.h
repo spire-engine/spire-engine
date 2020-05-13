@@ -1,6 +1,7 @@
 #ifndef GAME_ENGINE_PROPERTY_EDIT_CONTROL_H
 #define GAME_ENGINE_PROPERTY_EDIT_CONTROL_H
 
+#include "OS.h"
 
 namespace GameEngine
 {
@@ -12,7 +13,7 @@ namespace GameEngine
 	protected:
 		Property * targetProperty;
 	public:
-		Event<Property *> OnPropertyChanged;
+		CoreLib::Event<Property *> OnPropertyChanged;
 		PropertyEdit(Container * owner, Property * pTargetProperty)
 			: Container(owner), targetProperty(pTargetProperty)
 		{
@@ -44,7 +45,7 @@ namespace GameEngine
 		}
 		void txtValue_KeyPressed(UI_Base *, UIKeyEventArgs & e)
 		{
-			if (e.Key == VK_RETURN && e.Shift == 0)
+			if (TestKey(e.Key, VirtualKeys::Return) && e.Shift == 0)
 			{
 				try
 				{
@@ -179,7 +180,7 @@ namespace GameEngine
 		}
 		void txtValue_KeyPressed(UI_Base *, UIKeyEventArgs & e)
 		{
-			if (e.Key == VK_RETURN && e.Shift == 0)
+			if (TestKey(e.Key, VirtualKeys::Return) && e.Shift == 0)
 			{
 				SetPropertyValue(txtValue->GetText());
 			}

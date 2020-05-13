@@ -1,6 +1,7 @@
-#ifdef _WIN32
 #ifndef UISYSTEM_WINDOWS_H
 #define UISYSTEM_WINDOWS_H
+
+#ifdef _WIN32
 
 #include "UISystemBase.h"
 #include <Windows.h>

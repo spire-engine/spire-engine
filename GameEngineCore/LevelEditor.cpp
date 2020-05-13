@@ -1,5 +1,4 @@
 #include "LevelEditor.h"
-#include "CoreLib/WinForm/WinCommonDlg.h"
 #include "Engine.h"
 #include "CoreLib/LibUI/LibUI.h"
 #include "Level.h"
@@ -529,7 +528,7 @@ namespace GameEngine
         }
         void txtName_KeyPressed(UI_Base*, UIKeyEventArgs & e)
         {
-            if (e.Key == VK_RETURN)
+            if (TestKey(e.Key, VirtualKeys::Return))
             {
                 RenameActor(selectedActor, txtName->GetText());
                 if (selectedActor)
@@ -802,12 +801,12 @@ namespace GameEngine
 					mnSaveAs_Clicked(nullptr);
 				return true;
 			}
-			else if (e.Key == VK_DELETE)
+			else if (TestKey(e.Key, VirtualKeys::Delete))
 			{
 				DeleteActor(selectedActor);
 				return true;
 			}
-			else if (e.Key == VK_F12)
+			else if (TestKey(e.Key, VirtualKeys::F12))
 			{
 				mnUpdateLightProbes_Clicked(nullptr);
 			}
@@ -825,7 +824,7 @@ namespace GameEngine
                 lightmapBaker->Cancel();
         }
 	};
-	LevelEditor * GameEngine::CreateLevelEditor()
+	LevelEditor * CreateLevelEditor()
 	{
 		return new LevelEditorImpl();
 	}

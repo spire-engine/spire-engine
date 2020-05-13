@@ -11,7 +11,7 @@ namespace GameEngine
 		virtual void SetPipelineStates(FixedFunctionPipelineStates & states) override
 		{
 			states.DepthCompareFunc = CompareFunc::Less;
-            states.CullMode = CullMode::Disabled;
+            states.cullMode = CullMode::Disabled;
 			states.EnablePolygonOffset = true;
 			states.PolygonOffsetUnits = 10.0f;
 			states.PolygonOffsetFactor = 2.0f;

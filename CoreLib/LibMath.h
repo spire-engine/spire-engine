@@ -1,6 +1,7 @@
 #ifndef CORE_LIB_MATH_H
 #define CORE_LIB_MATH_H
 
+#include <cmath>
 #include <math.h>
 
 namespace CoreLib
@@ -56,13 +57,17 @@ namespace CoreLib
 #ifdef _M_X64
 				return _isnanf(x);
 #else
-				return isnan(x);
+				return isnanf(x);
 #endif
 			}
 
 			static inline int IsInf(float x)
 			{
+#ifdef _M_X64
 				return isinf(x);
+#else
+				return !finite(x);
+#endif
 			}
 
 			static inline unsigned int Ones32(register unsigned int x)

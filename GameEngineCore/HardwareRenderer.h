@@ -759,11 +759,11 @@ namespace GameEngine
 		int PatchSize = 3;
 		CompareFunc DepthCompareFunc = CompareFunc::Disabled, StencilCompareFunc = CompareFunc::Disabled;
 		StencilOp StencilFailOp = StencilOp::Keep, StencilDepthFailOp = StencilOp::Keep, StencilDepthPassOp = StencilOp::Keep;
-		BlendMode BlendMode = GameEngine::BlendMode::Replace;
+		BlendMode blendMode = GameEngine::BlendMode::Replace;
         PolygonMode PolygonFillMode = PolygonMode::Fill;
 		unsigned int StencilMask = 0xFFFFFFFF;
 		unsigned int StencilReference = 0;
-		CullMode CullMode = GameEngine::CullMode::CullBackFace;
+		CullMode cullMode = GameEngine::CullMode::CullBackFace;
 
 	};
 

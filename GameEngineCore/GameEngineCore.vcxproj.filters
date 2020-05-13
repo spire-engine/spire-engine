@@ -222,6 +222,18 @@
     <ClCompile Include="FontRasterizer-Generic.cpp">
       <Filter>OS\Linux</Filter>
     </ClCompile>
+    <ClCompile Include="HardwareInputInterface-Linux.cpp">
+      <Filter>OS\Linux</Filter>
+    </ClCompile>
+    <ClCompile Include="OS-Linux.cpp">
+      <Filter>OS\Linux</Filter>
+    </ClCompile>
+    <ClCompile Include="SystemWindow-Linux.cpp">
+      <Filter>OS\Linux</Filter>
+    </ClCompile>
+    <ClCompile Include="UISystem-Linux.cpp">
+      <Filter>OS\Linux</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -457,6 +469,18 @@
       <Filter>Renderer\RenderProcedure</Filter>
     </ClInclude>
     <ClInclude Include="stb_truetype.h">
+      <Filter>OS\Linux</Filter>
+    </ClInclude>
+    <ClInclude Include="UISystem-Linux.h">
+      <Filter>OS\Linux</Filter>
+    </ClInclude>
+    <ClInclude Include="SystemWindow-Linux.h">
+      <Filter>OS\Linux</Filter>
+    </ClInclude>
+    <ClInclude Include="Win32VirtualKeys.h">
+      <Filter>OS\Win32</Filter>
+    </ClInclude>
+    <ClInclude Include="LinuxVirtualKeys.h">
       <Filter>OS\Linux</Filter>
     </ClInclude>
   </ItemGroup>

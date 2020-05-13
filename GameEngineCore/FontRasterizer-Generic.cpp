@@ -12,6 +12,12 @@ namespace GameEngine
 
     String FindFontFile(const Font& font)
     {
+        // Try directly find a font file under game directory named font.FontName.
+        auto fontFile = Engine::Instance()->FindFile(font.FontName, ResourceType::Font);
+        // If we can find this file, return.
+        if (fontFile.Length() != 0)
+            return fontFile;
+        // Otherwise, return a default font.
         const char* fontFileName = nullptr;
         if (font.FontName == "Webdings" || font.FontName == "UISymbols")
             fontFileName = "UISymbols/uisymbols.ttf";

@@ -3,7 +3,7 @@
 
 #include "CoreLib/Basic.h"
 #include "Ray.h"
-#include "VectorMath.h"
+#include "CoreLib/VectorMath.h"
 
 namespace GameEngine
 {

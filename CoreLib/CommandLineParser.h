@@ -12,7 +12,10 @@ namespace CoreLib
 		private:
 			List<String> stream;
 		public:
+			CommandLineParser() = default;
 			CommandLineParser(const String & cmdLine);
+			void Parse(const String & cmdLine);
+			void SetArguments(int argc, const char ** argv);
 			String GetFileName();
 			bool OptionExists(const String & opt);
 			String GetOptionValue(const String & opt);

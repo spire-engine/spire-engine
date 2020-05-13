@@ -23,9 +23,9 @@ namespace GameEngine
         }
         virtual void SetPipelineStates(FixedFunctionPipelineStates & state)
         {
-            state.BlendMode = BlendMode::AlphaBlend;
+            state.blendMode = BlendMode::AlphaBlend;
             state.DepthCompareFunc = CompareFunc::LessEqual;
-            state.CullMode = CullMode::Disabled;
+            state.cullMode = CullMode::Disabled;
         }
         virtual char * GetName() override
         {

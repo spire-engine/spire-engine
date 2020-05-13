@@ -18,7 +18,7 @@ namespace GameEngine
 		virtual RenderTargetLayout * CreateRenderTargetLayout() = 0;
 		virtual void SetPipelineStates(FixedFunctionPipelineStates & state)
 		{
-			state.BlendMode = BlendMode::Replace;
+			state.blendMode = BlendMode::Replace;
 			state.DepthCompareFunc = CompareFunc::Less;
 		}
 		virtual void Create(Renderer * renderer) override;
