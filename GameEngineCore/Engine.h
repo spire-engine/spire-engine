@@ -69,7 +69,7 @@ namespace GameEngine
 		float fixedFrameDuration = 1.0f / 30.0f;
 		unsigned int frameCounter = 0;
 		bool inDataTransfer = false;
-        TargetShadingLanguage targetShadingLanguage;
+        TargetShadingLanguage targetShadingLanguage = TargetShadingLanguage::SPIRV;
 		WindowBounds currentViewport;
 		GraphicsSettings graphicsSettings;
 		CoreLib::String levelToLoad;
@@ -158,6 +158,10 @@ namespace GameEngine
 		CoreLib::ArrayView<RenderStat> GetRenderStats()
 		{
 			return renderStats.GetArrayView();
+		}
+		void SetTargetShadingLanguage(TargetShadingLanguage lang)
+		{
+			targetShadingLanguage = lang;
 		}
         TargetShadingLanguage GetTargetShadingLanguage()
         {

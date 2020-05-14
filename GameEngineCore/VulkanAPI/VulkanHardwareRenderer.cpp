@@ -310,7 +310,7 @@ namespace VK
 
 			// Create the instance
 			State().instance = vk::createInstance(instInfo);
-
+			
 			// Load instance level function pointers
 			volkLoadInstance((VkInstance)(State().instance));
 
@@ -505,7 +505,11 @@ namespace VK
 				return;
             renderThreadId = 0;
 			State().initialized = true;
-            volkInitialize();
+            if (volkInitialize() != VK_SUCCESS)
+			{
+				printf("Fatal error: Vulkan driver not found on the current system.\n");
+				exit(-1);
+			}
 			CreateInstance();
 			SelectPhysicalDevice();
 			InitDevice();

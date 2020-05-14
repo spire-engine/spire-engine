@@ -100,7 +100,7 @@ INTERMEDIATEDIR := build/intermediate/$(TARGET)/$(CONFIGURATION)/
 LDFLAGS := -L$(OUTPUTDIR)
 
 ifeq (debug,$(CONFIGURATION))
-CFLAGS += -g
+CFLAGS += -g -D_DEBUG
 else
 CFLAGS += -O2
 endif

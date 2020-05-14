@@ -112,14 +112,14 @@ namespace GameEngine
 		int storageBufferAlignment = 32;
 		int defaultEnvMapId = -1;
 	private:
-        void RegisterRenderProcedure(IRenderProcedure* proc)
+        void RegisterRenderProcedure(IRenderProcedure* proc, ViewResource* viewRes)
         {
             auto name = proc->GetName();
             renderProcedures.Add(name, proc);
             renderProcedureNames.Add(name);
             if (currentRenderProcedure == nullptr)
                 currentRenderProcedure = proc;
-            proc->Init(this, mainView.Ptr());
+            proc->Init(this, viewRes);
         }
 		void RunRenderProcedure()
 		{
@@ -154,6 +154,7 @@ namespace GameEngine
 				hardwareRenderer = CreateDummyHardwareRenderer();
 				break;
 			}
+			Engine::Instance()->SetTargetShadingLanguage(hardwareRenderer->GetShadingLanguage());
 			hardwareRenderer->SetMaxTempBufferVersions(DynamicBufferLengthMultiplier);
             
             computeTaskManager = new ComputeTaskManager(hardwareRenderer, Engine::GetShaderCompiler());
@@ -163,14 +164,13 @@ namespace GameEngine
 			mainView = new ViewResource(hardwareRenderer);
 			mainView->Resize(1024, 1024);
 			
-			RegisterRenderProcedure(CreateStandardRenderProcedure(true, true));
-            lightProbeRenderProcedure = CreateLightProbeRenderProcedure();
-            RegisterRenderProcedure(lightProbeRenderProcedure);
-            RegisterRenderProcedure(CreateLightmapDebugViewRenderProcedure());
+			RegisterRenderProcedure(CreateStandardRenderProcedure(true, true), mainView.Ptr());
+            RegisterRenderProcedure(CreateLightmapDebugViewRenderProcedure(), mainView.Ptr());
 
             cubemapRenderView = new ViewResource(hardwareRenderer);
             cubemapRenderView->Resize(EnvMapSize, EnvMapSize);
-            lightProbeRenderProcedure->Init(this, cubemapRenderView.Ptr());
+            lightProbeRenderProcedure = CreateLightProbeRenderProcedure();
+            RegisterRenderProcedure(lightProbeRenderProcedure, cubemapRenderView.Ptr());
 
 			// Fetch uniform buffer alignment requirements
 			uniformBufferAlignment = hardwareRenderer->UniformBufferAlignment();

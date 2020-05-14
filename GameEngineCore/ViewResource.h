@@ -29,7 +29,7 @@ namespace GameEngine
 	private:
 		CoreLib::RefPtr<FrameBuffer> frameBuffer;
 		CoreLib::List<CoreLib::RefPtr<RenderTarget>> bindings;
-		RenderTargetLayout * renderTargetLayout = nullptr;
+		CoreLib::RefPtr<RenderTargetLayout> renderTargetLayout = nullptr;
 		RenderOutput() {}
 	public:
 		void GetSize(int &w, int &h)
