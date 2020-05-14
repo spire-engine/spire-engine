@@ -3,6 +3,7 @@
 
 #include "CoreLib/Basic.h"
 #include "CoreLib/VectorMath.h"
+#include "OS.h"
 
 namespace GameEngine
 {
@@ -825,7 +826,7 @@ namespace GameEngine
     class WindowSurface : public CoreLib::RefObject
     {
     public:
-        virtual void * GetWindowHandle() = 0;
+        virtual WindowHandle GetWindowHandle() = 0;
         virtual void Resize(int width, int height) = 0;
         virtual void GetSize(int & width, int & height) = 0;
     };
@@ -906,13 +907,14 @@ namespace GameEngine
 		virtual TargetShadingLanguage GetShadingLanguage() = 0;
 		virtual int UniformBufferAlignment() = 0;
 		virtual int StorageBufferAlignment() = 0;
-        virtual WindowSurface * CreateSurface(void * windowHandle, int width, int height) = 0;
+        virtual WindowSurface * CreateSurface(WindowHandle windowHandle, int width, int height) = 0;
 		virtual CoreLib::String GetRendererName() = 0;
 		virtual void TransferBarrier(int barrierId) = 0;
 	};
 
 	// HardwareRenderer instance constructors
 	HardwareRenderer* CreateVulkanHardwareRenderer(int gpuId, CoreLib::String cacheLocation);
+	HardwareRenderer* CreateDummyHardwareRenderer();
 }
 
 #endif

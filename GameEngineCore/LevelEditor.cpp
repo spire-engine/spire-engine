@@ -41,7 +41,7 @@ namespace GameEngine
 
         GraphicsUI::ListBox * lstActors = nullptr;
         GraphicsUI::TextBox * txtName = nullptr;
-        RefPtr<GameEngine::FileDialog> dlgOpen, dlgSave;
+        RefPtr<GameEngine::OsFileDialog> dlgOpen, dlgSave;
         const Color uiGrayText = Color(180, 180, 180, 255);
         void UpdatePropertyPanel()
         {
@@ -655,7 +655,7 @@ namespace GameEngine
                     int lightmapId = -1;
                     if (lightmapSet.ActorLightmapIds.TryGetValue(selectedActor, lightmapId))
                     {
-                        RefPtr<FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+                        RefPtr<OsFileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
                         dlg->DefaultEXT = "pfm";
                         dlg->Filter = "Portable Float Map|*.pfm";
                         if (dlg->ShowSave())

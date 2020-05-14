@@ -18,10 +18,13 @@ namespace GameEngine
 
     CoreLib::Text::CommandLineParser OsApplication::commandlineParser;
 
-    void OsApplication::Init(int /*argc*/, const char** /*argv*/)
+    void OsApplication::Init(int argc, const char** argv)
     {
         WinForm::Application::Init();
-        commandlineParser.Parse(WinForm::Application::GetCommandLine());
+        if (argc != 0)
+            commandlineParser.SetArguments(argc, argv);
+        else
+            commandlineParser.Parse(WinForm::Application::GetCommandLine());
     }
     GraphicsUI::ISystemInterface* OsApplication::CreateUISystemInterface(HardwareRenderer * renderer)
     {
@@ -49,6 +52,7 @@ namespace GameEngine
     }
     void OsApplication::Dispose()
     {
+        commandlineParser = CoreLib::Text::CommandLineParser();
         WinForm::Application::Dispose();
     }
     void OsApplication::DebugPrint(const char * buffer)
@@ -86,7 +90,7 @@ namespace GameEngine
         }
     };
 
-    class Win32FileDialog : public FileDialog
+    class Win32FileDialog : public OsFileDialog
     {
     private:
         CoreLib::WinForm::FileDialog dlg;
@@ -129,7 +133,7 @@ namespace GameEngine
         }
     };
 
-    FileDialog* OsApplication::CreateFileDialog(SystemWindow* parent)
+    OsFileDialog* OsApplication::CreateFileDialog(SystemWindow* parent)
     {
         return new Win32FileDialog(parent);
     }

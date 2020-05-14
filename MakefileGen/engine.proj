@@ -11,6 +11,7 @@ GameEngine
     libdir "ExternalLibs/Slang/bin/linux-x64/release"
     link "slang"
     link "slang-glslang"
+    link "X11"
     include "GameEngineCore/"
     include "./"
     cflags "-std=c++14 -msse4.1"

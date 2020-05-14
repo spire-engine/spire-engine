@@ -181,6 +181,14 @@ namespace GameEngine
 			return;
 		}
 		table->entries[propName] = (int)(((unsigned char *)prop) - ((unsigned char *)this));
+		auto attribute = String(prop->GetAttribute());
+		int altIdx = attribute.IndexOf("altname(");
+		if (altIdx != -1)
+		{
+			int endIdx = attribute.IndexOf(')', altIdx);
+			String altName = attribute.SubString(altIdx + 8, endIdx - (altIdx + 8)).ToLower();
+			table->entriesAlternateName[altName] = (int)(((unsigned char*)prop) - ((unsigned char*)this));
+		}
 	}
 
 	PropertyTable* PropertyContainer::GetPropertyTable()
@@ -239,6 +247,10 @@ namespace GameEngine
 			i++;
 		}
 		if (table->entries.TryGetValue(lowerCaseName, offset))
+		{
+			return GetProperty(offset);
+		}
+		if (table->entriesAlternateName.TryGetValue(lowerCaseName, offset))
 		{
 			return GetProperty(offset);
 		}

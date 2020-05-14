@@ -237,7 +237,7 @@ public:
 			Engine::Instance()->GetMainWindow()->ShowMessage("Please load source model first.", "Error");
 			return;
 		}
-		RefPtr<GameEngine::FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+		RefPtr<GameEngine::OsFileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
 		dlg->Filter = "Skeleton|*.skeleton|All Files|*.*";
 		if (dlg->ShowOpen())
 		{
@@ -294,7 +294,7 @@ public:
 
 	void LoadAnimation(GraphicsUI::UI_Base *)
 	{
-		RefPtr<GameEngine::FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+		RefPtr<GameEngine::OsFileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
 		dlg->Filter = "Animation|*.anim|All Files|*.*";
 		if (dlg->ShowOpen())
 		{
@@ -305,7 +305,7 @@ public:
 
 	void LoadSourceModel(GraphicsUI::UI_Base *)
 	{
-        RefPtr<GameEngine::FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+        RefPtr<GameEngine::OsFileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
 		dlg->Filter = "Model|*.model|All Files|*.*";
 		if (dlg->ShowOpen())
 		{
@@ -342,7 +342,7 @@ public:
 
 	void Save(GraphicsUI::UI_Base *)
 	{
-        RefPtr<GameEngine::FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+        RefPtr<GameEngine::OsFileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
 		dlg->Filter = "Retarget File|*.retarget|All Files|*.*";
 		dlg->DefaultEXT = "retarget";
 		if (dlg->ShowSave())
@@ -353,7 +353,7 @@ public:
 
 	void Open(GraphicsUI::UI_Base *)
 	{
-        RefPtr<GameEngine::FileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
+        RefPtr<GameEngine::OsFileDialog> dlg = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
 		dlg->Filter = "Retarget File|*.retarget|All Files|*.*";
 		dlg->DefaultEXT = "retarget";
 		if (sourceModel && targetSkeleton)

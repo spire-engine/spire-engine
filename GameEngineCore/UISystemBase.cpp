@@ -137,7 +137,7 @@ namespace GameEngine
 
     GraphicsUI::IFont* UISystemBase::LoadFont(UIWindowContext* ctx, const Font& f)
     {
-        auto identifier = f.ToString() + "_" + String((long long)(void*)ctx->window->GetNativeHandle());
+        auto identifier = f.ToString() + "_" + WindowHandleToString(ctx->window->GetNativeHandle());
         RefPtr<SystemFont> font;
         if (!fonts.TryGetValue(identifier, font))
         {

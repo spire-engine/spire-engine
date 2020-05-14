@@ -1,12 +1,11 @@
-#include "volk.h"
-#include "vulkan.hpp"
 #include "../GameEngineCore/HardwareRenderer.h"
 #include "CoreLib/WinForm/Debug.h"
 #include "CoreLib/VectorMath.h"
 #include "CoreLib/PerformanceCounter.h"
-//using glslang lib for now to generate spirv
 #include "../Engine.h"
 #include "CoreLib/LibIO.h"
+#include "volk.h"
+#include "vulkan.hpp"
 
 // Only execute actions of DEBUG_ONLY in DEBUG mode
 #if _DEBUG
@@ -16,6 +15,9 @@
 #define DEBUG_ONLY(x) do {    } while(0)
 #endif
 
+#ifdef __linux__
+#undef Always
+#endif
 
 using namespace GameEngine;
 using namespace CoreLib::IO;
@@ -738,7 +740,7 @@ namespace VK
 		}
 
 		// Resource creation functions
-		static vk::SurfaceKHR CreateSurface(void* windowHandle)
+		static vk::SurfaceKHR CreateSurface(WindowHandle windowHandle)
 		{
 			// Create the surface
 			vk::SurfaceKHR surface;
@@ -749,11 +751,16 @@ namespace VK
 				.setHinstance(GetModuleHandle(NULL));
 
 			surface = State().instance.createWin32SurfaceKHR(surfaceCreateInfo);
+#elif __linux__
+			vk::XlibSurfaceCreateInfoKHR surfaceCreateInfo = vk::XlibSurfaceCreateInfoKHR()
+				.setWindow(windowHandle.window)
+				.setDpy((Display*)windowHandle.display);
+			surface = State().instance.createXlibSurfaceKHR(surfaceCreateInfo);
 #elif __ANDROID__
 			vk::AndroidSurfaceCreateInfoKHR surfaceCreateInfo = vk::AndroidSurfaceCreaetInfoKHR()
 				.setWindow((ANativeWindow*)window);
 
-			surface = isntance.createAndroidSurfaceKHR(surfaceCreateInfo);
+			surface = State().instance.createAndroidSurfaceKHR(surfaceCreateInfo);
 #endif
 
 			// Check to see if the current physical device supports the surface
@@ -4193,7 +4200,7 @@ namespace VK
     class VkWindowSurface : public GameEngine::WindowSurface
     {
     public:
-        void* handle = nullptr;
+        WindowHandle handle = {};
         int width = -1;
         int height = -1;
 
@@ -4205,12 +4212,12 @@ namespace VK
 		CoreLib::List<vk::Fence> presentCommandBufferFences;
         vk::Semaphore imageAvailableSemaphore, renderFinishedSemaphore;
 
-        VkWindowSurface(void * hwnd, int w, int h)
+        VkWindowSurface(WindowHandle windowHandle, int w, int h)
         {
-            handle = hwnd;
+            handle = windowHandle;
             width = w;
             height = h;
-            surface = RendererState::CreateSurface(hwnd);
+            surface = RendererState::CreateSurface(windowHandle);
             CreateSwapchain();
             CreateSemaphores();
             Clear();
@@ -4601,7 +4608,7 @@ namespace VK
             DestroyCommandBuffers();
             DestroySwapchain();
             if (surface) RendererState::Instance().destroySurfaceKHR(surface);
-            handle = nullptr;
+            handle = WindowHandle();
         }
         void Clear()
         {
@@ -4622,7 +4629,7 @@ namespace VK
             w = this->width;
             h = this->height;
         }
-        virtual void* GetWindowHandle() override
+        virtual WindowHandle GetWindowHandle() override
         {
             return this->handle;
         }
@@ -4667,7 +4674,7 @@ namespace VK
 			RendererState::ResetTempBufferVersion(version);
 		}
 
-		virtual WindowSurface* CreateSurface(void* windowHandle, int pwidth, int pheight) override
+		virtual WindowSurface* CreateSurface(WindowHandle windowHandle, int pwidth, int pheight) override
 		{
 			VkWindowSurface * rs = new VkWindowSurface(windowHandle, pwidth, pheight);
             return rs;

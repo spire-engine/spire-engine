@@ -13,10 +13,30 @@
 
 namespace GameEngine
 {
-	typedef void* WindowHandle;
+#if defined(_WIN32)
+	typedef uint64_t WindowHandle;
+    inline CoreLib::String WindowHandleToString(WindowHandle handle)
+    {
+        return CoreLib::String((long long)handle);
+    }
+#elif defined(__linux__)
+    struct WindowHandle
+    {
+        void* display = nullptr;
+        uint32_t window = 0;
+        operator bool()
+        {
+            return window;
+        }
+    };
+    inline CoreLib::String WindowHandleToString(WindowHandle handle)
+    {
+        return CoreLib::String(handle.window);
+    }
+#endif
 	enum class RenderAPI
 	{
-		Vulkan
+		Vulkan, Dummy
 	};
 
     class HardwareRenderer;
@@ -59,7 +79,7 @@ namespace GameEngine
         virtual DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags = MessageBoxFlags::OKOnly) = 0;
     };
 
-    class FileDialog : public CoreLib::RefObject
+    class OsFileDialog : public CoreLib::RefObject
     {
     private:
         SystemWindow * owner;
@@ -160,7 +180,7 @@ namespace GameEngine
         static SystemWindow* CreateSystemWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize);
         static OsTimer* CreateTimer();
         static OsFontRasterizer* CreateFontRasterizer();
-        static FileDialog* CreateFileDialog(SystemWindow* parent);
+        static OsFileDialog* CreateFileDialog(SystemWindow* parent);
         static void SetMainLoopEventHandler(CoreLib::Procedure<> handler);
         static DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags = MessageBoxFlags::OKOnly);
         static void Run(SystemWindow* mainWindow);

@@ -234,6 +234,9 @@
     <ClCompile Include="UISystem-Linux.cpp">
       <Filter>OS\Linux</Filter>
     </ClCompile>
+    <ClCompile Include="DummyHardwareRenderer.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />

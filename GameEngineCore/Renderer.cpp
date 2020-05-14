@@ -150,6 +150,9 @@ namespace GameEngine
 				hardwareRenderer = CreateVulkanHardwareRenderer(Engine::Instance()->GpuId, 
                     Path::Combine(Engine::Instance()->GetDirectory(false, ResourceType::ShaderCache), "pipeline_cache.tmp"));
 				break;
+			case RenderAPI::Dummy:
+				hardwareRenderer = CreateDummyHardwareRenderer();
+				break;
 			}
 			hardwareRenderer->SetMaxTempBufferVersions(DynamicBufferLengthMultiplier);
             

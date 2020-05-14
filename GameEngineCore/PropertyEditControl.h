@@ -100,7 +100,7 @@ namespace GameEngine
 	private:
 		ResourceType resType = ResourceType::Level;
 		String ext;
-		RefPtr<GameEngine::FileDialog> openDlg;
+		RefPtr<GameEngine::OsFileDialog> openDlg;
 		Label * lblName;
 		TextBox * txtValue;
 		Button * btnBrowse;

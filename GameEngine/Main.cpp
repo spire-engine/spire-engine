@@ -38,8 +38,8 @@ int __stdcall wWinMain(
 	_In_ int       /*nCmdShow*/
 )
 {
-#endif
 	OsApplication::Init(0, nullptr);
+#endif
 	{
 		EngineInitArguments args;
 		auto & appParams = args.LaunchParams;
@@ -55,6 +55,8 @@ int __stdcall wWinMain(
 			auto& parser = OsApplication::GetCommandLineParser();
 			if (parser.OptionExists("-vk"))
 				args.API = RenderAPI::Vulkan;
+			if (parser.OptionExists("-no_renderer"))
+				args.API = RenderAPI::Dummy;
 			if (parser.OptionExists("-dir"))
 				args.GameDirectory = RemoveQuote(parser.GetOptionValue("-dir"));
 			if (parser.OptionExists("-enginedir"))

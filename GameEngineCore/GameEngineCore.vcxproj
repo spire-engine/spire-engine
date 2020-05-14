@@ -113,6 +113,7 @@
     <ClCompile Include="DirectionalLightActor.cpp" />
     <ClCompile Include="Drawable.cpp" />
     <ClCompile Include="DrawCallStatForm.cpp" />
+    <ClCompile Include="DummyHardwareRenderer.cpp" />
     <ClCompile Include="DynamicVariable.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="EngineActorClasses.cpp" />

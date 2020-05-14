@@ -26,7 +26,7 @@ namespace GameEngine
 		void RetargetFileName_Changing(CoreLib::String & newFileName);
 	public:
 		PROPERTY_ATTRIB(CoreLib::String, ModelFile, "resource(Mesh, model)");
-		PROPERTY_ATTRIB(CoreLib::String, RetargetFileName, "resource(Animation, retarget)");
+		PROPERTY_ATTRIB(CoreLib::String, RetargetFileName, "resource(Animation, retarget);altname(RetargetFile)");
 	public:
         VectorMath::Vec3 GetRootPosition();
         VectorMath::Vec3 GetRootOrientation();

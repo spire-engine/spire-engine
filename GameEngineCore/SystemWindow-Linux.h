@@ -7,6 +7,8 @@
 #include "UISystemBase.h"
 #include "OS.h"
 #include "HardwareRenderer.h"
+#include <X11/Xlib.h>
+
 namespace GameEngine
 {
     class UISystemBase;
@@ -15,6 +17,8 @@ namespace GameEngine
     {
     private:
         CoreLib::RefPtr<UIWindowContext> uiContext;
+        Window handle;
+        bool visible = false;
     public:
         LinuxSystemWindow(UISystemBase* sysInterface, int log2UIBufferSize);
         ~LinuxSystemWindow();
@@ -23,6 +27,7 @@ namespace GameEngine
         {
             return uiContext.Ptr();
         }
+        bool IsChildOf(Window wnd);
         virtual void SetClientWidth(int w) override;
         virtual void SetClientHeight(int h) override;
         virtual int GetClientWidth() override;

@@ -13,6 +13,8 @@ namespace GameEngine
 	struct PropertyTable : public CoreLib::RefObject
 	{
 		CoreLib::EnumerableDictionary<CoreLib::String, int> entries;
+		CoreLib::EnumerableDictionary<CoreLib::String, int> entriesAlternateName;
+
 		bool isComplete = false;
 		const char * className = nullptr;
 	};
