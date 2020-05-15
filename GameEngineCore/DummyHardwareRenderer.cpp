@@ -42,7 +42,7 @@ namespace DummyRenderer
         Texture() {}
     public:
         virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
-        virtual bool IsDepthStencilFormat() override {}
+        virtual bool IsDepthStencilFormat() override { return false; }
     };
 
     class Texture2D : public virtual GameEngine::Texture2D
@@ -223,7 +223,7 @@ namespace DummyRenderer
 		virtual void DrawIndexedInstanced(int /*numInstances*/, int /*firstIndex*/, int /*indexCount*/) override {}
 		virtual void DispatchCompute(int /*groupCountX*/, int /*groupCountY*/, int /*groupCountZ*/) override {}
 		virtual void TransferLayout(CoreLib::ArrayView<GameEngine::Texture*> /*attachments*/, TextureLayoutTransfer /*transferDirection*/) override {}
-		virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, TextureLayout /*srcLayout*/, VectorMath::Vec2i /*destOffset*/) override {}
+		virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, TextureLayout /*srcLayout*/, VectorMath::Vec2i /*destOffset*/, bool /*flipSrc*/) override {}
 		virtual void ClearAttachments(GameEngine::FrameBuffer * /*frameBuffer*/) override {}
 		virtual void MemoryAccessBarrier(MemoryBarrierType /*barrierType*/) override {}
 	};
@@ -251,7 +251,10 @@ namespace DummyRenderer
         virtual void QueuePipelineBarrier(ResourceUsage /*usageBefore*/, ResourceUsage /*usageAfter*/, CoreLib::ArrayView<ImagePipelineBarrier> /*barriers*/) override {}
         virtual void QueuePipelineBarrier(ResourceUsage /*usageBefore*/, ResourceUsage /*usageAfter*/, CoreLib::ArrayView<GameEngine::Buffer*> /*buffers*/) override {}
         virtual void EndJobSubmission(GameEngine::Fence* /*fence*/) override {}
-		virtual void Present(GameEngine::WindowSurface * /*surface*/, GameEngine::Texture2D* /*srcImage*/) override {}
+		virtual void Present(GameEngine::WindowSurface * /*surface*/, GameEngine::Texture2D* /*srcImage*/) override
+        {
+            //printf("present called\n");
+        }
 		virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, VectorMath::Vec2i /*destOffset*/) override {}
 		virtual void Wait() override {}
 		virtual void SetMaxTempBufferVersions(int /*versionCount*/) override {}

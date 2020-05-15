@@ -8,6 +8,7 @@
 #include "StaticMeshActor.h"
 #include "LightmapBaker.h"
 #include "LightmapUVGeneration.h"
+#include "CoreLib/LibUI/KeyCode.h"
 
 using namespace CoreLib;
 using namespace GraphicsUI;
@@ -374,6 +375,8 @@ namespace GameEngine
             pnlProperties->Padding = EM(0.5f);
 
             LevelChanged();
+            
+            entry->SizeChanged();
         }
 
         void InitEditorActors()
@@ -528,7 +531,7 @@ namespace GameEngine
         }
         void txtName_KeyPressed(UI_Base*, UIKeyEventArgs & e)
         {
-            if (TestKey(e.Key, VirtualKeys::Return))
+            if (e.Key == Keys::Return)
             {
                 RenameActor(selectedActor, txtName->GetText());
                 if (selectedActor)
@@ -801,12 +804,12 @@ namespace GameEngine
 					mnSaveAs_Clicked(nullptr);
 				return true;
 			}
-			else if (TestKey(e.Key, VirtualKeys::Delete))
+			else if (e.Key == Keys::Delete)
 			{
 				DeleteActor(selectedActor);
 				return true;
 			}
-			else if (TestKey(e.Key, VirtualKeys::F12))
+			else if (e.Key == Keys::F12)
 			{
 				mnUpdateLightProbes_Clicked(nullptr);
 			}

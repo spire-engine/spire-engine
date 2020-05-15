@@ -210,6 +210,7 @@ namespace CoreLib
 			Procedure & operator = (const Procedure & proc)
 			{
 				funcPtr = proc.funcPtr;
+				return *this;
 			}
 			void Clear()
 			{

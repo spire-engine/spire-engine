@@ -7,6 +7,7 @@
 #include "../PerformanceCounter.h"
 #include "UISystemInterface.h"
 #include "../LibIO.h"
+#include "KeyCode.h"
 
 namespace GraphicsUI
 {
@@ -53,31 +54,6 @@ namespace GraphicsUI
 	const int CT_MENU = 256;
 	const int CT_MENU_ITEM = 512;
 	const int CT_TOOL_BUTTON = 513;
-
-	namespace Keys
-	{
-		const int Left = 0x25;
-		const int Up = 0x26; 
-		const int Down = 0x28;
-		const int Right = 0x27;
-		const int Escape = 0x1B;
-		const int Return = 0x0D;
-		const int Space = 0x20;
-		const int Shift = 0x10;
-		const int Ctrl = 0x11;
-		const int Alt = 0x12;
-		const int Backspace = 0x08;
-		const int Delete = 0x2E;
-		const int Home = 0x24;
-		const int End = 0x23;
-		const int PageUp = 0x21;
-		const int PageDown = 0x22;
-		const int Insert = 0x2D;
-		const int Tab = 0x09;
-		const int Z = 0x5A;
-		const int C = 0x43;
-		const int R = 0x52;
-	}
 
 	struct MarginValues
 	{

@@ -2,6 +2,7 @@ GameEngine
 {
     cppblob "GameEngine/"
     cppblob "GameEngineCore/"
+    cppblob "GameEngineCore/Linux/"
     cppblob "GameEngineCore/VulkanAPI/"
     cppblob "GameEngineCore/H264Encoder/src/"
     cppblob "CoreLib/"
@@ -14,5 +15,5 @@ GameEngine
     link "X11"
     include "GameEngineCore/"
     include "./"
-    cflags "-std=c++14 -msse4.1"
+    cflags "-std=c++14 -msse4.1 -Wno-init-list-lifetime"
 }

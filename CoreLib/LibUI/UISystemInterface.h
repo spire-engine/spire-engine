@@ -105,7 +105,7 @@ namespace GraphicsUI
 
 	enum class CursorType
 	{
-		Arrow, Cross, IBeam, Wait, SizeNS, SizeWE, SizeNESW, SizeNWSE, SizeAll
+		Arrow, Cross, IBeam, Wait, SizeNS, SizeWE, SizeNESW_Top, SizeNESW_Bottom, SizeNWSE_Top, SizeNWSE_Bottom, SizeAll, _Count
 	};
 
 	class DrawBufferVertex

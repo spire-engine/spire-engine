@@ -818,7 +818,7 @@ namespace GameEngine
 		virtual void DrawIndexedInstanced(int numInstances, int firstIndex, int indexCount) = 0;
 		virtual void DispatchCompute(int groupCountX, int groupCountY, int groupCountZ) = 0;
 		virtual void TransferLayout(CoreLib::ArrayView<Texture*> attachments, TextureLayoutTransfer transferDirection) = 0;
-		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, TextureLayout srcLayout, VectorMath::Vec2i destOffset) = 0;
+		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, TextureLayout srcLayout, VectorMath::Vec2i destOffset, bool flipSrc) = 0;
 		virtual void ClearAttachments(FrameBuffer * frameBuffer) = 0;
 		virtual void MemoryAccessBarrier(MemoryBarrierType barrierType) = 0;
 	};

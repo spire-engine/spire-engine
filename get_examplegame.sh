@@ -13,8 +13,17 @@ if ! [ -x "$(command -v jq)" ]; then
 if [[ $EUID -ne 0 ]]; then
   sudo apt-get install jq
 else
-  echo "Please run this script in root, or install jq first:"
+  echo "Please install jq first:"
   echo " sudo apt-get install jq"
+  exit 0
+fi
+fi
+if ! [ -x "$(command -v curl)" ]; then
+if [[ $EUID -ne 0 ]]; then
+  sudo apt-get install jq
+else
+  echo "Please install curl first:"
+  echo " sudo apt-get install curl"
   exit 0
 fi
 fi
@@ -22,7 +31,7 @@ if ! [ -x "$(command -v unzip)" ]; then
 if [[ $EUID -ne 0 ]]; then
   sudo apt-get install unzip
 else
-  echo "Please run this script in root, or install unzip first:"
+  echo "Please install unzip first:"
   echo " sudo apt-get install unzip"
   exit 0
 fi

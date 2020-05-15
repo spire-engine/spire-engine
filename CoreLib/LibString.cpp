@@ -133,8 +133,8 @@ namespace CoreLib
 #endif
 				if (len)
 					*len = buf.Count() / sizeof(wchar_t);
-				buf.Add(0);
-				buf.Add(0);
+				for (int i = 0; i < sizeof(wchar_t); i++)
+					buf.Add(0);
 				const_cast<String*>(this)->wcharBuffer = (wchar_t*)buf.Buffer();
 				buf.ReleaseBuffer();
 				return wcharBuffer;

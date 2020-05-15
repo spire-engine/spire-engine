@@ -35,22 +35,16 @@ inline size_t strnlen_s(const char * str, size_t numberofElements)
 	return strnlen(str, numberofElements);
 }
 
-inline int sprintf_s(char * buffer, size_t sizeOfBuffer, const char * format, ...)
+template<typename ...Args>
+inline int sprintf_s(char * buffer, size_t sizeOfBuffer, const char * format, Args... args)
 {
-	va_list argptr;
-	va_start(argptr, format);
-	int rs = snprintf(buffer, sizeOfBuffer, format, argptr);
-	va_end(argptr);
-	return rs;
+	return snprintf(buffer, sizeOfBuffer, format, args...);
 }
 
-inline int swprintf_s(wchar_t * buffer, size_t sizeOfBuffer, const wchar_t * format, ...)
+template<typename ...Args>
+inline int swprintf_s(wchar_t * buffer, size_t sizeOfBuffer, const wchar_t * format, Args... args)
 {
-	va_list argptr;
-	va_start(argptr, format);
-	int rs = swprintf(buffer, sizeOfBuffer, format, argptr);
-	va_end(argptr);
-	return rs;
+	return swprintf(buffer, sizeOfBuffer, format, args...);
 }
 
 inline void wcscpy_s(wchar_t * strDestination, size_t /*numberOfElements*/, const wchar_t * strSource)

@@ -24,16 +24,16 @@ ExternalLibs/Slang ExternalLibs/Slang/bin/linux-x64 :
 	@tar xvzf Slang.tar.gz -C ExternalLibs/
 	@rm -f Slang.tar.gz
 
-build/depinstall:
+build/depinstall: build_dir
 	@echo "#include <X11/Xlib.h>" > build/x11test.cpp
 	@echo "int main(){return 0;}" >> build/x11test.cpp
-	@if g++ -c build/x11test.cpp -o build/x11test 2> $@ ; then echo 0 ; fi
+	@if g++ -c build/x11test.cpp -o build/x11test 2> $@ ; then echo "Xlib detected" ; fi
 	@if ! test -f build/x11test ; then\
 		echo "Required package libx11-dev not found, atempting to install...";\
 		sudo apt-get install libx11-dev;\
 	fi
-	rm -f build/x11test.cpp
-	rm -f build/x11test
+	@rm -f build/x11test.cpp
+	@rm -f build/x11test
 	@touch $@
 
 build_dir:

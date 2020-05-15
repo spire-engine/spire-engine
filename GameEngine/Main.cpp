@@ -102,7 +102,6 @@ int __stdcall wWinMain(
 
             args.Width = w;
 			args.Height = h;
-
 			RegisterTestUserActor();
 			if (parser.OptionExists("-editor"))
 			{

@@ -1,9 +1,13 @@
 #if defined(__linux__)
 
 #include "UISystem-Linux.h"
+#include "OsApplicationContext-Linux.h"
 
 namespace GameEngine
 {
+    // Defined in OS-Linux.cpp
+    LinuxApplicationContext* GetLinuxApplicationContext();
+
     void LinuxUISystem::SetClipboardText(const CoreLib::String& text)
     {
     }
@@ -27,6 +31,11 @@ namespace GameEngine
     }
     void LinuxUISystem::SwitchCursor(GraphicsUI::CursorType c)
     {
+        auto context = GetLinuxApplicationContext();
+        if (context->xdisplay && context->currentMouseEventWindow)
+        {
+            XDefineCursor(context->xdisplay, context->currentMouseEventWindow->GetNativeHandle().window, context->cursors[(int)c]);
+        }
     }
     LinuxUISystem::LinuxUISystem(HardwareRenderer* ctx)
         : UISystemBase(ctx)

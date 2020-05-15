@@ -1,7 +1,7 @@
 #ifndef GAME_ENGINE_PROPERTY_EDIT_CONTROL_H
 #define GAME_ENGINE_PROPERTY_EDIT_CONTROL_H
 
-#include "OS.h"
+#include "CoreLib/LibUI/KeyCode.h"
 
 namespace GameEngine
 {
@@ -45,7 +45,7 @@ namespace GameEngine
 		}
 		void txtValue_KeyPressed(UI_Base *, UIKeyEventArgs & e)
 		{
-			if (TestKey(e.Key, VirtualKeys::Return) && e.Shift == 0)
+			if (e.Key == CoreLib::Keys::Return && e.Shift == 0)
 			{
 				try
 				{
@@ -180,7 +180,7 @@ namespace GameEngine
 		}
 		void txtValue_KeyPressed(UI_Base *, UIKeyEventArgs & e)
 		{
-			if (TestKey(e.Key, VirtualKeys::Return) && e.Shift == 0)
+			if (e.Key == CoreLib::Keys::Return && e.Shift == 0)
 			{
 				SetPropertyValue(txtValue->GetText());
 			}

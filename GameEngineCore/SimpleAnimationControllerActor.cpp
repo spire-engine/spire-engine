@@ -30,7 +30,7 @@ namespace GameEngine
 		//	Engine::Instance()->RequestExit();
 		//	return;
 		//}
-        if (simpleAnimation)
+        if (simpleAnimation && skeleton)
         {
 		    Pose p;
             p.Transforms.SetSize(skeleton->Bones.Count());

@@ -130,7 +130,10 @@ namespace GameEngine
         frameBuffer = sysInterface->CreateFrameBuffer(uiOverlayTexture.Ptr());
         screenWidth = w;
         screenHeight = h;
-        Matrix4::CreateOrthoMatrix(orthoMatrix, 0.0f, (float)screenWidth, 0.0f, (float)screenHeight, 1.0f, -1.0f);
+        Matrix4::CreateIdentityMatrix(orthoMatrix);
+        orthoMatrix.m[0][0] = 2.0f / screenWidth;
+        orthoMatrix.m[1][1] = 2.0f / screenHeight;
+        orthoMatrix.m[3][0] = orthoMatrix.m[3][1] = -1.0f;
         uniformBuffer->SetData(&orthoMatrix, sizeof(orthoMatrix));
         hwRenderer->Wait();
     }
@@ -270,7 +273,7 @@ namespace GameEngine
             auto cmdBuf = wndCtx->blitCmdBuffer->BeginRecording();
             if (baseTexture)
                 cmdBuf->Blit(wndCtx->uiOverlayTexture.Ptr(), baseTexture, TextureLayout::Sample,
-                    VectorMath::Vec2i::Create(viewport.x, viewport.y));
+                    VectorMath::Vec2i::Create(viewport.x, viewport.y), true);
             else
                 cmdBuf->TransferLayout(MakeArrayView(dynamic_cast<Texture*>(wndCtx->uiOverlayTexture.Ptr())), TextureLayoutTransfer::UndefinedToRenderAttachment);
             wndCtx->uiOverlayTexture->SetCurrentLayout(TextureLayout::ColorAttachment);

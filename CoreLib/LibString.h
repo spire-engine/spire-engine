@@ -439,12 +439,12 @@ namespace CoreLib
 
 			int IndexOf(char ch, int id) const
 			{
+				if (!buffer)
+					return -1;
 #if _DEBUG
 				if (id < 0 || id >= length)
 					throw "SubString: index out of range.";
 #endif
-				if (!buffer)
-					return -1;
 				for (int i = id; i < length; i++)
 					if (buffer[i] == ch)
 						return i;

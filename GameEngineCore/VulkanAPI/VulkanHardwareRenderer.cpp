@@ -10,7 +10,7 @@
 // Only execute actions of DEBUG_ONLY in DEBUG mode
 #if _DEBUG
 #define DEBUG_ONLY(x) do { x; } while(0)
-#define USE_VALIDATION_LAYER 0
+#define USE_VALIDATION_LAYER 1
 #else
 #define DEBUG_ONLY(x) do {    } while(0)
 #endif
@@ -297,6 +297,8 @@ namespace VK
             enabledInstanceExtensions.Add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 #if _WIN32
 			enabledInstanceExtensions.Add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#elif defined(__linux__)
+			enabledInstanceExtensions.Add(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
 #endif
 			DEBUG_ONLY(enabledInstanceExtensions.Add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME));
 
@@ -3968,12 +3970,23 @@ namespace VK
 			);
 		}
 
-		virtual void Blit(GameEngine::Texture2D* dstImage, GameEngine::Texture2D* srcImage, TextureLayout srcLayout, VectorMath::Vec2i dstOffset) override
+		virtual void Blit(
+			GameEngine::Texture2D *dstImage,
+			GameEngine::Texture2D *srcImage,
+			TextureLayout srcLayout,
+			VectorMath::Vec2i dstOffset,
+			bool flipSrc) override
 		{
 #if _DEBUG
 			if (inRenderPass == true)
 				throw HardwareRendererException("BeginRecording must take no parameters for Blit");
 #endif
+			int srcWidth = dynamic_cast<VK::Texture2D*>(srcImage)->width;
+			int srcHeight = dynamic_cast<VK::Texture2D*>(srcImage)->height;
+			int destWidth = dynamic_cast<VK::Texture2D*>(dstImage)->width;
+			int destHeight = dynamic_cast<VK::Texture2D*>(dstImage)->height;
+			if (dstOffset.x >= destWidth || dstOffset.y >= destHeight)
+				return;
 			vk::ImageLayout oriLayout;
 			switch (srcLayout)
 			{
@@ -4067,17 +4080,19 @@ namespace VK
 				.setBaseArrayLayer(0)
 				.setLayerCount(1);
 
-			int srcWidth = dynamic_cast<VK::Texture2D*>(srcImage)->width;
-			int srcHeight = dynamic_cast<VK::Texture2D*>(srcImage)->height;
-			int destWidth = dynamic_cast<VK::Texture2D*>(dstImage)->width;
-			int destHeight = dynamic_cast<VK::Texture2D*>(dstImage)->height;
-
 			std::array<vk::Offset3D, 2> srcOffsets;
-			srcOffsets[0] = vk::Offset3D(0, 0, 0);
-			srcOffsets[1] = vk::Offset3D(srcWidth, srcHeight, 1);
-
+			if (flipSrc)
+			{
+				srcOffsets[0] = vk::Offset3D(0, srcHeight, 0);
+				srcOffsets[1] = vk::Offset3D(srcWidth, 0, 1);
+			}
+			else
+			{
+				srcOffsets[0] = vk::Offset3D(0, 0, 0);
+				srcOffsets[1] = vk::Offset3D(srcWidth, srcHeight, 1);
+			}
 			std::array<vk::Offset3D, 2> dstOffsets;
-			dstOffset.y = destHeight - (dstOffset.y + srcHeight);
+			//dstOffset.y = destHeight - (dstOffset.y + srcHeight);
 			dstOffsets[0] = vk::Offset3D(dstOffset.x, dstOffset.y, 0);
 			dstOffsets[1] = vk::Offset3D(dstOffset.x + srcWidth, dstOffset.y + srcHeight, 1);
 			int wFix = 0, hFix = 0;
@@ -4089,6 +4104,10 @@ namespace VK
 			dstOffsets[1].y += hFix;
 			srcOffsets[1].x += wFix;
 			srcOffsets[1].y += hFix;
+			assert(dstOffsets[0].x >= 0 && dstOffsets[0].y >= 0);
+			assert(dstOffsets[0].x < destWidth && dstOffsets[0].y < destHeight);
+			assert(dstOffsets[1].x >= dstOffsets[0].x && dstOffsets[1].y > dstOffsets[0].y);
+			assert(dstOffsets[1].x <= destWidth && dstOffsets[1].y <= destHeight);
 
 			vk::ImageBlit blitRegions = vk::ImageBlit()
 				.setSrcSubresource(subresourceLayers)
@@ -4104,6 +4123,7 @@ namespace VK
 				blitRegions,
 				vk::Filter::eNearest
 			);
+			
 
 			barriers[0] = postBlitBarrier;
 			barriers[1] = postBlitSrcBarrier;
@@ -4235,10 +4255,18 @@ namespace VK
         void Present(GameEngine::Texture2D * srcImage)
         {
             if (images.Count() == 0) return;
-            uint32_t nextImage = RendererState::Device().acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphore, vk::Fence()).value;
+			uint32_t nextImage = 0;
+			try
+			{
+            	nextImage = RendererState::Device().acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphore, vk::Fence()).value;
+			}
+			catch (vk::OutOfDateKHRError)
+			{
+				CreateSwapchain();
+				return;
+			}
             static int frameId = 0;
             frameId++;
-
             vk::CommandBufferBeginInfo commandBufferBeginInfo = vk::CommandBufferBeginInfo()
                 .setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
                 .setPInheritanceInfo(nullptr);
@@ -4338,8 +4366,8 @@ namespace VK
 
                 // We need to flip y coordinate because Vulkan is left-handed, origin at top-left
                 std::array<vk::Offset3D, 2> dstOffsets;
-                dstOffsets[0] = vk::Offset3D(0, height, 0);
-                dstOffsets[1] = vk::Offset3D(width, 0, 1);
+                dstOffsets[0] = vk::Offset3D(0, 0, 0);
+                dstOffsets[1] = vk::Offset3D(width, height, 1);
 
                 vk::ImageBlit blitRegions = vk::ImageBlit()
                     .setSrcSubresource(subresourceLayers)
@@ -4348,12 +4376,12 @@ namespace VK
                     .setDstOffsets(dstOffsets);
 
 				cmdBuffer.blitImage(
-                    dynamic_cast<VK::Texture2D*>(srcImage)->image,
-                    vk::ImageLayout::eTransferSrcOptimal,
-                    images[nextImage],
-                    vk::ImageLayout::eTransferDstOptimal,
-                    blitRegions,
-                    vk::Filter::eNearest
+                     dynamic_cast<VK::Texture2D*>(srcImage)->image,
+                     vk::ImageLayout::eTransferSrcOptimal,
+                     images[nextImage],
+                     vk::ImageLayout::eTransferDstOptimal,
+                     blitRegions,
+                     vk::Filter::eNearest
                 );
 
 				cmdBuffer.pipelineBarrier(
@@ -4377,7 +4405,7 @@ namespace VK
 			
 			cmdBuffer.end(); // stop recording
 
-            vk::PipelineStageFlags waitDstStageMask = vk::PipelineStageFlags(vk::PipelineStageFlagBits::eTopOfPipe);
+            vk::PipelineStageFlags waitDstStageMask = vk::PipelineStageFlags(vk::PipelineStageFlagBits::eTransfer);
 
             vk::SubmitInfo submitInfo = vk::SubmitInfo()
                 .setWaitSemaphoreCount(1)
@@ -4387,6 +4415,7 @@ namespace VK
                 .setPCommandBuffers(&cmdBuffer)
                 .setSignalSemaphoreCount(1)
                 .setPSignalSemaphores(&renderFinishedSemaphore);
+			
             RendererState::RenderQueue().submit(submitInfo, presentCommandBufferFences[cmdBufId]);
 
             vk::PresentInfoKHR presentInfo = vk::PresentInfoKHR()
@@ -4396,8 +4425,17 @@ namespace VK
                 .setPSwapchains(&swapchain)
                 .setPImageIndices(&nextImage)
                 .setPResults(nullptr);
+			try
+			{
+            	RendererState::RenderQueue().presentKHR(presentInfo);
 
-            RendererState::RenderQueue().presentKHR(presentInfo);
+			}
+			catch (vk::OutOfDateKHRError)
+			{
+				printf("present exception\n");
+
+				CreateSwapchain();
+			}
         }
 
         void CreateSwapchain()
@@ -4436,12 +4474,16 @@ namespace VK
             }
 
             vk::Extent2D swapchainExtent = {};
-            if (surfaceCapabilities.currentExtent.width == -1) {
+            if (surfaceCapabilities.currentExtent.width == -1)
+			{
                 swapchainExtent.width = this->width;
                 swapchainExtent.height = this->height;
             }
-            else {
+            else 
+			{
                 swapchainExtent = surfaceCapabilities.currentExtent;
+				this->width = swapchainExtent.width;
+				this->height = swapchainExtent.height;
             }
 
             // Select swapchain pre-transform
@@ -5183,7 +5225,7 @@ namespace VK
 			srcOffsets[0] = vk::Offset3D(0, 0, 0);
 			srcOffsets[1] = vk::Offset3D(srcWidth, srcHeight, 1);
 			std::array<vk::Offset3D, 2> dstOffsets;
-			dstOffset.y = destHeight - (dstOffset.y + srcHeight);
+			//dstOffset.y = destHeight - (dstOffset.y + srcHeight);
 			dstOffsets[0] = vk::Offset3D(dstOffset.x, dstOffset.y, 0);
 			dstOffsets[1] = vk::Offset3D(dstOffset.x + srcWidth, dstOffset.y + srcHeight, 1);
 			int wFix = 0, hFix = 0;
@@ -5244,7 +5286,7 @@ namespace VK
 		}
 		virtual void Present(GameEngine::WindowSurface *surface, GameEngine::Texture2D* srcImage) override
 		{
-            ((VkWindowSurface*)surface)->Present(srcImage);
+          	((VkWindowSurface*)surface)->Present(srcImage);
 		}
 
 		virtual BufferObject* CreateBuffer(BufferUsage usage, int size) override

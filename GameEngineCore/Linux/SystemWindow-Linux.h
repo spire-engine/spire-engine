@@ -7,18 +7,32 @@
 #include "UISystemBase.h"
 #include "OS.h"
 #include "HardwareRenderer.h"
-#include <X11/Xlib.h>
 
 namespace GameEngine
 {
     class UISystemBase;
 
+    enum class KeyEvent
+    {
+        Press, Release
+    };
+
+    enum class MouseEvent
+    {
+        Move, Down, Up, Scroll
+    };
+
     class LinuxSystemWindow : public SystemWindow
     {
     private:
         CoreLib::RefPtr<UIWindowContext> uiContext;
-        Window handle;
+        uint32_t handle;
         bool visible = false;
+    public:
+        int cursorX = 0, cursorY = 0;
+        int lastMouseDownX = 0, lastMouseDownY = 0;
+        unsigned long lastMouseDownTime = 0;
+        int currentWidth = 0, currentHeight = 0;
     public:
         LinuxSystemWindow(UISystemBase* sysInterface, int log2UIBufferSize);
         ~LinuxSystemWindow();
@@ -27,7 +41,6 @@ namespace GameEngine
         {
             return uiContext.Ptr();
         }
-        bool IsChildOf(Window wnd);
         virtual void SetClientWidth(int w) override;
         virtual void SetClientHeight(int h) override;
         virtual int GetClientWidth() override;
@@ -44,6 +57,9 @@ namespace GameEngine
         virtual void Invoke(const CoreLib::Event<>& f) override;
         virtual void InvokeAsync(const CoreLib::Event<>& f) override;
         virtual GameEngine::DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags) override;
+        void HandleKeyEvent(KeyEvent eventType, int keyCode, int keyChar, int state);
+        void HandleMouseEvent(MouseEvent eventType, int x, int y, int delta, int button, int state, unsigned long time);
+        void HandleResizeEvent(int w, int h);
     };
 
 }

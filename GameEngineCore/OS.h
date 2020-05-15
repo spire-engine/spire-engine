@@ -5,12 +5,6 @@
 #include "CoreLib/LibUI/LibUI.h"
 #include "CoreLib/CommandLineParser.h"
 
-#if defined(_WIN32)
-#include "Win32VirtualKeys.h"
-#elif defined(__linux)
-#include "LinuxVirtualKeys.h"
-#endif
-
 namespace GameEngine
 {
 #if defined(_WIN32)
@@ -198,12 +192,6 @@ namespace GameEngine
             DebugPrint("\n");
         }
     };
-
-    template<typename T>
-    inline bool TestKey(T key, VirtualKeys vkey)
-    {
-        return key == static_cast<T>(vkey);
-    }
 }
 
 #endif

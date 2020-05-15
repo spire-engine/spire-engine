@@ -49,8 +49,8 @@ namespace GameEngine
 
     void Win32SystemWindow::WindowResized(CoreLib::Object * /*sender*/, CoreLib::WinForm::EventArgs /*e*/)
     {
-        SystemWindow::SizeChanged();
         uiContext->SetSize(BaseForm::GetClientWidth(), BaseForm::GetClientHeight());
+        SystemWindow::SizeChanged();
     }
 
     void Win32SystemWindow::WindowResizing(CoreLib::Object * /*sender*/, CoreLib::WinForm::ResizingEventArgs &/* e*/)

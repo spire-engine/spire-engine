@@ -1133,12 +1133,12 @@ namespace GraphicsUI
 		Label::DoKeyDown(Key,Shift);
 		if (!Enabled || !Visible)
 			return false;
-		if (Key == 0x20) // VK_SPACE
+		if (Key == Keys::Space) // VK_SPACE
 		{
 			IsMouseDown = true;
 			BorderStyle = BS_LOWERED;
 		}
-		else if (Key == 0x0D) // VK_RETURN
+		else if (Key == Keys::Return) // VK_RETURN
 		{
 			Control::DoClick();
 		}
@@ -1150,7 +1150,7 @@ namespace GraphicsUI
 		Label::DoKeyUp(Key,Shift);
 		if (!Enabled || !Visible)
 			return false;
-		if (Key == 0x20) // VK_SPACE
+		if (Key == Keys::Space) // VK_SPACE
 		{
 			IsMouseDown = false;
 			BorderStyle = BS_RAISED;
@@ -1717,10 +1717,13 @@ namespace GraphicsUI
 		case ResizeMode::Bottom:
 			return CursorType::SizeNS;
 		case ResizeMode::TopLeft:
+			return CursorType::SizeNWSE_Top;
 		case ResizeMode::BottomRight:
-			return CursorType::SizeNWSE;
+			return CursorType::SizeNWSE_Bottom;
+		case ResizeMode::TopRight:
+			return CursorType::SizeNESW_Top;
 		default:
-			return CursorType::SizeNESW;
+			return CursorType::SizeNESW_Bottom;
 		}
 	}
 
@@ -1929,7 +1932,7 @@ namespace GraphicsUI
 					return true;
 			}
 		}
-		if (Key == 0x09 && Popups.Count() == 0)  // VK_TAB
+		if (Key == Keys::Tab && Popups.Count() == 0)  // VK_TAB
 		{
 			if (Shift & SS_CONTROL)
 			{
@@ -2763,7 +2766,7 @@ namespace GraphicsUI
 		Control::DoKeyDown(Key,Shift);
 		if (!Enabled || !Visible)
 			return false;
-		if (Key == 0x20 || Key == 0x0D) // VK_SPACE, VK_RETURN
+		if (Key == Keys::Space || Key == Keys::Return) // VK_SPACE, VK_RETURN
 		{
 			Checked = !Checked; 
 			UI_MsgArgs Args;
@@ -2875,7 +2878,7 @@ namespace GraphicsUI
 		Control::DoKeyDown(Key,Shift);
 		if (!Enabled || !Visible)
 			return false;
-		if (Key == 0x20 || Key == 0x0D) // VK_SPACE, VK_RETURN
+		if (Key == Keys::Space || Key == Keys::Return) // VK_SPACE, VK_RETURN
 		{
 			SetValue(true);
 		}
@@ -3076,7 +3079,7 @@ namespace GraphicsUI
 			{
 				int selEnd;
 				selEnd = SelStart+SelLength;
-				if (Key == 0x25) // VK_LEFT
+				if (Key == Keys::Left) // VK_LEFT
 				{
 					if (CursorPos==0)
 						return false;
@@ -3098,7 +3101,7 @@ namespace GraphicsUI
 					}
 					cursorPosChanged = true;
 				}
-				else if(Key == 0x27) // VK_RIGHT
+				else if(Key == Keys::Right) // VK_RIGHT
 				{
 					if (CursorPos==FText.Length())
 						return false;
@@ -3124,22 +3127,22 @@ namespace GraphicsUI
 			}
 			else if (Shift == SS_CONTROL)
 			{
-				if (Key == L'C')
+				if (Key == Keys::C)
 				{
 					CopyToClipBoard();
 				}
-				else if (Key == L'V')
+				else if (Key == Keys::V)
 				{
 					DeleteSelectionText();
 					if (!Locked)
 						PasteFromClipBoard();
 				}
-				else if (Key == L'X')
+				else if (Key == Keys::X)
 				{
 					CopyToClipBoard();
 					DeleteSelectionText();
 				}
-				else if (Key == L'A')
+				else if (Key == Keys::A)
 				{
 					SelectAll();
 				}
@@ -3147,7 +3150,7 @@ namespace GraphicsUI
 			}
 			else if (Shift == 0)
 			{
-				if (Key == 0x25) // VK_LEFT
+				if (Key == Keys::Left) // VK_LEFT
 				{
 					if (SelLength == 0)
 					{
@@ -3165,7 +3168,7 @@ namespace GraphicsUI
 					cursorPosChanged = true;
 					return true;
 				}			
-				else if (Key == 0x27) // VK_RIGHT
+				else if (Key == Keys::Right) // VK_RIGHT
 				{
 					if (SelLength == 0)
 					{
@@ -3181,7 +3184,7 @@ namespace GraphicsUI
 					cursorPosChanged = true;
 					return true;
 				}
-				else if (Key == 0x2E && !Locked) // VK_DELETE
+				else if (Key == Keys::Delete && !Locked) // VK_DELETE
 				{
 					if (SelLength)
 					{
@@ -3201,7 +3204,7 @@ namespace GraphicsUI
 					}
 					return true;
 				}
-				else if (Key == 0x08 && !Locked) // VK_BACK
+				else if (Key == Keys::Backspace && !Locked) // VK_BACK
 				{
 					if (SelLength != 0)
 					{
@@ -4069,13 +4072,13 @@ namespace GraphicsUI
 		}
 		if (Items.Count())
 		{
-			if (Key == 0x28) // VK_DOWN
+			if (Key == Keys::Down) // VK_DOWN
 			{
 				SelectedIndex = ClampInt(SelectedIndex+1,0,Items.Count()-1);
 				SelectionChanged();
 
 			}
-			else if (Key == 0x26) // VK_UP
+			else if (Key == Keys::Up) // VK_UP
 			{
 				SelectedIndex = ClampInt(SelectedIndex-1,0,Items.Count()-1);
 				SelectionChanged();
@@ -4607,11 +4610,11 @@ namespace GraphicsUI
 		bool AltDown = (shift != 0);
 		if (!AltDown && (Key == 0x26 || Key == 0x28))
 		{
-			if (Key == 0x26) // VK_UP
+			if (Key == Keys::Up) // VK_UP
 			{
 				HighLightID = ClampInt(HighLightID - 1, 0, Items.Count() - 1);
 			}
-			else if (Key == 0x28) // VK_DOWN
+			else if (Key == Keys::Down) // VK_DOWN
 			{
 				HighLightID = ClampInt(HighLightID + 1, 0, Items.Count() - 1);
 			}
@@ -4636,7 +4639,7 @@ namespace GraphicsUI
 				}
 			}
 		}
-		if ((Key == 0x20 || Key == 0x0D)) // VK_SPACE VK_RETURN
+		if ((Key == Keys::Space || Key == Keys::Return)) // VK_SPACE VK_RETURN
 		{
 			if (ShowList)
 			{
@@ -4649,7 +4652,7 @@ namespace GraphicsUI
 			ToggleList(!ShowList);
 			return true;
 		}
-		else if (Key == 0x1B) // VK_ESCAPE
+		else if (Key == Keys::Escape) // VK_ESCAPE
 		{
 			ToggleList(false);
 			return true;
@@ -5234,7 +5237,7 @@ namespace GraphicsUI
 			return false;
 		if (Shift & SS_ALT)
 			ShowMnemonicKey(true);
-		if ((Key >= L'A' && Key <= L'Z') || (Key >= L'0' && Key <= L'9'))
+		if ((Key >= 'A' && Key <= 'Z') || (Key >= '0' && Key <= '9'))
 		{
 			for (int i=0; i<Items.Count(); i++)
 				Items[i]->Selected = false;
@@ -5249,7 +5252,7 @@ namespace GraphicsUI
 		}
 		int id = GetSelectedItemID();
 
-		if (Key == 0x20 || Key == 0x0D) // VK_SPACE || VK_RETURN
+		if (Key == Keys::Space || Key == Keys::Return) // VK_SPACE || VK_RETURN
 		{
 			if (id >= 0 && Items[id]->Selected && Items[id]->Enabled && !Items[id]->IsSeperator())
 			{
@@ -5264,12 +5267,12 @@ namespace GraphicsUI
 			if (parentItem && parentItem->Parent && parentItem->Parent->Type == CT_MENU &&
 				((Menu*)parentItem->Parent)->style == msMainMenu)
 				parentMainMenu = ((Menu*)parentItem->Parent);
-			if (Key == 0x26 || Key == 0x28) // VK_UP VK_DOWN
+			if (Key == Keys::Up || Key == Keys::Down) // VK_UP VK_DOWN
 			{
 				for (int i=0; i<Items.Count(); i++)
 					Items[i]->Selected = false;
 					
-				if (Key == 0x28)
+				if (Key == Keys::Down)
 				{
 					int nxt = id + 1;
 					int tc = Items.Count();
@@ -5288,7 +5291,7 @@ namespace GraphicsUI
 					if (nxt == id)
 						Items[id]->Selected = true;
 				}
-				else if (Key == 0x26)
+				else if (Key == Keys::Up)
 				{
 					int nxt = id - 1;
 					int tc = Items.Count();
@@ -5313,7 +5316,7 @@ namespace GraphicsUI
 				}
 				return true;
 			}
-			if (Key == 0x27)  // VK_RIGHT
+			if (Key == Keys::Right)  // VK_RIGHT
 			{
 				if (id != -1 && Items[id]->SubMenu && Items[id]->SubMenu->Count())
 				{
@@ -5377,7 +5380,7 @@ namespace GraphicsUI
 				}
 				return true;
 			}
-			else if (Key == 0x1B) // VK_LEFT || VK_ESCAPE
+			else if (Key == Keys::Left) // VK_LEFT || VK_ESCAPE
 			{
 				if (parentItem && parentItem->Parent)
 				{
@@ -5396,12 +5399,12 @@ namespace GraphicsUI
 		}
 		else
 		{
-			if (Key == 0x25 || Key == 0x27) // VK_LEFT VK_RIGHT
+			if (Key == Keys::Left || Key == Keys::Right) // VK_LEFT VK_RIGHT
 			{
 				for (int i=0; i<Items.Count(); i++)
 					Items[i]->Selected = false;
 					
-				if (Key == 0x27)
+				if (Key == Keys::Right)
 				{
 					int nxt = id + 1;
 					int tc = Items.Count();
@@ -5420,7 +5423,7 @@ namespace GraphicsUI
 					if (nxt == id)
 						Items[id]->Selected = true;
 				}
-				else if (Key == 0x25)
+				else if (Key == Keys::Left)
 				{
 					int nxt = id - 1;
 					int tc = Items.Count();
@@ -5445,7 +5448,7 @@ namespace GraphicsUI
 				}
 				return true;
 			}
-			else if (Key == 0x28) // VK_DOWN
+			else if (Key == Keys::Down) // VK_DOWN
  			{
 				if (id != -1)
 					Items[id]->Hit(MouseOperation::MouseDown);
@@ -5463,7 +5466,7 @@ namespace GraphicsUI
 				}
 				return true;
 			}
-			else if (Key == 0x1B) // VK_ESCAPE
+			else if (Key == Keys::Escape) // VK_ESCAPE
 			{
 				CloseSubMenu();
 				for (auto item : Items)
