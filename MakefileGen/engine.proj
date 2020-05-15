@@ -15,5 +15,5 @@ GameEngine
     link "X11"
     include "GameEngineCore/"
     include "./"
-    cflags "-std=c++14 -msse4.1 -Wno-init-list-lifetime"
+    cflags "-std=c++14 -msse4.1 -Wno-init-list-lifetime -Wno-stringop-overflow"
 }
