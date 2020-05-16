@@ -479,11 +479,11 @@ namespace GameEngine
                     auto y = (unsigned char)Math::Clamp(((lum) >> 16), 0, 255);
                     auto Cb = (unsigned char)Math::Clamp(((36962 * (color.b - y)) >> 16) + 128, 0, 255);
                     auto Cr = (unsigned char)Math::Clamp(((46727 * (color.r - y)) >> 16) + 128, 0, 255);
-                    yPlane[(height - i - 1)*width + j] = y;
+                    yPlane[i * width + j] = y;
                     if ((i & 1) == 0 && (j & 1) == 0)
                     {
-                        uPlane[(hHeight - (i >> 1) - 1) * hWidth + (j >> 1)] = Cb;
-                        vPlane[(hHeight - (i >> 1) - 1) * hWidth + (j >> 1)] = Cr;
+                        uPlane[(i >> 1) * hWidth + (j >> 1)] = Cb;
+                        vPlane[(i >> 1) * hWidth + (j >> 1)] = Cr;
                     }
                 }
             }
@@ -561,8 +561,8 @@ namespace GameEngine
             params.iComplexityMode = HIGH_COMPLEXITY;
             params.fMaxFrameRate = (float)options.FramesPerSecond;
             params.iSpatialLayerNum = 1;
-            params.iMaxQp = 1;
-            params.iMinQp = 0;
+            params.iMaxQp = 50;
+            params.iMinQp = 12;
             params.iRCMode = RC_QUALITY_MODE;
             params.iMultipleThreadIdc = 8;
             for (int i = 0; i < params.iSpatialLayerNum; i++) {

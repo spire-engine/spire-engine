@@ -43,7 +43,12 @@ namespace GameEngine
 
         if (instance)
         {
-            instance->Tick();
+			if (params.HeadlessMode)
+			{
+				if (frameId % 10 == 0)
+					Print("Rendering frame %d\n", frameId);
+			}
+			instance->Tick();
             if (params.EnableVideoCapture)
             {
                 renderer->Wait();
@@ -62,8 +67,9 @@ namespace GameEngine
                 if (Engine::Instance()->GetTime() >= params.Length)
                 {
                     mainWindow->Close();
-                }
-            }
+					OsApplication::Quit();
+				}
+			}
             frameId++;
             if (frameId == params.RunForFrames)
             {
@@ -81,6 +87,7 @@ namespace GameEngine
                     CoreLib::IO::File::WriteAllText(params.RenderStatsDumpFileName, sb.ProduceString());
                 }
                 mainWindow->Close();
+				OsApplication::Quit();
             }
         }
     }
@@ -130,6 +137,11 @@ namespace GameEngine
 	{
 		try
 		{
+            params = args.LaunchParams;
+
+			if (params.HeadlessMode)
+				Print("Running in headless mode.\n");
+			
             gameDir = Path::Normalize(args.GameDirectory);
             engineDir = Path::Normalize(args.EngineDirectory);
             Path::CreateDir(Path::Combine(gameDir, "Cache"));
@@ -140,7 +152,6 @@ namespace GameEngine
 
             GpuId = args.GpuId;
             RecompileShaders = args.RecompileShaders;
-            params = args.LaunchParams;
 
             if (args.Editor)
                 engineMode = EngineMode::Editor;
@@ -172,7 +183,7 @@ namespace GameEngine
 			Global::Colors = CreateDarkColorTable();
 
             // create main window
-            mainWindow = OsApplication::CreateSystemWindow(uiSystemInterface.Ptr(), 22);
+            mainWindow = CreateSystemWindow();
             mainWindow->GetUIEntry()->BackColor.A = 0;
             mainWindow->SetText("Game Engine");
             mainWindow->SizeChanged.Bind([=]() 
@@ -535,8 +546,10 @@ namespace GameEngine
 
 	SystemWindow * Engine::CreateSystemWindow(int log2BufferSize)
     {
-        return OsApplication::CreateSystemWindow(uiSystemInterface.Ptr(), log2BufferSize);
-    }
+		if (params.HeadlessMode)
+			return OsApplication::CreateDummyWindow(uiSystemInterface.Ptr(), log2BufferSize);
+		return OsApplication::CreateSystemWindow(uiSystemInterface.Ptr(), log2BufferSize);
+	}
 
 	Texture2D * Engine::GetRenderResult(bool withUI)
 	{

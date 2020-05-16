@@ -84,6 +84,8 @@ int __stdcall wWinMain(
 			}
 			if (parser.OptionExists("-no_console"))
 				args.NoConsole = true;
+			if (parser.OptionExists("-headless"))
+				appParams.HeadlessMode = true;
 			if (parser.OptionExists("-runforframes"))
 				appParams.RunForFrames = (int)StringToInt(parser.GetOptionValue("-runforframes"));
 			if (parser.OptionExists("-dumpstat"))

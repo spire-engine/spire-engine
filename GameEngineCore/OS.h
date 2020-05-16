@@ -172,12 +172,14 @@ namespace GameEngine
     public:
         static GraphicsUI::ISystemInterface* CreateUISystemInterface(HardwareRenderer * renderer);
         static SystemWindow* CreateSystemWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize);
+        static SystemWindow* CreateDummyWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize);
         static OsTimer* CreateTimer();
         static OsFontRasterizer* CreateFontRasterizer();
         static OsFileDialog* CreateFileDialog(SystemWindow* parent);
         static void SetMainLoopEventHandler(CoreLib::Procedure<> handler);
         static DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags = MessageBoxFlags::OKOnly);
         static void Run(SystemWindow* mainWindow);
+        static void Quit();
         static void DoEvents();
         static void Init(int argc, const char** argv);
         static void Dispose();

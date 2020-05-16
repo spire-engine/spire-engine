@@ -29,6 +29,7 @@ namespace GameEngine
         float Length = 10.0f;
         int FramesPerSecond = 30;
         int RunForFrames = 0; // run for this many frames and then terminate
+		bool HeadlessMode = false;
     };
 	class EngineInitArguments
 	{
@@ -240,7 +241,7 @@ namespace GameEngine
 #if __GNUC__
 #pragma GCC diagnostic pop
 #endif
-			if (instance && instance->uiCommandForm)
+			if (instance && instance->uiCommandForm && !instance->params.HeadlessMode)
 			{
 				instance->uiCommandForm->Write(printBuffer);
 				float timeElapsed = CoreLib::Diagnostics::PerformanceCounter::EndSeconds(lastUIUpdate);
@@ -261,7 +262,8 @@ namespace GameEngine
 #pragma GCC diagnostic pop
 #endif
 			}
-            OsApplication::DebugPrint(printBuffer);
+			if (!instance->params.HeadlessMode)
+            	OsApplication::DebugPrint(printBuffer);
 		}
 		static void SaveImage(Texture2D * texture, CoreLib::String fileName);
 	};

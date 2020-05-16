@@ -322,7 +322,7 @@ namespace VK
 		static void SelectPhysicalDevice()
 		{
 			std::vector<vk::PhysicalDevice> physicalDevices = State().instance.enumeratePhysicalDevices();
-			DEBUG_ONLY(VkDebug::PrintDeviceInfo(physicalDevices));
+			//DEBUG_ONLY(VkDebug::PrintDeviceInfo(physicalDevices));
 			if (GpuId >= physicalDevices.size())
 				GpuId = 0;
 			State().physicalDevice = physicalDevices[GpuId];
@@ -332,7 +332,7 @@ namespace VK
 		static void SelectPhysicalDevice(vk::SurfaceKHR surface)
 		{
 			std::vector<vk::PhysicalDevice> physicalDevices = State().instance.enumeratePhysicalDevices();
-			DEBUG_ONLY(VkDebug::PrintDeviceInfo(physicalDevices));
+			//DEBUG_ONLY(VkDebug::PrintDeviceInfo(physicalDevices));
 
 			int k = 0;
 			for (auto physDevice : physicalDevices)
@@ -747,9 +747,8 @@ namespace VK
 		// Resource creation functions
 		static vk::SurfaceKHR CreateSurface(WindowHandle windowHandle)
 		{
-			// Create the surface
+			// Create the surface.
 			vk::SurfaceKHR surface;
-
 #if _WIN32
 			vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo = vk::Win32SurfaceCreateInfoKHR()
 				.setHwnd((HWND)windowHandle)
@@ -4236,7 +4235,8 @@ namespace VK
             handle = windowHandle;
             width = w;
             height = h;
-            surface = RendererState::CreateSurface(windowHandle);
+			if (windowHandle)
+            	surface = RendererState::CreateSurface(windowHandle);
             CreateSwapchain();
             CreateSemaphores();
             Clear();
@@ -4432,8 +4432,10 @@ namespace VK
 
         void CreateSwapchain()
         {
-            std::vector<vk::SurfaceFormatKHR> surfaceFormats = RendererState::PhysicalDevice().getSurfaceFormatsKHR(surface);
-            vk::Format format;
+			if (!surface)
+				return;
+			std::vector<vk::SurfaceFormatKHR> surfaceFormats = RendererState::PhysicalDevice().getSurfaceFormatsKHR(surface);
+			vk::Format format;
             vk::ColorSpaceKHR colorSpace = surfaceFormats.at(0).colorSpace;
             if ((surfaceFormats.size() == 1) && (surfaceFormats.at(0).format == vk::Format::eUndefined))
                 format = vk::Format::eB8G8R8A8Unorm;
@@ -4633,7 +4635,8 @@ namespace VK
         void DestroySwapchain()
         {
             RendererState::Device().waitIdle();
-            DestroySwapchain(swapchain);
+			if (swapchain)
+            	DestroySwapchain(swapchain);
         }
 
         void DestroySwapchain(vk::SwapchainKHR pswapchain)

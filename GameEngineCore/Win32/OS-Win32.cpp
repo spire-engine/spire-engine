@@ -50,6 +50,10 @@ namespace GameEngine
     {
         WinForm::Application::Run(dynamic_cast<Win32SystemWindow*>(mainWindow), true);
     }
+    void OsApplication::Quit()
+    {
+        WinForm::Application::Terminate();
+    }
     void OsApplication::Dispose()
     {
         commandlineParser = CoreLib::Text::CommandLineParser();

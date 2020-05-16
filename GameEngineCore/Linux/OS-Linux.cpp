@@ -92,6 +92,11 @@ namespace GameEngine
         }
     }
 
+    void OsApplication::Quit()
+    {
+        appContext.terminate = true;
+    }
+
     SystemWindow* OsApplication::CreateSystemWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize)
     {
         if (!appContext.xdisplay)
@@ -111,6 +116,8 @@ namespace GameEngine
 
     void OsApplication::DoEvents()
     {
+        if (!appContext.xdisplay)
+            return;
         static bool supressInvokeTasks = false;
         LinuxSystemWindow* sysWindow = nullptr;
         int vKeyCode = 0;
