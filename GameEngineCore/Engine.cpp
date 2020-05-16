@@ -88,10 +88,16 @@ namespace GameEngine
     bool Engine::OnToggleConsoleAction(const CoreLib::String & /*actionName*/, ActionInput /*val*/)
 	{
 		if (uiCommandForm)
+		{
 			if (uiCommandForm->Visible)
+			{
 				mainWindow->GetUIEntry()->CloseWindow(uiCommandForm);
+			}
 			else
+			{
                 mainWindow->GetUIEntry()->ShowWindow(uiCommandForm);
+			}
+		}
 		return true;
 	}
 
@@ -205,6 +211,9 @@ namespace GameEngine
 			{
 			case RenderAPI::Vulkan:
 				Print("Vulkan: %s\n", renderer->GetHardwareRenderer()->GetRendererName().Buffer());
+				break;
+			case RenderAPI::Dummy:
+				Print("Using dummy renderer.\n");
 				break;
 			}
 

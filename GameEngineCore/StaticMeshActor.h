@@ -21,7 +21,7 @@ namespace GameEngine
 		ModelDrawableInstance modelInstance;
 		bool localTransformChanged = true;
 		virtual bool ParseField(CoreLib::String fieldName, CoreLib::Text::TokenReader & parser) override;
-		virtual void SerializeFields(CoreLib::StringBuilder & sb);
+		virtual void SerializeFields(CoreLib::StringBuilder & sb) override;
 		void MeshFile_Changing(CoreLib::String & newMeshFile);
 		void MaterialFile_Changing(CoreLib::String & newMaterialFile);
 		void ModelFile_Changing(CoreLib::String & newModelFile);

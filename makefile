@@ -38,7 +38,6 @@ build/depinstall: build_dir
 
 build_dir:
 	@mkdir -p build
-
 clean:
 	@rm -rf build
 	-@rm -f makefile-gen

@@ -399,7 +399,7 @@ namespace GraphicsUI
         LineCap EndCap = LineCap::None;
 		Line(Container * owner);
         void SetPoints(float x0, float y0, float x1, float y1, float lineWidth = 1.0f);
-		virtual void Draw(int absX, int absY);
+		virtual void Draw(int absX, int absY) override;
         virtual void DoDpiChanged() override;
 		bool HitTest(int x, int y); // x,y in parent coordinates
 	};
@@ -420,7 +420,7 @@ namespace GraphicsUI
 		bool EnableDpiScale = true;
 		LinePath(Container * owner);
 		void SetPoints(CoreLib::ArrayView<VectorMath::Vec2> points, float lineWidth = 1.0f);
-		virtual void Draw(int absX, int absY);
+		virtual void Draw(int absX, int absY) override;
 		virtual void DoDpiChanged() override;
 		bool HitTest(int x, int y); // x,y in parent coordinates
 	};
@@ -430,7 +430,7 @@ namespace GraphicsUI
     public:
         Ellipse(Container * owner);
 		virtual void DoDpiChanged() override;
-        virtual void Draw(int absX, int absY);
+        virtual void Draw(int absX, int absY) override;
     };
 
 	class Triangle : public Control
@@ -466,7 +466,7 @@ namespace GraphicsUI
 	protected:
 		bool drawChildren = true;
 		ContainerLayoutType layout = ContainerLayoutType::None;
-		virtual Control * FindControlAtPosition(int x, int y);
+		virtual Control * FindControlAtPosition(int x, int y) override;
 		CoreLib::List<CoreLib::RefPtr<Control>> controls;
 	public:
 		Container(Container * parent);
@@ -1554,20 +1554,20 @@ namespace GraphicsUI
 		void UpdateLabel(float angle);
 		void UpdateShape();
 	protected:
-		virtual Control * FindControlAtPosition(int x, int y);
+		virtual Control * FindControlAtPosition(int x, int y) override;
 	public:
 		TransformManipulator(Container * owner);
 		CoreLib::Event<UI_Base *, ManipulationEventArgs> OnApplyManipulation;
 		CoreLib::Event<UI_Base *, ManipulationEventArgs> OnPreviewManipulation;
 		float ScreenSpaceRadius;
-		virtual void Draw(int absX, int absY);
+		virtual void Draw(int absX, int absY) override;
 		void SetTarget(ManipulationMode manipulationMode, const ManipulatorSceneView & view, const VectorMath::Matrix4& viewTransform,
 			const VectorMath::Vec3 & camPos, const VectorMath::Vec3 & pos);
-		virtual bool DoMouseMove(int X, int Y);
+		virtual bool DoMouseMove(int X, int Y) override;
 		virtual bool IsPointInContent(int x, int y) override;
-		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseLeave();
+		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseLeave() override;
 		virtual void DoDpiChanged() override;
 	};
 }

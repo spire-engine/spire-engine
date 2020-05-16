@@ -117,6 +117,8 @@ namespace CoreLib
                     ((float*)buffer.Buffer())[i * 2 + 2] = pix.z;
                     ((float*)buffer.Buffer())[i * 2 + 3] = pix.w;
 					break;
+				default:
+					throw NotImplementedException("Create texture for specified format not implemented.");
 				}
 			}
 		}

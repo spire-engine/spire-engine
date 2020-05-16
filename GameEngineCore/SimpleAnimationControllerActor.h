@@ -24,7 +24,7 @@ namespace GameEngine
         {
             return "SimpleAnimationController";
         }
-        virtual void OnLoad();
+        virtual void OnLoad() override;
     };
 }
 

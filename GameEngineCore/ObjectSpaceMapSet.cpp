@@ -42,8 +42,9 @@ namespace GameEngine
             auto ptr = (unsigned short*)(data.Buffer() + (y * Height + x) * 8);
             return VectorMath::Vec4::Create(HalfToFloat(ptr[0]), HalfToFloat(ptr[1]), HalfToFloat(ptr[2]), HalfToFloat(ptr[3]));
         }
+        default:
+            return VectorMath::Vec4::Create(0.0f);
         }
-        return VectorMath::Vec4::Create(0.0f);
     }
     VectorMath::Vec4 RawObjectSpaceMap::Sample(VectorMath::Vec2 uv)
     {
@@ -76,6 +77,8 @@ namespace GameEngine
             ptr[3] = FloatToHalf(value.w);
             break;
         }
+        default:
+            break;
         }
     }
     void RawObjectSpaceMap::Init(DataType type, int w, int h)

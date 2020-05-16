@@ -23,7 +23,7 @@ namespace GameEngine
 		PROPERTY_DEF(float, FOV, 75.0f);
 		PROPERTY_DEF(float, Radius, 50.0f);
 	public:
-		VectorMath::Vec3 GetPosition()
+		VectorMath::Vec3 GetPosition() override
 		{
 			return Position.GetValue();
 		}

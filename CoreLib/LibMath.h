@@ -70,7 +70,7 @@ namespace CoreLib
 #endif
 			}
 
-			static inline unsigned int Ones32(register unsigned int x)
+			static inline unsigned int Ones32(unsigned int x)
 			{
 				/* 32-bit recursive reduction using SWAR...
 					but first step is mapping 2-bit values
@@ -84,7 +84,7 @@ namespace CoreLib
 				return(x & 0x0000003f);
 			}
 
-			static inline unsigned int Log2Floor(register unsigned int x)
+			static inline unsigned int Log2Floor(unsigned int x)
 			{
 				x |= (x >> 1);
 				x |= (x >> 2);
@@ -94,7 +94,7 @@ namespace CoreLib
 				return(Ones32(x >> 1));
 			}
 
-			static inline unsigned int Log2Ceil(register unsigned int x)
+			static inline unsigned int Log2Ceil(unsigned int x)
 			{
 				int y = (x & (x - 1));
 				y |= -y;

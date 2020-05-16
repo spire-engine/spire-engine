@@ -535,6 +535,8 @@ namespace GameEngine
                     case ShaderVariableType::StorageBuffer:
 						descLayout.Type = BindingType::StorageBuffer;
 						break;
+					default:
+						throw NotImplementedException("unknown shader variable type.");
 					}
                     descLayout.ArraySize = v.Value.BindingLength;
 					descs.Add(descLayout);

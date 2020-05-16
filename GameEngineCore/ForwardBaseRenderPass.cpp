@@ -21,7 +21,7 @@ namespace GameEngine
 				AttachmentLayout(TextureUsage::ColorAttachment, StorageFormat::RGBA_F16),
 				AttachmentLayout(TextureUsage::DepthAttachment, DepthBufferFormat)).GetArrayView(), false);
 		}
-		virtual void SetPipelineStates(FixedFunctionPipelineStates & state)
+		virtual void SetPipelineStates(FixedFunctionPipelineStates & state) override
 		{
 			state.blendMode = BlendMode::AlphaBlend;
 			state.DepthCompareFunc = CompareFunc::LessEqual;

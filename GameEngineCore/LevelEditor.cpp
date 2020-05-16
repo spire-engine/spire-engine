@@ -411,6 +411,8 @@ namespace GameEngine
                 case ManipulationHandleType::RotationZ:
                     Matrix4::RotationZ(rs, e.RotationAngle);
                     break;
+                default:
+                    break;
                 }
                 Vec3 translation = Vec3::Create(existingTransform.values[12], existingTransform.values[13], existingTransform.values[14]);
                 existingTransform.values[12] = 0.0f;

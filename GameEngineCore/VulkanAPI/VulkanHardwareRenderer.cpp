@@ -118,14 +118,13 @@ namespace VK
 		VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 			VkDebugReportFlagsEXT      flags,
 			VkDebugReportObjectTypeEXT objectType,
-			uint64_t                   object,
-			size_t                     location,
+			uint64_t                   /*object*/,
+			size_t                     /*location*/,
 			int32_t                    messageCode,
 			const char*                pLayerPrefix,
 			const char*                pMessage,
-			void*                      pUserData)
+			void*                      /*pUserData*/)
 		{
-			(void)objectType, object, location, messageCode, pUserData;
 			if (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT)
 				CoreLib::Diagnostics::Debug::Write("ERROR");
 			if (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT)
@@ -712,7 +711,7 @@ namespace VK
 					RendererState::State().descriptorPoolChains[renderThreadId]->Add(new DescriptorPoolObject());
 					return AllocateDescriptorSet(layout, false);
 				}
-				else throw HardwareRendererException("Couldn't allocate descriptor set.");
+				else CORELIB_ABORT("Couldn't allocate descriptor set.");
 			}
 			else return res;
 		}
@@ -880,7 +879,7 @@ namespace VK
 		case StorageFormat::Depth24: return vk::Format::eX8D24UnormPack32;
 		case StorageFormat::Depth32: return vk::Format::eD32Sfloat;
 		case StorageFormat::Depth24Stencil8: return vk::Format::eD24UnormS8Uint;
-		default: throw CoreLib::NotImplementedException("TranslateStorageFormat");
+		default: CORELIB_NOT_IMPLEMENTED("TranslateStorageFormat");
 		}
 	};
 
@@ -892,7 +891,7 @@ namespace VK
 		case BufferUsage::IndexBuffer: return vk::BufferUsageFlagBits::eIndexBuffer;
 		case BufferUsage::StorageBuffer: return vk::BufferUsageFlagBits::eStorageBuffer;
 		case BufferUsage::UniformBuffer: return vk::BufferUsageFlagBits::eUniformBuffer;
-		default: throw CoreLib::NotImplementedException("TranslateUsageFlags");
+		default: CORELIB_NOT_IMPLEMENTED("TranslateUsageFlags");
 		}
 	}
 
@@ -975,7 +974,7 @@ namespace VK
 		case BindingType::UniformBuffer: return vk::DescriptorType::eUniformBuffer; //TODO: dynamic?
 		case BindingType::StorageBuffer: return vk::DescriptorType::eStorageBuffer; //TODO: ^
 		case BindingType::Unused: throw HardwareRendererException("Attempting to use unused binding");
-		default: throw CoreLib::NotImplementedException("TranslateBindingType");
+		default: CORELIB_NOT_IMPLEMENTED("TranslateBindingType");
 		}
 	}
 
@@ -988,7 +987,7 @@ namespace VK
 		case StageFlags::sfGraphics:return vk::ShaderStageFlagBits::eAllGraphics;
 		case StageFlags::sfCompute: return vk::ShaderStageFlagBits::eCompute;
         case StageFlags::sfGraphicsAndCompute: return vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eAllGraphics;
-		default: throw CoreLib::NotImplementedException("TranslateStageFlags");
+		default: CORELIB_NOT_IMPLEMENTED("TranslateStageFlags");
 		}
 	}
 
@@ -1008,7 +1007,7 @@ namespace VK
         case TextureUsage::Storage:
         case TextureUsage::SampledStorage:
             return vk::ImageLayout::eGeneral;
-		default: throw CoreLib::NotImplementedException("LayoutFromUsage");
+		default: CORELIB_NOT_IMPLEMENTED("LayoutFromUsage");
 		}
 	}
 
@@ -1025,7 +1024,7 @@ namespace VK
 		case CompareFunc::NotEqual: return vk::CompareOp::eNotEqual;
 		case CompareFunc::Always: return vk::CompareOp::eAlways;
 		case CompareFunc::Never: return vk::CompareOp::eNever;
-		default: throw CoreLib::NotImplementedException("TranslateCompareFunc");
+		default: CORELIB_NOT_IMPLEMENTED("TranslateCompareFunc");
 		}
 	}
 
@@ -1041,7 +1040,7 @@ namespace VK
 		case StencilOp::Decrement: return vk::StencilOp::eDecrementAndClamp;
 		case StencilOp::DecrementWrap: return vk::StencilOp::eDecrementAndWrap;
 		case StencilOp::Invert: return vk::StencilOp::eInvert;
-		default: throw CoreLib::NotImplementedException("TranslateStencilOp");
+		default: CORELIB_NOT_IMPLEMENTED("TranslateStencilOp");
 		}
 	}
 
@@ -1066,7 +1065,7 @@ namespace VK
 		case PrimitiveType::Lines: return vk::PrimitiveTopology::eLineList;
 		case PrimitiveType::TriangleStrips: return vk::PrimitiveTopology::eTriangleStrip;
 		case PrimitiveType::LineStrips: return vk::PrimitiveTopology::eLineStrip;
-		default: throw CoreLib::NotImplementedException("TranslatePrimitiveTopology");
+		default: CORELIB_NOT_IMPLEMENTED("TranslatePrimitiveTopology");
 		}
 	}
 
@@ -1077,7 +1076,7 @@ namespace VK
 		case LoadOp::Load: return vk::AttachmentLoadOp::eLoad;
 		case LoadOp::Clear: return vk::AttachmentLoadOp::eClear;
 		case LoadOp::DontCare: return vk::AttachmentLoadOp::eDontCare;
-		default: throw CoreLib::NotImplementedException("TranslateLoadOp");
+		default: CORELIB_NOT_IMPLEMENTED("TranslateLoadOp");
 		}
 	}
 
@@ -1087,7 +1086,7 @@ namespace VK
 		{
 		case StoreOp::Store: return vk::AttachmentStoreOp::eStore;
 		case StoreOp::DontCare: return vk::AttachmentStoreOp::eDontCare;
-		default: throw CoreLib::NotImplementedException("TranslateStoreOp");
+		default: CORELIB_NOT_IMPLEMENTED("TranslateStoreOp");
 		}
 	}
 
@@ -1119,14 +1118,14 @@ namespace VK
 		case vk::ImageLayout::ePresentSrcKHR:
 			return vk::AccessFlagBits::eMemoryRead;
 		default:
-			throw HardwareRendererException("Invalid ImageLayout");
+			CORELIB_ABORT("Invalid ImageLayout");
 		}
 	}
 
 	vk::SampleCountFlagBits SampleCount(int samples)
 	{
 		if (samples <= 0 || (samples & (samples - 1)) != 0)
-			throw HardwareRendererException("samples must be a power of 2");
+			CORELIB_ABORT("samples must be a power of 2");
 
 		return (vk::SampleCountFlagBits)samples;
 	}
@@ -1147,7 +1146,7 @@ namespace VK
 			}
 			memoryTypeBits >>= 1;
 		}
-		throw HardwareRendererException("Could not find a valid memory type index.");
+		CORELIB_ABORT("Could not find a valid memory type index.");
 	}
 
 	vk::ShaderStageFlagBits ShaderStage(ShaderType stage)
@@ -1157,7 +1156,7 @@ namespace VK
 		case ShaderType::VertexShader: return vk::ShaderStageFlagBits::eVertex;
 		case ShaderType::FragmentShader: return vk::ShaderStageFlagBits::eFragment;
 		case ShaderType::ComputeShader: return vk::ShaderStageFlagBits::eCompute;
-		default: throw CoreLib::NotImplementedException("ShaderStageFlagBits");
+		default: CORELIB_NOT_IMPLEMENTED("ShaderStageFlagBits");
 		}
 	}
 
@@ -1393,14 +1392,9 @@ namespace VK
 
 		void SetData(int level, int layer, int xOffset, int yOffset, int zOffset, int pwidth, int pheight, int pdepth, int layerCount, DataType inputType, void* data)
 		{
-			if (numSamples > 1)
-				throw HardwareRendererException("samples must be equal to 1");
-
-			if (this->mipLevels < level)
-				throw HardwareRendererException("Attempted to set mipmap data for invalid level");
-
-			if (this->arrayLayers < layer)
-				throw HardwareRendererException("Attempted to set layer data for invalid layer");
+			CORELIB_ASSERT(numSamples == 1 && "samples must be equal to 1");
+			CORELIB_ASSERT(this->mipLevels > level && "Attempted to set mipmap data for invalid level");
+			CORELIB_ASSERT(this->mipLevels > level && "Attempted to set layer data for invalid layer");
 
 			vk::ImageAspectFlags aspectFlags;
 			if (isDepthFormat(format))
@@ -1426,6 +1420,9 @@ namespace VK
 					break;
 				case StorageFormat::RGBA_F16:
 					channelCount = 4;
+					break;
+				default:
+					channelCount = 1;
 					break;
 				}
 				translatedBuffer.SetSize(pwidth * pheight * pdepth * layerCount * channelCount);
@@ -1590,10 +1587,7 @@ namespace VK
 			{
 				bufferSize = width * height * StorageFormatSize(format);
 			}
-			if (bufferSize > bufSize)
-			{
-				throw CoreLib::InvalidOperationException("buffer size is too small");
-			}
+			CORELIB_ASSERT(bufferSize <= bufSize && "buffer size is too small");
 			vk::BufferCreateInfo stagingBufferCreateInfo = vk::BufferCreateInfo()
 				.setFlags(vk::BufferCreateFlags())
 				.setSize(bufferSize)
@@ -1750,6 +1744,8 @@ namespace VK
 			case StorageFormat::RGBA_I16:
 			case StorageFormat::RGBA_I32_Raw:
 				blitFilter = vk::Filter::eNearest;
+			default:
+				break;
 			}
 
 			vk::CommandBufferBeginInfo transferBeginInfo = vk::CommandBufferBeginInfo()
@@ -1901,7 +1897,7 @@ namespace VK
         {
             currentLayout = TranslateImageLayout(layout);
         }
-		void GetSize(int& pwidth, int& pheight)
+		void GetSize(int& pwidth, int& pheight) override
 		{
 			pwidth = width;
 			pheight = height;
@@ -1911,19 +1907,19 @@ namespace VK
             return this->format == StorageFormat::Depth24 || this->format == StorageFormat::Depth24Stencil8 || this->format == StorageFormat::Depth32;
         }
 
-		void SetData(int level, int pwidth, int pheight, int /*numSamples*/, DataType inputType, void* data)
+		void SetData(int level, int pwidth, int pheight, int /*numSamples*/, DataType inputType, void* data) override
 		{
 			VK::Texture::SetData(level, 0, 0, 0, 0, pwidth, pheight, 1, 1, inputType, data);
 		}
-		void SetData(int pwidth, int pheight, int /*numSamples*/, DataType inputType, void* data)
+		void SetData(int pwidth, int pheight, int /*numSamples*/, DataType inputType, void* data) override
 		{
 			VK::Texture::SetData(0, 0, 0, 0, 0, pwidth, pheight, 1, 1, inputType, data);
 		}
-		void BuildMipmaps()
+		void BuildMipmaps() override
 		{
 			VK::Texture::BuildMipmaps();
 		}
-		void GetData(int mipLevel, void * data, int bufSize)
+		void GetData(int mipLevel, void * data, int bufSize) override
 		{
 			VK::Texture::GetData(mipLevel, 0, data, bufSize);
 		}
@@ -2348,8 +2344,7 @@ namespace VK
 		}
 		void SetData(int offset, void* data, int psize)
 		{
-			if (data == nullptr)
-				throw HardwareRendererException("Initialize buffer with size preferred.");
+			CORELIB_ASSERT(data && "Initialize buffer with size preferred.");
 
 			// If the buffer is mappable, map and memcpy
 			if (location & vk::MemoryPropertyFlagBits::eHostVisible)
@@ -2677,8 +2672,7 @@ namespace VK
 
 		void SetDepthAttachment(int binding, StorageFormat format, bool ignoreInitialContent, LoadOp loadOp = LoadOp::Load, StoreOp storeOp = StoreOp::Store)
 		{
-			if (depthReference.layout != vk::ImageLayout::eUndefined)
-				throw HardwareRendererException("Only 1 depth/stencil attachment allowed.");
+			CORELIB_ASSERT(depthReference.layout == vk::ImageLayout::eUndefined && "Only 1 depth/stencil attachment allowed.");
 
 			Resize(binding + 1);
             if (ignoreInitialContent)
@@ -3650,7 +3644,7 @@ namespace VK
 			lastVertBufferOffset = 0;
 			lastIndexBufferOffset = 0;
 		}
-		inline void BeginRecording()
+		void BeginRecording() override
 		{
 			inRenderPass = false;
 
@@ -3727,7 +3721,8 @@ namespace VK
 			if (byteOffset != lastIndexBufferOffset || indexBuffer != lastIndexBuffer)
 			{
 				//TODO: Can make index buffer use 16 bit ints if possible?
-				buffer.bindIndexBuffer(reinterpret_cast<VK::BufferObject*>(indexBuffer)->buffer, { (vk::DeviceSize)byteOffset }, vk::IndexType::eUint32);
+				buffer.bindIndexBuffer(reinterpret_cast<VK::BufferObject*>(indexBuffer)->buffer,
+					(vk::DeviceSize)byteOffset, vk::IndexType::eUint32);
 				lastIndexBuffer = indexBuffer;
 				lastIndexBufferOffset = byteOffset;
 			}
@@ -4205,6 +4200,8 @@ namespace VK
 						.setColorAttachment(VK_ATTACHMENT_UNUSED)
 						.setClearValue(vk::ClearDepthStencilValue(1.0f, 0)));
 					break;
+				default:
+					CORELIB_NOT_IMPLEMENTED("Texture usage");
 				}
 
 				rects.Add(
@@ -5042,6 +5039,9 @@ namespace VK
                 case ResourceUsage::HostWrite:
                     memBar.setSrcAccessMask(vk::AccessFlagBits::eHostWrite);
                     break;
+				default:
+					CORELIB_UNREACHABLE("Unknown resource usage.");
+					break;
                 }
                 switch (usageAfter)
                 {
@@ -5063,6 +5063,9 @@ namespace VK
                 case ResourceUsage::HostWrite:
                     memBar.setDstAccessMask(vk::AccessFlagBits::eHostWrite);
                     break;
+				default:
+					CORELIB_UNREACHABLE("Unknown resource usage.");
+					break;
                 }
                 memoryBarriers->Add(memBar);
             }
@@ -5104,13 +5107,11 @@ namespace VK
 					render = false;
 					post = true;
 				}
-#if _DEBUG
-				else if (post && internalBuffer->inRenderPass == true)
+				else
 				{
-					throw HardwareRendererException("Command buffers must be in 3 groups - prePass, renderPass, and postPass");
+					CORELIB_DEBUG_ASSERT(!(post && internalBuffer->inRenderPass == true) && "Command buffers must be in 3 groups - prePass, renderPass, and postPass");
 				}
-#endif
-
+				
 				if (pre)
 					prePassCommandBuffers.Add(internalBuffer->buffer);
 				else if (render)
@@ -5300,7 +5301,7 @@ namespace VK
 			return new BufferObject(TranslateUsageFlags(usage), size, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 		}
 
-		Texture2D* CreateTexture2D(int pwidth, int pheight, StorageFormat format, DataType dataType, void* data)
+		Texture2D* CreateTexture2D(int pwidth, int pheight, StorageFormat format, DataType dataType, void* data) override
 		{
 			TextureUsage usage;
 			usage = TextureUsage::Sampled;
@@ -5312,14 +5313,14 @@ namespace VK
 			return res;
 		}
 
-		Texture2D* CreateTexture2D(TextureUsage usage, int pwidth, int pheight, int mipLevelCount, StorageFormat format)
+		Texture2D* CreateTexture2D(TextureUsage usage, int pwidth, int pheight, int mipLevelCount, StorageFormat format) override
 		{
 			Texture2D* res = new Texture2D(usage, pwidth, pheight, mipLevelCount, format);
 			res->TransferLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 			return res;
 		}
 
-		Texture2D* CreateTexture2D(TextureUsage usage, int pwidth, int pheight, int mipLevelCount, StorageFormat format, DataType dataType, CoreLib::ArrayView<void*> mipLevelData)
+		Texture2D* CreateTexture2D(TextureUsage usage, int pwidth, int pheight, int mipLevelCount, StorageFormat format, DataType dataType, CoreLib::ArrayView<void*> mipLevelData) override
 		{
 			Texture2D* res = new Texture2D(usage, pwidth, pheight, mipLevelCount, format);
 			for (int level = 0; level < mipLevelCount; level++)
@@ -5327,14 +5328,14 @@ namespace VK
 			return res;
 		}
 
-		Texture2DArray* CreateTexture2DArray(TextureUsage usage, int w, int h, int layers, int mipLevelCount, StorageFormat format)
+		Texture2DArray* CreateTexture2DArray(TextureUsage usage, int w, int h, int layers, int mipLevelCount, StorageFormat format) override
 		{
 			Texture2DArray* res = new Texture2DArray(usage, w, h, mipLevelCount, layers, format);
 			res->TransferLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 			return res;
 		}
 
-		TextureCube* CreateTextureCube(TextureUsage usage, int size, int mipLevelCount, StorageFormat format)
+		TextureCube* CreateTextureCube(TextureUsage usage, int size, int mipLevelCount, StorageFormat format) override
 		{
 			TextureCube* res = new TextureCube(usage, size, mipLevelCount, format);
 			res->TransferLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -5348,19 +5349,19 @@ namespace VK
 			return rs;
 		}
 
-		Texture3D* CreateTexture3D(TextureUsage usage, int w, int h, int d, int mipLevelCount, StorageFormat format)
+		Texture3D* CreateTexture3D(TextureUsage usage, int w, int h, int d, int mipLevelCount, StorageFormat format) override
 		{
 			Texture3D* res = new Texture3D(usage, w, h, d, mipLevelCount, format);
 			res->TransferLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 			return res;
 		}
 
-		TextureSampler* CreateTextureSampler()
+		TextureSampler* CreateTextureSampler() override
 		{
 			return new TextureSampler();
 		}
 
-		Shader* CreateShader(ShaderType stage, const char* data, int size)
+		Shader* CreateShader(ShaderType stage, const char* data, int size) override
 		{
 			Shader* result = new Shader();
 			result->Create(stage, data, size);
@@ -5389,15 +5390,15 @@ namespace VK
 
 		virtual int GetDescriptorPoolCount() override
 		{
-			throw CoreLib::NotImplementedException("GetDescriptorPoolCount");
+			CORELIB_NOT_IMPLEMENTED("GetDescriptorPoolCount");
 		}
 
-		Fence* CreateFence()
+		Fence* CreateFence() override
 		{
 			return new Fence();
 		}
 
-		CommandBuffer* CreateCommandBuffer()
+		CommandBuffer* CreateCommandBuffer() override
 		{
 			return new CommandBuffer();
 		}

@@ -23,7 +23,7 @@ namespace GameEngine
 		void BuildMesh(int w, int h, float cellSpace, float heightScale, CoreLib::ArrayView<unsigned short> heightField);
 	protected:
 		virtual bool ParseField(CoreLib::String fieldName, CoreLib::Text::TokenReader & parser) override;
-		virtual void SerializeFields(CoreLib::StringBuilder & sb);
+		virtual void SerializeFields(CoreLib::StringBuilder & sb) override;
 	public:
 		Material * MaterialInstance = nullptr;
 

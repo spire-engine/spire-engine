@@ -99,6 +99,8 @@ INTERMEDIATEDIR := build/intermediate/$(TARGET)/$(CONFIGURATION)/
 
 LDFLAGS := -L$(OUTPUTDIR)
 
+COMPILER_NAME := $(notdir $(CXX))
+
 ifeq (debug,$(CONFIGURATION))
 CFLAGS += -g -D_DEBUG
 else
@@ -118,7 +120,31 @@ RELATIVE_RPATH_INCANTATION := "-Wl,-rpath,"'$$'"ORIGIN/"
         }
         else if (head.Content == "link")
         {
-            makefileSb << "LDFLAGS += -l" << tokenReader.ReadStringLiteral() << "\n";
+            auto linkOption = tokenReader.ReadStringLiteral();
+            if (!linkOption.StartsWith('-'))
+                makefileSb << "LDFLAGS += -l" << linkOption << "\n";
+            else
+                makefileSb << "LDFLAGS += " << linkOption << "\n";
+        }
+        else if (head.Content == "link_debug")
+        {
+            makefileSb << "ifeq (debug,$(CONFIGURATION))\n\t";
+            auto linkOption = tokenReader.ReadStringLiteral();
+            if (!linkOption.StartsWith('-'))
+                makefileSb << "LDFLAGS += -l" << linkOption << "\n";
+            else
+                makefileSb << "LDFLAGS += " << linkOption<< "\n";
+            makefileSb << "endif\n";
+        }
+        else if (head.Content == "link_release")
+        {
+            makefileSb << "ifeq (release,$(CONFIGURATION))\n\t";
+            auto linkOption = tokenReader.ReadStringLiteral();
+            if (!linkOption.StartsWith('-'))
+                makefileSb << "LDFLAGS += -l" << linkOption << "\n";
+            else
+                makefileSb << "LDFLAGS += " << linkOption << "\n";
+            makefileSb << "endif\n";
         }
         else if (head.Content == "libdir")
         {
@@ -131,7 +157,28 @@ RELATIVE_RPATH_INCANTATION := "-Wl,-rpath,"'$$'"ORIGIN/"
         else if (head.Content == "cflags")
         {
             makefileSb << "CFLAGS += " << tokenReader.ReadStringLiteral() << "\n";
-
+        }
+        else if (head.Content == "cflags_release")
+        {
+            makefileSb << "ifeq (release,$(CONFIGURATION))\n\tCFLAGS += " 
+                << tokenReader.ReadStringLiteral() << "\nendif\n";
+        }
+        else if (head.Content == "cflags_debug")
+        {
+            makefileSb << "ifeq (debug,$(CONFIGURATION))\n\tCFLAGS += " 
+                << tokenReader.ReadStringLiteral() << "\nendif\n";
+        }
+        else if (head.Content == "cflags_gcc")
+        {
+            makefileSb << "ifneq (,$(findstring \"g++\",$(CXX)))\n\tCFLAGS += "; 
+            makefileSb << tokenReader.ReadStringLiteral();
+            makefileSb << "\nendif\n";
+        }
+        else if (head.Content == "cflags_clang")
+        {
+            makefileSb << "ifneq (,$(findstring clang,$(CXX)))\n\tCFLAGS += "; 
+            makefileSb << tokenReader.ReadStringLiteral();
+            makefileSb << "\nendif\n";
         }
         else if (head.Content == "}")
         {
@@ -207,7 +254,7 @@ RELATIVE_RPATH_INCANTATION := "-Wl,-rpath,"'$$'"ORIGIN/"
             for (auto dep : source.Value->dependentFiles)
                 makefileSb << " " << dep;
             makefileSb << " | " << source.Value->dirDependency << "\n";
-            makefileSb << "\n\t@echo \"" << source.Key << "\"\n";
+            makefileSb << "\n\t@echo \"$(COMPILER_NAME): " << source.Key << "\"\n";
             makefileSb << "\n\t@$(CXX) -c " << source.Key << " -o " << targetName << " $(CFLAGS)" << "\n";
         }
     }

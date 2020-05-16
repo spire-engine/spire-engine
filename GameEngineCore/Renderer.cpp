@@ -346,7 +346,7 @@ namespace GameEngine
 			mainView->Resize(w, h);
 			Wait();
 		}
-		Texture2D * GetRenderedImage()
+		Texture2D * GetRenderedImage() override
 		{
 			if (currentRenderProcedure)
 				return currentRenderProcedure->GetOutput()->Texture.Ptr();

@@ -7790,8 +7790,9 @@ namespace GraphicsUI
 			return "XZ";
 		case ManipulationHandleType::ScaleXYZ:
 			return "XYZ";
+		default:
+			return "";
 		}
-		return "";
 	}
 
 	bool IsRotationHandle(ManipulationHandleType t)
@@ -8424,8 +8425,9 @@ namespace GraphicsUI
 		case ManipulationHandleType::TranslationAxisCore:
 		case ManipulationHandleType::ScaleAxisCore:
 			return Color(0x60, 0x7D, 0x8B, 255);
+		default:
+			return Color();
 		}
-		return Color();
 	}
 
 	Color ManipulationHandle::GetHighlightColor()
@@ -8491,8 +8493,8 @@ namespace GraphicsUI
 			VirtualPlaneAxesW[1] = Vec3::Create(0.0f, 0.0f, 1.0f);
 			planeNormal = xAxisW;
 			ArcDisc(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, VirtualPlaneAxesW[0], VirtualPlaneAxesW[1], wSize * 0.75f, wSize, xBegin, xBegin + Math::Pi * 0.5f);
+			break;
 		}
-		break;
 		case ManipulationHandleType::RotationY:
 		{
 			float yBegin;
@@ -8508,8 +8510,8 @@ namespace GraphicsUI
 			VirtualPlaneAxesW[1] = Vec3::Create(1.0f, 0.0f, 0.0f);
 			planeNormal = yAxisW;
 			ArcDisc(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, VirtualPlaneAxesW[0], VirtualPlaneAxesW[1], wSize * 0.75f, wSize, yBegin, yBegin + Math::Pi * 0.5f);
+			break;
 		}
-		break;
 		case ManipulationHandleType::RotationZ:
 		{
 			float zBegin;
@@ -8525,32 +8527,32 @@ namespace GraphicsUI
 			VirtualPlaneAxesW[1] = Vec3::Create(0.0f, 1.0f, 0.0f);
 			planeNormal = zAxisW;
 			ArcDisc(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, VirtualPlaneAxesW[0], VirtualPlaneAxesW[1], wSize * 0.75f, wSize, zBegin, zBegin + Math::Pi * 0.5f);
+			break;
 		}
-		break;
 		case ManipulationHandleType::AxisX:
 		{
 			Vec2 vmin, vmax;
 			vmin.x = vmin.y = 1e9f;	
 			vmax.x = vmax.y = -1e9f;
 			AddAxis(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, xAxisW * Sign(dir.x), wSize * 1.1f, (float)emToPixel(0.1f), (float)emToPixel(0.8f), vmin, vmax);
+			break;
 		}
-		break;
 		case ManipulationHandleType::AxisY:
 		{
 			Vec2 vmin, vmax;
 			vmin.x = vmin.y = 1e9f;
 			vmax.x = vmax.y = -1e9f;
 			AddAxis(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, yAxisW * Sign(dir.y), wSize * 1.1f, (float)emToPixel(0.1f), (float)emToPixel(0.8f), vmin, vmax);
+			break;
 		}
-		break;
 		case ManipulationHandleType::AxisZ:
 		{
 			Vec2 vmin, vmax;
 			vmin.x = vmin.y = 1e9f;
 			vmax.x = vmax.y = -1e9f;
 			AddAxis(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, zAxisW * Sign(dir.z), wSize * 1.1f, (float)emToPixel(0.1f), (float)emToPixel(0.8f), vmin, vmax);
+			break;
 		}
-		break;
 		case ManipulationHandleType::TranslationX:
 		case ManipulationHandleType::ScaleX:
 		{
@@ -8560,8 +8562,8 @@ namespace GraphicsUI
 			planeNormal = selectPlaneNormal(yAxisW, zAxisW);
 			Binormal = transformNormal(xAxisW * Sign(dir.x));
 			AddAxis(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, xAxisW * Sign(dir.x), wSize * 1.1f, (float)emToPixel(0.3f), (float)emToPixel(1.5f), vmin, vmax);
+			break;
 		}
-		break;
 		case ManipulationHandleType::TranslationY:
 		case ManipulationHandleType::ScaleY:
 		{
@@ -8571,8 +8573,8 @@ namespace GraphicsUI
 			planeNormal = selectPlaneNormal(zAxisW, xAxisW);
 			Binormal = transformNormal(yAxisW * Sign(dir.y));
 			AddAxis(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, yAxisW * Sign(dir.y), wSize * 1.1f, (float)emToPixel(0.3f), (float)emToPixel(1.5f), vmin, vmax);
-		}
 			break;
+		}
 		case ManipulationHandleType::TranslationZ:
 		case ManipulationHandleType::ScaleZ:
 		{
@@ -8582,61 +8584,48 @@ namespace GraphicsUI
 			planeNormal = selectPlaneNormal(xAxisW, yAxisW);
 			Binormal = transformNormal(zAxisW * Sign(dir.z));
 			AddAxis(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, zAxisW * Sign(dir.z), wSize * 1.1f, (float)emToPixel(0.3f), (float)emToPixel(1.5f), vmin, vmax);
+			break;
 		}
-		break;
 		case ManipulationHandleType::TranslationXY:
 		{
 			planeNormal = zAxisW;
 			AddSquare(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, xAxisW * Sign(dir.x), yAxisW * Sign(dir.y), wSize * 0.5f);
+			break;
 		}
-		break;
 		case ManipulationHandleType::TranslationYZ:
-		{
 			planeNormal = xAxisW;
 			AddSquare(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, yAxisW * Sign(dir.y), zAxisW * Sign(dir.z), wSize * 0.5f);
-		}
-		break;
+			break;
 		case ManipulationHandleType::TranslationXZ:
-		{
 			planeNormal = yAxisW;
 			AddSquare(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, xAxisW * Sign(dir.x), zAxisW * Sign(dir.z), wSize * 0.5f);
-		}
-		break;
-
+			break;
 		case ManipulationHandleType::ScaleXY:
-		{
 			planeNormal = zAxisW;
 			Binormal = transformNormal((xAxisW * Sign(dir.x) + yAxisW * Sign(dir.y)));
 			AddScaleTrapezoid(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, xAxisW * Sign(dir.x), yAxisW * Sign(dir.y), wSize * 0.5f, wSize * 0.25f);
-		}
-		break;
+			break;
 		case ManipulationHandleType::ScaleYZ:
-		{
 			planeNormal = xAxisW;
 			Binormal = transformNormal(yAxisW * Sign(dir.y) + zAxisW * Sign(dir.z));
 			AddScaleTrapezoid(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, yAxisW * Sign(dir.y), zAxisW * Sign(dir.z), wSize * 0.5f, wSize * 0.25f);
-		}
-		break;
+			break;
 		case ManipulationHandleType::ScaleXZ:
-		{
 			planeNormal = yAxisW;
 			Binormal = transformNormal(xAxisW * Sign(dir.x) + zAxisW * Sign(dir.z));
 			AddScaleTrapezoid(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, xAxisW * Sign(dir.x), zAxisW * Sign(dir.z), wSize * 0.5f, wSize * 0.25f);
-		}
-		break;
+			break;
 		case ManipulationHandleType::ScaleXYZ:
-		{
 			planeNormal = (xAxisW * Sign(dir.x) + yAxisW * Sign(dir.y) + zAxisW * Sign(dir.z)).Normalize();
 			Binormal = Vec2::Create(0.0f, -1.0f);
 			AddScaleTriangle(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, xAxisW * Sign(dir.x), yAxisW * Sign(dir.y), zAxisW * Sign(dir.z), wSize * 0.5f);
-		}
-		break;
+			break;
 		case ManipulationHandleType::TranslationAxisCore:
 		case ManipulationHandleType::ScaleAxisCore:
-		{
 			AddCircle(UIFaces, viewportTransform, viewProjTransform, wHandleCenter, (float)emToPixel(0.5f));
-		}
-		break;
+			break;
+		default:
+			break;
 		}
 		VirtualPlane.w = -Vec3::Dot(planeNormal, worldObjPos);
 		VirtualPlane.x = planeNormal.x;

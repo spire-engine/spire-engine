@@ -234,8 +234,9 @@ namespace GameEngine
             case sfCompute:
                 return SLANG_STAGE_COMPUTE;
                 break;
+            default:
+                throw ArgumentException("Unknown shader type.");
             }
-            throw ArgumentException("Unknown shader type.");
         }
         BindingType SlangResourceKindToDescriptorType(slang::TypeReflection::Kind k, SlangResourceShape shape, SlangResourceAccess access)
         {
@@ -257,8 +258,9 @@ namespace GameEngine
                     else
                         return BindingType::Texture;
                 }
+            default:
+                throw ArgumentException("Unknown slang resource kind.");
             }
-            throw ArgumentException("Unknown slang resource kind.");
         }
         bool IsResourceParam(int slangCategory)
         {

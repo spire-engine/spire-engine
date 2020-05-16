@@ -233,6 +233,7 @@ namespace GameEngine
 			static char printBuffer[32768];
 			static CoreLib::Diagnostics::TimePoint lastUIUpdate;
 #if __GNUC__
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-security"
 #endif
 			snprintf(printBuffer, 32768, message, args...);
@@ -252,6 +253,7 @@ namespace GameEngine
 			else
 			{
 #if __GNUC__
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-security"
 #endif
 				printf(message, args...);
