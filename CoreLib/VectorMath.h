@@ -1389,7 +1389,7 @@ namespace VectorMath
 
 	inline void GetOrthoVec(Vec3 & vout, const Vec3 & vin)
 	{
-		Vec3 absV = Vec3::Create(abs(vin.x), abs(vin.y), abs(vin.z));
+		Vec3 absV = Vec3::Create(std::abs(vin.x), std::abs(vin.y), std::abs(vin.z));
 		if (absV.x <= absV.y && absV.x <= absV.z)
 			Vec3::Cross(vout, vin, Vec3::Create(1.0f, 0.0f, 0.0f));
 		else if (absV.y <= absV.x && absV.y <= absV.z)
