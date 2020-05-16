@@ -6,9 +6,6 @@ language: cpp
 
 # Build and test (clang, gcc) x (debug, release)
 
-env:
-  OMP_NUM_THREADS=1
-
 matrix:
   include:
     - os: linux
@@ -28,4 +25,7 @@ matrix:
       env:
         - CONFIGURATION=release
 
-script: bash ./get_examplegame.sh && make test
+script:
+  - export OMP_NUM_THREADS=4
+  - export LD_LIBRARY_PATH=$(if [[ $CXX == "clang++" ]]; then echo -n '/usr/local/clang/lib'; fi)
+  - bash ./get_examplegame.sh && make test
