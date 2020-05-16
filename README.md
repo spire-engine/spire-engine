@@ -1,25 +1,53 @@
-# SpireMiniEngine
+# SpireEngine
 
-[![Build status](https://ci.appveyor.com/api/projects/status/mw8aht0tabk677h1/branch/master?svg=true)](https://ci.appveyor.com/project/csyonghe/spireminiengine/branch/master)
+[![Build Status](https://travis-ci.com/spire-engine/engine.svg?branch=master)](https://travis-ci.com/spire-engine/engine)
 
-SpireMiniEngine is a mini game engine that uses Spire to manange shader library and cross-compile shaders for different platforms.
+SpireEngine is a Vulkan-based, cross-platform mini game engine that uses Slang to manange shader library and cross-compile shaders for different platforms.
 
-## How to Run:
+![](https://github.com/csyonghe/SpireMiniEngineExtBinaries/blob/master/screenshot1.png)
+
+## Build
+SpireEngine currently runs on both Windows and Linux.
+### Windows
 - Run "prepare.ps1" script, which downloads the Autodesk FBX SDK binaries required for building ModelImporter.
-- Open "GameEngine.sln" in Visual Studio 2017.
-- Build the solution. You may want to change Windows SDK Version in project settings to use a locally installed Windows SDK.
-- Set GameEngine as start-up project.
-- Right click GameEngine project and set the following start-up command:
+- Open "GameEngine.sln" in Visual Studio 2019.
+- Build the solution. 
+### Linux
+SpireEngine does not depend on any special libraries except Xlib on Linux platforms. Just run `make` in the project root directory.
+```
+make -j16
+```
+The makefile script will automatically check and install Xlib if it does not exists on the system.
 
+SpireEngine can be built by both `g++` and `clang++`. You can set `CXX` environment variable to each of these to explicitly specify the compiler to use:
+```
+CXX=clang++ make -j16
+```
+
+## Run
+To run SpireEngine, you need some addtional assets. You can download an example game by running the `get_examplegame.ps1` script on Windows, or the `get_examplegame.sh` script on Linux. After the assets have been downloaded, follow these steps to run:
+
+### Windows
+- Open GameEngine.sln in Visual Studio.
+- Set GameEngine as start-up project.
+- Right click GameEngine project and set the following start-up arguments in Debug settings:
 `
--enginedir "$(SolutionDir)EngineContent" -dir "$(SolutionDir)ExampleGame" -gl
+-enginedir "$(SolutionDir)EngineContent" -dir "$(SolutionDir)ExampleGame" -level "level0.level"
 `
 - Run.
 
-To run the engine in editor mode, add `-editor` argument when launching GameEngine.exe:
+### Linux
 ```
-GameEngine.exe -editor -enginedir "$(SolutionDir)EngineContent" -dir "$(SolutionDir)ExampleGame"
+build/linux-x86-64/release/GameEngine -enginedir EngineContent -dir ExampleGame -level "level0.level"
 ```
-## Screenshot
 
-![](https://github.com/csyonghe/SpireMiniEngineExtBinaries/raw/master/screenshot0.png)
+## Editor Mode
+To run the engine in editor mode, pass `-editor` command line argument when launching GameEngine.
+
+## Render Video Output
+SpireEngine supports rendering to video files. You can use the following command line arguments:
+- `-reclen <time_in_seconds>`: specifies the length of video output, in seconds.
+- `-recdir <mp4_filename_or_directory>`: specifies the location of the ouput video. If a *.mp4 filename is provided, SpireEngine will directly encode the resulting video as an H.264 video file. If a directory name is provided, SpireEngine will output individual images for each frame to the directory.
+
+## Headless Mode
+If you need to run SpireEngine in an non-desktop environment, you can pass the `-headless` argument to start without a window. This can be useful when rendering videos on a window-less server environment.

@@ -141,6 +141,10 @@ namespace CoreLib
 		{
 			List<String> dirs = Split(path);
 			StringBuilder sb;
+			if (path.StartsWith("\\\\"))
+				sb << "\\\\";
+			else if (path.StartsWith(Path::PathDelimiter))
+				sb << Path::PathDelimiter;
 			for (int i = 0; i < dirs.Count(); i++)
 			{
 				sb << dirs[i];
