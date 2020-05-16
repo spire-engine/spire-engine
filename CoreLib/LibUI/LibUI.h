@@ -494,6 +494,7 @@ namespace GraphicsUI
 		virtual ContainerLayoutType GetLayout() { return layout; }
 		virtual void SetLayout(ContainerLayoutType layout);
 		virtual void DoDpiChanged() override;
+		void FreeChildren();
 	};
 
 	class Label;
@@ -748,7 +749,9 @@ namespace GraphicsUI
 		void DeactivateAllForms();
 	public:
 		UIEntry(int WndWidth, int WndHeight, UIWindowContext * ctx, ISystemInterface * pSystem);
-		ISystemInterface * System = nullptr;
+		~UIEntry();
+		ISystemInterface *System = nullptr;
+
 	public:
 		bool KeyInputConsumed = false, MouseInputConsumed = false;
 		Menu * MainMenu = nullptr;

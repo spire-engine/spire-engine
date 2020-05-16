@@ -1214,6 +1214,13 @@ namespace GraphicsUI
 		layout = pLayout;
 	}
 
+	void Container::FreeChildren()
+	{
+		for (auto &child : controls)
+			child = nullptr;
+		controls.Clear();
+	}
+
 	bool Container::DoClosePopup()
 	{
 		for (int i=0;i<controls.Count(); i++)
@@ -1861,6 +1868,13 @@ namespace GraphicsUI
 		ImeMessageHandler.ImeWindow->WindowWidth = WndWidth;
 		ImeMessageHandler.ImeWindow->WindowHeight = WndHeight;
 		DoDpiChanged();
+	}
+
+	UIEntry::~UIEntry()
+	{
+		// Child controls references fields defined in UIEntry.
+		// They must be destroyed before freeing UIEntry members.
+		FreeChildren();
 	}
 
 	void UIEntry::InternalBroadcastMessage(UI_MsgArgs *Args)
