@@ -13,6 +13,7 @@ GameEngine
     link "slang"
     link "slang-glslang"
     link "X11"
+    link "rt"
     include "GameEngineCore/"
     include "./"
     cflags "-std=c++14 -msse4.1"

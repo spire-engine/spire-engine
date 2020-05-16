@@ -53,6 +53,14 @@ namespace GameEngine
             else
                 return KeyState::Released;
         }
+        void QueueTask(const CoreLib::Event<>& f)
+        {
+            uiThreadTaskQueueMutex.Lock();
+            UIThreadTask task;
+            task.callback = new CoreLib::Event<>(f);
+            uiThreadTaskQueue.Add(CoreLib::_Move(task));
+            uiThreadTaskQueueMutex.Unlock();
+        }
     };
 }
 

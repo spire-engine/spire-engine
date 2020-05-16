@@ -161,11 +161,7 @@ namespace GameEngine
     void LinuxSystemWindow::InvokeAsync(const CoreLib::Event<>& f)
     {
         auto context = GetLinuxApplicationContext();
-        context->uiThreadTaskQueueMutex.Lock();
-        UIThreadTask task;
-        task.callback = new CoreLib::Event<>(f);
-        context->uiThreadTaskQueue.Add(CoreLib::_Move(task));
-        context->uiThreadTaskQueueMutex.Unlock();
+        context->QueueTask(f);
     }
 
     DialogResult LinuxSystemWindow::ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags)
@@ -218,6 +214,7 @@ namespace GameEngine
         switch (eventType)
         {
         case MouseEvent::Down:
+            this->uiContext->tmrHover->Start();
             this->uiContext->uiEntry->DoMouseDown(x, y, shiftstate);
             if (x == lastMouseDownX && y == lastMouseDownY && time - lastMouseDownTime < 200)
             {
@@ -232,9 +229,11 @@ namespace GameEngine
             lastMouseDownY = y;
             break;
         case MouseEvent::Up:
+            this->uiContext->tmrHover->Stop();
             this->uiContext->uiEntry->DoMouseUp(x, y, shiftstate);
             break;
         case MouseEvent::Move:
+            this->uiContext->tmrHover->Start();
             this->uiContext->uiEntry->DoMouseMove(x, y);
             break;
         case MouseEvent::Scroll:

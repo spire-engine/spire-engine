@@ -7,6 +7,8 @@
 #include "Linux/SystemWindow-Linux.h"
 #include "CoreLib/Tokenizer.h"
 #include "Linux/tinyfiledialogs.h"
+#include <signal.h>
+#include <time.h>
 #include <X11/Xlib.h>
 #include <X11/cursorfont.h>
 
@@ -284,18 +286,48 @@ namespace GameEngine
 
     class LinuxOsTimer : public OsTimer
     {
+    private:
+        int interval = 0;
+        timer_t timerid = 0;
+
     public:
         LinuxOsTimer()
         {
         }
+        static void SignalHandler(sigval_t sigVal)
+        {
+            auto timer = (LinuxOsTimer *)sigVal.sival_ptr;
+            appContext.QueueTask(timer->Tick);
+        }
         virtual void SetInterval(int val) override
         {
+            interval = val;
         }
         virtual void Start() override
         {
+            if (timerid != 0)
+                Stop();
+            sigevent_t sev = {};
+            sev.sigev_notify = SIGEV_THREAD;
+            sev.sigev_value.sival_ptr = this;
+            sev._sigev_un._sigev_thread._attribute = nullptr;
+            sev._sigev_un._sigev_thread._function = SignalHandler;
+            timer_create(CLOCK_REALTIME, &sev, &timerid);
+            struct itimerspec its;
+            long long freq_nanosecs = interval * 1000000;
+            its.it_value.tv_sec = freq_nanosecs / 1000000000;
+            its.it_value.tv_nsec = freq_nanosecs % 1000000000;
+            its.it_interval.tv_sec = its.it_value.tv_sec;
+            its.it_interval.tv_nsec = its.it_value.tv_nsec;
+            timer_settime(timerid, 0, &its, nullptr);
         }
         virtual void Stop() override
         {
+            if (timerid != 0)
+            {
+                timer_delete(timerid);
+                timerid = 0;
+            }
         }
     };
 
