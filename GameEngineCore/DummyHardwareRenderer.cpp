@@ -1,4 +1,6 @@
 #include "HardwareRenderer.h"
+#include "CoreLib/Stream.h"
+#include "CoreLib/TextIO.h"
 
 namespace GameEngine
 {
@@ -186,19 +188,32 @@ namespace DummyRenderer
 
     class PipelineBuilder : public virtual GameEngine::PipelineBuilder
 	{
-	public:
-		PipelineBuilder() {}
+        CoreLib::IO::StreamWriter *writer;
+        CoreLib::String pipelineName;
+
+    public:
+        PipelineBuilder(CoreLib::IO::StreamWriter *streamWriter)
+            : writer(streamWriter) {}
 	public:
 		virtual void SetShaders(CoreLib::ArrayView<GameEngine::Shader*> /*shaders*/) override {}
 		virtual void SetVertexLayout(VertexFormat /*vertexFormat*/) override {}
 		virtual void SetBindingLayout(CoreLib::ArrayView<GameEngine::DescriptorSetLayout*> /*descriptorSets*/) override {}
-		virtual void SetDebugName(CoreLib::String /*name*/) override {}
-		virtual GameEngine::Pipeline* ToPipeline(GameEngine::RenderTargetLayout* /*renderTargetLayout*/) override
+        virtual void SetDebugName(CoreLib::String name) override
         {
+            pipelineName = name;
+        }
+        virtual GameEngine::Pipeline* ToPipeline(GameEngine::RenderTargetLayout* /*renderTargetLayout*/) override
+        {
+            writer->Write("Create GraphicsPipeline ");
+            writer->Write(pipelineName);
+            writer->Write("\n");
             return new Pipeline();
         }
 		virtual GameEngine::Pipeline* CreateComputePipeline(CoreLib::ArrayView<GameEngine::DescriptorSetLayout*> /*descriptorSets*/, GameEngine::Shader* /*shader*/) override
         {
+            writer->Write("Create ComputePipeline ");
+            writer->Write(pipelineName);
+            writer->Write("\n");
             return new Pipeline();
         }
 	};
@@ -241,21 +256,40 @@ namespace DummyRenderer
     class HardwareRenderer : public GameEngine::HardwareRenderer
 	{
 	public:
-        HardwareRenderer() {}
+        CoreLib::RefPtr<CoreLib::IO::StreamWriter> writer;
+        HardwareRenderer()
+        {
+            writer = new CoreLib::IO::StreamWriter("rendercommands.txt");
+        }
         virtual void ThreadInit(int /*threadId*/) override {}
 		virtual void ClearTexture(GameEngine::Texture2D* /*texture*/) override {}
         virtual void BeginJobSubmission() override {}
-		virtual void QueueRenderPass(GameEngine::FrameBuffer* /*frameBuffer*/, CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/) override {}
-		virtual void QueueNonRenderCommandBuffers(CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/) override {}
-        virtual void QueueComputeTask(GameEngine::Pipeline* /*computePipeline*/, GameEngine::DescriptorSet* /*descriptorSet*/, int /*x*/, int /*y*/, int /*z*/) override {}
-        virtual void QueuePipelineBarrier(ResourceUsage /*usageBefore*/, ResourceUsage /*usageAfter*/, CoreLib::ArrayView<ImagePipelineBarrier> /*barriers*/) override {}
-        virtual void QueuePipelineBarrier(ResourceUsage /*usageBefore*/, ResourceUsage /*usageAfter*/, CoreLib::ArrayView<GameEngine::Buffer*> /*buffers*/) override {}
+		virtual void QueueRenderPass(GameEngine::FrameBuffer* /*frameBuffer*/, CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/) override
+        {
+            writer->Write("Execute RenderPass\n");
+        }
+		virtual void QueueNonRenderCommandBuffers(CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/) override
+        {
+            writer->Write("Execute CommandBuffer\n");
+        }
+        virtual void QueueComputeTask(GameEngine::Pipeline* /*computePipeline*/, GameEngine::DescriptorSet* /*descriptorSet*/, int /*x*/, int /*y*/, int /*z*/) override
+        {
+            writer->Write("Execute ComputeTask\n");
+        }
+        virtual void QueuePipelineBarrier(ResourceUsage /*usageBefore*/, ResourceUsage /*usageAfter*/, CoreLib::ArrayView<ImagePipelineBarrier> /*barriers*/) override
+        {
+            writer->Write("PipelineBarrier\n");
+        }
+        virtual void QueuePipelineBarrier(ResourceUsage /*usageBefore*/, ResourceUsage /*usageAfter*/, CoreLib::ArrayView<GameEngine::Buffer*> /*buffers*/) override
+        {
+            writer->Write("PipelineBarrier\n");
+        }
         virtual void EndJobSubmission(GameEngine::Fence* /*fence*/) override {}
 		virtual void Present(GameEngine::WindowSurface * /*surface*/, GameEngine::Texture2D* /*srcImage*/) override
         {
-            //printf("present called\n");
+            writer->Write("Present\n");
         }
-		virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, VectorMath::Vec2i /*destOffset*/) override {}
+        virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, VectorMath::Vec2i /*destOffset*/) override {}
 		virtual void Wait() override {}
 		virtual void SetMaxTempBufferVersions(int /*versionCount*/) override {}
 		virtual void ResetTempBufferVersion(int /*version*/) override {}
@@ -265,62 +299,110 @@ namespace DummyRenderer
         }
 		virtual GameEngine::Buffer* CreateBuffer(BufferUsage /*usage*/, int sizeInBytes) override
         {
+            writer->Write("Create Buffer (");
+            writer->Write(CoreLib::String(sizeInBytes));
+            writer->Write(" bytes)\n");
             return new Buffer(sizeInBytes);
         }
 		virtual GameEngine::Buffer* CreateMappedBuffer(BufferUsage /*usage*/, int sizeInBytes) override
         {
+            writer->Write("Create Buffer (");
+            writer->Write(CoreLib::String(sizeInBytes));
+            writer->Write(" bytes)\n");
             return new Buffer(sizeInBytes);
         }
-		virtual GameEngine::Texture2D* CreateTexture2D(int /*width*/, int /*height*/, StorageFormat /*format*/, DataType /*type*/, void* /*data*/) override
+		virtual GameEngine::Texture2D* CreateTexture2D(int width, int height, StorageFormat /*format*/, DataType /*type*/, void* /*data*/) override
         {
+            writer->Write("Create Texture2D (");
+            writer->Write(CoreLib::String(width));
+            writer->Write("x");
+            writer->Write(CoreLib::String(height));
+            writer->Write(")\n");
             return new Texture2D();
         }
-		virtual GameEngine::Texture2D* CreateTexture2D(TextureUsage /*usage*/, int /*width*/, int /*height*/, int /*mipLevelCount*/, StorageFormat /*format*/) override
+		virtual GameEngine::Texture2D* CreateTexture2D(TextureUsage /*usage*/, int width, int height, int /*mipLevelCount*/, StorageFormat /*format*/) override
         {
+            writer->Write("Create Texture2D (");
+            writer->Write(CoreLib::String(width));
+            writer->Write("x");
+            writer->Write(CoreLib::String(height));
+            writer->Write(")\n");
             return new Texture2D();
         }
-		virtual GameEngine::Texture2D* CreateTexture2D(TextureUsage /*usage*/, int /*width*/, int /*height*/, int /*mipLevelCount*/, StorageFormat /*format*/, DataType /*type*/, CoreLib::ArrayView<void*> /*mipLevelData*/) override
+		virtual GameEngine::Texture2D* CreateTexture2D(TextureUsage /*usage*/, int width, int height, int /*mipLevelCount*/, StorageFormat /*format*/, DataType /*type*/, CoreLib::ArrayView<void*> /*mipLevelData*/) override
         {
+            writer->Write("Create Texture2D (");
+            writer->Write(CoreLib::String(width));
+            writer->Write("x");
+            writer->Write(CoreLib::String(height));
+            writer->Write(")\n");
             return new Texture2D();
         }
-		virtual GameEngine::Texture2DArray* CreateTexture2DArray(TextureUsage /*usage*/, int /*width*/, int /*height*/, int /*layers*/, int /*mipLevelCount*/, StorageFormat /*format*/) override
+		virtual GameEngine::Texture2DArray* CreateTexture2DArray(TextureUsage /*usage*/, int width, int height, int layers, int /*mipLevelCount*/, StorageFormat /*format*/) override
         {
+            writer->Write("Create Texture2DArray (");
+            writer->Write(CoreLib::String(width));
+            writer->Write("x");
+            writer->Write(CoreLib::String(height));
+            writer->Write("x");
+            writer->Write(CoreLib::String(layers));
+            writer->Write(")\n");
             return new Texture2DArray();
         }
-		virtual GameEngine::TextureCube* CreateTextureCube(TextureUsage /*usage*/, int /*size*/, int /*mipLevelCount*/, StorageFormat /*format*/) override
+		virtual GameEngine::TextureCube* CreateTextureCube(TextureUsage /*usage*/, int size, int /*mipLevelCount*/, StorageFormat /*format*/) override
         {
+            writer->Write("Create TextureCube (");
+            writer->Write(CoreLib::String(size));
+            writer->Write(")\n");
             return new TextureCube();
         }
-		virtual GameEngine::TextureCubeArray* CreateTextureCubeArray(TextureUsage /*usage*/, int /*size*/, int /*mipLevelCount*/, int /*cubemapCount*/, StorageFormat /*format*/) override
+		virtual GameEngine::TextureCubeArray* CreateTextureCubeArray(TextureUsage /*usage*/, int size, int /*mipLevelCount*/, int cubemapCount, StorageFormat /*format*/) override
         {
+            writer->Write("Create TextureCubeArray (");
+            writer->Write(CoreLib::String(size));
+            writer->Write("x");
+            writer->Write(CoreLib::String(cubemapCount));
+            writer->Write(")\n");
             return new TextureCubeArray();
         }
-		virtual GameEngine::Texture3D* CreateTexture3D(TextureUsage /*usage*/, int /*width*/, int /*height*/, int /*depth*/, int /*mipLevelCount*/, StorageFormat /*format*/) override
+		virtual GameEngine::Texture3D* CreateTexture3D(TextureUsage /*usage*/, int width, int height, int depth, int /*mipLevelCount*/, StorageFormat /*format*/) override
         {
+            writer->Write("Create Texture3D (");
+            writer->Write(CoreLib::String(width));
+            writer->Write("x");
+            writer->Write(CoreLib::String(height));
+            writer->Write("x");
+            writer->Write(CoreLib::String(depth));
+            writer->Write(")\n");
             return new Texture3D();
         }
 		virtual GameEngine::TextureSampler* CreateTextureSampler() override
         {
+            writer->Write("Create TextureSampler\n");
             return new TextureSampler();
         }
 		virtual GameEngine::Shader* CreateShader(ShaderType /*stage*/, const char* /*data*/, int /*size*/) override
         {
+            writer->Write("Create Shader\n");
             return new Shader();
         }
 		virtual GameEngine::RenderTargetLayout* CreateRenderTargetLayout(CoreLib::ArrayView<AttachmentLayout> /*bindings*/, bool /*ignoreInitialContent*/) override
         {
+            writer->Write("Create RenderTargetLayout\n");
             return new RenderTargetLayout();
         }
 		virtual GameEngine::PipelineBuilder* CreatePipelineBuilder() override
         {
-            return new PipelineBuilder();
+            return new PipelineBuilder(writer.Ptr());
         }
 		virtual GameEngine::DescriptorSetLayout* CreateDescriptorSetLayout(CoreLib::ArrayView<DescriptorLayout> /*descriptors*/) override
         {
+            writer->Write("Create DescriptorSetLayout\n");
             return new DescriptorSetLayout();
         }
 		virtual GameEngine::DescriptorSet* CreateDescriptorSet(GameEngine::DescriptorSetLayout* /*layout*/) override
         {
+            writer->Write("Create DescriptorSet\n");
             return new DescriptorSet();
         }
 		virtual int GetDescriptorPoolCount() override
@@ -329,6 +411,7 @@ namespace DummyRenderer
         }
 		virtual GameEngine::CommandBuffer* CreateCommandBuffer() override
         {
+            writer->Write("Create CommandBuffer\n");
             return new CommandBuffer();
         }
 		virtual TargetShadingLanguage GetShadingLanguage() override { return TargetShadingLanguage::SPIRV; }
@@ -336,6 +419,7 @@ namespace DummyRenderer
 		virtual int StorageBufferAlignment() override { return 16; }
         virtual GameEngine::WindowSurface * CreateSurface(WindowHandle /*windowHandle*/, int /*width*/, int /*height*/) override
         {
+            writer->Write("Create Surface\n");
             return new WindowSurface();
         }
 		virtual CoreLib::String GetRendererName() override
