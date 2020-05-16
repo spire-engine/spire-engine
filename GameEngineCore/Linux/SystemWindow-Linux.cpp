@@ -3,6 +3,7 @@
 #include "SystemWindow-Linux.h"
 #include "OsApplicationContext-Linux.h"
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <X11/Xresource.h>
 
 namespace GameEngine
@@ -107,6 +108,11 @@ namespace GameEngine
         if (!handle) return;
         auto context = GetLinuxApplicationContext();
         XStoreName(context->xdisplay, handle, text.Buffer());
+        XClassHint* hint = XAllocClassHint();
+        hint->res_class = (char *)text.Buffer();
+        hint->res_name = (char *)text.Buffer();
+        XSetClassHint(context->xdisplay, handle, hint);
+        XFree(hint);
     }
     bool LinuxSystemWindow::IsVisible()
     {
