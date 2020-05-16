@@ -1,0 +1,28 @@
+# .travis.yml
+#
+# This is the configuration file to drive Travis CI for Slang.
+
+language: cpp
+
+# Build and test (clang, gcc) x (debug, release)
+
+matrix:
+  include:
+    - os: linux
+      compiler: gcc
+      env:
+        - CONFIGURATION=debug
+    - os: linux
+      compiler: clang
+      env:
+        - CONFIGURATION=debug
+    - os: linux
+      compiler: clang
+      env:
+        - CONFIGURATION=release
+    - os: linux
+      compiler: gcc
+      env:
+        - CONFIGURATION=release
+
+script: bash ./get_examplegame.sh && make test
