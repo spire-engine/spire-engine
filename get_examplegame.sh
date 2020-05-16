@@ -1,14 +1,13 @@
-OAUTH_TOKEN="a24eb1b3f90011ccd912a42f82f4f865df9ff0f6"
 # Repo owner (user id)
-OWNER="csyonghe"
+OWNER="spire-engine"
 # Repo name
-REPO="SpireEngine"
+REPO="engine"
 #The file name expected to download. This is deleted before curl pulls down a new one
 FILE_NAME="ExampleGame.zip"
 
 
 # Concatenate the values together for a 
-API_URL="https://$OAUTH_TOKEN:@api.github.com/repos/$OWNER/$REPO"
+API_URL="https://api.github.com/repos/$OWNER/$REPO"
 if ! [ -x "$(command -v jq)" ]; then
 if [[ $EUID -ne 0 ]]; then
   sudo apt-get install jq
