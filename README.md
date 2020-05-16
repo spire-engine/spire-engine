@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.com/spire-engine/engine.svg?branch=master)](https://travis-ci.com/spire-engine/engine)
 
-SpireEngine is a Vulkan-based, cross-platform mini game engine that uses Slang to manange shader library and cross-compile shaders for different platforms.
+SpireEngine is a Vulkan-based, cross-platform mini game engine that uses Slang as its shader compiler.
 
 ![](https://github.com/csyonghe/SpireMiniEngineExtBinaries/blob/master/screenshot1.png)
 
