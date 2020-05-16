@@ -4307,8 +4307,8 @@ namespace VK
                 postPresentBarrier
             );
 
-            if (srcImage == nullptr)
-            {
+			if (srcImage == nullptr)
+			{
                 // If no source image, clear to debug purple
 				cmdBuffer.clearColorImage(
                     images[nextImage],
@@ -4359,7 +4359,6 @@ namespace VK
                 srcOffsets[0] = vk::Offset3D(0, 0, 0);
                 srcOffsets[1] = vk::Offset3D(dynamic_cast<VK::Texture2D*>(srcImage)->width, dynamic_cast<VK::Texture2D*>(srcImage)->height, 1);
 
-                // We need to flip y coordinate because Vulkan is left-handed, origin at top-left
                 std::array<vk::Offset3D, 2> dstOffsets;
                 dstOffsets[0] = vk::Offset3D(0, 0, 0);
                 dstOffsets[1] = vk::Offset3D(width, height, 1);
@@ -4428,12 +4427,13 @@ namespace VK
 			{
 				CreateSwapchain();
 			}
-        }
+		}
 
         void CreateSwapchain()
         {
 			if (!surface)
 				return;
+			vkDeviceWaitIdle(RendererState::Device());
 			std::vector<vk::SurfaceFormatKHR> surfaceFormats = RendererState::PhysicalDevice().getSurfaceFormatsKHR(surface);
 			vk::Format format;
             vk::ColorSpaceKHR colorSpace = surfaceFormats.at(0).colorSpace;
@@ -4456,7 +4456,7 @@ namespace VK
 
             vk::SurfaceCapabilitiesKHR surfaceCapabilities = RendererState::PhysicalDevice().getSurfaceCapabilitiesKHR(surface);
 
-            unsigned int desiredSwapchainImages = 3;
+            unsigned int desiredSwapchainImages = 2;
             if (desiredSwapchainImages < surfaceCapabilities.minImageCount)
 			{
                 desiredSwapchainImages = surfaceCapabilities.minImageCount;
@@ -4659,11 +4659,12 @@ namespace VK
         virtual void Resize(int pwidth, int pheight) override
         {
             if (!handle) return;
-
-            this->width = pwidth;
-            this->height = pheight;
-
-            CreateSwapchain();
+			if (width != pwidth || height != pheight)
+			{
+				this->width = pwidth;
+				this->height = pheight;
+				CreateSwapchain();
+			}
         }
         virtual void GetSize(int & w, int & h) override
         {

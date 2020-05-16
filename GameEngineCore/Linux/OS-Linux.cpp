@@ -185,10 +185,11 @@ namespace GameEngine
                 }
                 break;
             case ConfigureNotify:
-                if (appContext.systemWindows.TryGetValue(nextEvent.xbutton.window, sysWindow))
+                if (appContext.systemWindows.TryGetValue(nextEvent.xconfigure.window, sysWindow))
                 {
                     sysWindow->HandleResizeEvent(nextEvent.xconfigure.width, nextEvent.xconfigure.height);
                 }
+                break;
             case ClientMessage:
                 if (appContext.mainWindow->GetNativeHandle().window == nextEvent.xclient.window)
                 {

@@ -23,7 +23,7 @@ namespace GameEngine
         Atom wmDelete = XInternAtom(context->xdisplay, "WM_DELETE_WINDOW", True);
         XSetWMProtocols(context->xdisplay, handle, &wmDelete, 1);
         XSelectInput(context->xdisplay, handle, StructureNotifyMask | KeyPressMask | KeyReleaseMask 
-            | PointerMotionMask | ButtonPressMask | ButtonReleaseMask );
+            | PointerMotionMask | ButtonPressMask | ButtonReleaseMask);
         this->uiContext = pSysInterface->CreateWindowContext(this, GetClientWidth(), GetClientHeight(), log2UIBufferSize);
     }
 

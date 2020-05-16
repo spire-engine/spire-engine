@@ -13,7 +13,7 @@ SpireEngine currently runs on both Windows and Linux.
 - Open "GameEngine.sln" in Visual Studio 2019.
 - Build the solution. 
 ### Linux
-SpireEngine does not depend on any special libraries except Xlib on Linux platforms. Just run `make` in the project root directory.
+SpireEngine does not depend on any additional libraries except Xlib on Linux platforms. Just run `make` in the project root directory.
 ```
 make -j16
 ```
