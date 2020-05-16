@@ -71,9 +71,9 @@ namespace GameEngine
             c1 = _mm_set1_epi32(tri.C1);
             c2 = _mm_set1_epi32(tri.C2);
 
-            isOwnerEdge[0] = tri.Y0 < tri.Y1 || tri.Y0 == tri.Y1 && tri.Y2 >= tri.Y0;
-            isOwnerEdge[1] = tri.Y1 < tri.Y2 || tri.Y1 == tri.Y2 && tri.Y0 >= tri.Y1;
-            isOwnerEdge[2] = tri.Y2 < tri.Y0 || tri.Y0 == tri.Y2 && tri.Y1 >= tri.Y0;
+            isOwnerEdge[0] = tri.Y0 < tri.Y1 || (tri.Y0 == tri.Y1 && tri.Y2 >= tri.Y0);
+            isOwnerEdge[1] = tri.Y1 < tri.Y2 || (tri.Y1 == tri.Y2 && tri.Y0 >= tri.Y1);
+            isOwnerEdge[2] = tri.Y2 < tri.Y0 || (tri.Y0 == tri.Y2 && tri.Y1 >= tri.Y0);
         }
         /*
         template< typename TShader, int32 Dilate >
@@ -201,12 +201,12 @@ void RasterizeTriangle( TShader& Shader, const FVector2D Points[3], int32 Scisso
         // identify top vertex
         int startX = tri.X0;
         int startY = tri.Y0;
-        if (tri.Y1 < startY || tri.Y1 == startY && tri.X1 < startX)
+        if (tri.Y1 < startY || (tri.Y1 == startY && tri.X1 < startX))
         {
             startX = tri.X1;
             startY = tri.Y1;
         }
-        if (tri.Y2 < startY || tri.Y2 == startY && tri.X2 < startX)
+        if (tri.Y2 < startY || (tri.Y2 == startY && tri.X2 < startX))
         {
             startX = tri.X2;
             startY = tri.Y2;

@@ -22,7 +22,7 @@ String EscapeStr(String str)
     for (int i = 0; i < str.Length(); i++)
     {
         auto c = str[i];
-        if (c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z')
+        if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z'))
         {
             rs << c;
         }

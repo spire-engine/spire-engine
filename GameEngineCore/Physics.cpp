@@ -142,7 +142,7 @@ namespace GameEngine
 		Vec3::Cross(n, c, b);
 		Vec3::Normalize(n, n);
 		int k;
-		Vec3 absN = Vec3::Create(abs(n.x), abs(n.y), abs(n.z));
+		Vec3 absN = Vec3::Create(std::abs(n.x), std::abs(n.y), std::abs(n.z));
 		if (absN.x >= absN.y && absN.x >= absN.z)
 			k = 0;
 		else if (absN.y >= absN.x && absN.y >= absN.z)
