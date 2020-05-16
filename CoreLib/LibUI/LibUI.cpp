@@ -7080,6 +7080,7 @@ namespace GraphicsUI
 		vscrollBar->Posit(0, 0, Global::SCROLLBAR_BUTTON_SIZE, Height - 2);
 		content->Posit(0, -vscrollBar->GetPosition(), vscrollBar->Visible ? Width - vscrollBar->GetWidth() : Width, maxY);
 		Container::SizeChanged();
+		content->SetWidth(this->clientRect.w);
 	}
 	void VScrollPanel::AddChild(Control * ctrl)
 	{
