@@ -249,6 +249,7 @@ namespace CoreLib
 						destructor(pointer);
 						delete refCount;
 					}
+					pointer = nullptr;
 				}
 			}
 			T & operator *() const
@@ -434,6 +435,7 @@ namespace CoreLib
 						Destructor destructor;
 						destructor(pointer);
 					}
+					pointer = nullptr;
 				}
 			}
 			T & operator *() const
