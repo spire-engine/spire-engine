@@ -140,6 +140,10 @@ namespace GameEngine
         {
             return ' ';
         }
+        else if (keyCode == CoreLib::Keys::Return)
+        {
+            return CoreLib::Keys::Return;
+        }
         else if (keyCode >= CoreLib::Keys::Key0 && keyCode <= CoreLib::Keys::Key9)
         {
             if (!shift)
