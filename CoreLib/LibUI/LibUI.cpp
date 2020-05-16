@@ -7370,7 +7370,7 @@ namespace GraphicsUI
 	bool Line::HitTest(int x, int y)
 	{
 		auto d = Vec2::Create((float)x - x0, (float)y - y0);
-		if (abs(Vec2::Dot(d, normal)) < BorderWidth)
+		if (fabs(Vec2::Dot(d, normal)) < BorderWidth)
 		{
 			Vec2 dir = Vec2::Create(x1 - x0, y1 - y0);
 			float len = dir.Length();
@@ -7766,7 +7766,7 @@ namespace GraphicsUI
 	{
 		float dist = Vec3::Dot(plane.xyz(), origin) + plane.w;
 		float denom = -Vec3::Dot(dir, plane.xyz());
-		if (abs(denom) > 0.0001f)
+		if (fabs(denom) > 0.0001f)
 		{
 			float t = dist / denom;
 			if (t >= 0)
@@ -7871,7 +7871,7 @@ namespace GraphicsUI
 			return;
 		}
 		disableDraw = false;
-		auto worldHeightAtC = tan(view.FOV / 360.0f * Math::Pi) * abs(sphereCenterZ) * 2.0f;
+		auto worldHeightAtC = tan(view.FOV / 360.0f * Math::Pi) * fabs(sphereCenterZ) * 2.0f;
 		worldRadius = ScreenSpaceRadius / view.ViewportH * worldHeightAtC;
 		if (activeHandle == ManipulationHandleType::None)
 			viewDir = -v;
@@ -8229,7 +8229,7 @@ namespace GraphicsUI
 			auto newMouseWorldPos = ScreenCoordToVirtualPlanePoint(p);
 			float angle = Vec2::Dot(screenSpaceTangent, (p - mouseDownScreenSpace)) / 180.0f * Math::Pi * 0.5f;
 			float sign = Sign(angle);
-			angle = fmod(abs(angle), Math::Pi*2.0f) * sign;
+			angle = fmod(fabs(angle), Math::Pi*2.0f) * sign;
 			
 			rotDiscFaces.Clear();
 			if (activeHandle == ManipulationHandleType::RotationX)
@@ -8326,7 +8326,7 @@ namespace GraphicsUI
 			auto newMouseWorldPos = ScreenCoordToVirtualPlanePoint(p);
 			float angle = Vec2::Dot(screenSpaceTangent, (p - mouseDownScreenSpace)) / 180.0f * Math::Pi * 0.5f;
 			float sign = Sign(angle);
-			angle = fmod(abs(angle), Math::Pi*2.0f) * sign;
+			angle = fmod(fabs(angle), Math::Pi*2.0f) * sign;
 			ManipulationEventArgs e;
 			e.Handle = activeHandle;
 			e.RotationAngle = angle;
@@ -8483,8 +8483,8 @@ namespace GraphicsUI
 		Vec3 planeNormal = xAxisW;
 		auto selectPlaneNormal = [&](Vec3 a0, Vec3 a1)
 		{
-			float d0 = abs(Vec3::Dot(a0, dir));
-			float d1 = abs(Vec3::Dot(a1, dir));
+			float d0 = fabs(Vec3::Dot(a0, dir));
+			float d1 = fabs(Vec3::Dot(a1, dir));
 			if (d0 > d1)
 				return a0;
 			else

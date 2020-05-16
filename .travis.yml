@@ -6,6 +6,9 @@ language: cpp
 
 # Build and test (clang, gcc) x (debug, release)
 
+env:
+  OMP_NUM_THREADS=1
+
 matrix:
   include:
     - os: linux

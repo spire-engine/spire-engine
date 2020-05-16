@@ -573,7 +573,7 @@ namespace CoreLib
 
 			float squaredLengthX = dudx*dudx + dvdx*dvdx;
 			float squaredLengthY = dudy*dudy + dvdy*dvdy;
-			float determinant = abs(dudx*dvdy - dvdx*dudy);
+			float determinant = std::abs(dudx*dvdy - dvdx*dudy);
 			bool isMajorX = squaredLengthX > squaredLengthY;
 			float squaredLengthMajor = isMajorX ? squaredLengthX : squaredLengthY;
 			float lengthMajor = sqrt(squaredLengthMajor);
