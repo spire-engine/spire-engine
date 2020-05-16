@@ -50,12 +50,7 @@ build_dir:
 	@mkdir -p build
 
 test: $(ENGINE)
-	@rm -f rendercommands.txt
-	-build/linux-x86_64/$(CONFIGURATION)/GameEngine -enginedir ./EngineContent -dir ./ExampleGame -no_renderer -headless -runforframes 3
-	@if test $(shell grep 'Present' rendercommands.txt | wc -l) = 3 ; then\
-		echo "passed test 'Integration Test'"; \
-    else echo "failed test 'Integration Test'" ; fi
-	@rm -f rendercommands.txt
+	@bash run_test.sh $(ENGINE)
 clean:
 	@rm -rf build
 	-@rm -f makefile-gen
