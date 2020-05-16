@@ -4164,44 +4164,42 @@ namespace VK
 					h = internalHandle->height;
 					layers = internalHandle->arrayLayers;
 				}
-
-				switch (usage)
+				auto testUsageBit = [](GameEngine::TextureUsage value, GameEngine::TextureUsage bits)
 				{
-				case GameEngine::TextureUsage::ColorAttachment:
-				case GameEngine::TextureUsage::SampledColorAttachment:
+					return (value & bits) != GameEngine::TextureUsage::Unused;
+				};
+				if (testUsageBit(usage, GameEngine::TextureUsage::ColorAttachment | GameEngine::TextureUsage::SampledColorAttachment))
+				{
 					attachments.Add(
 						vk::ClearAttachment()
 						.setAspectMask(vk::ImageAspectFlagBits::eColor)
 						.setColorAttachment(k)
 						.setClearValue(vk::ClearColorValue())
 					);
-					break;
-				case GameEngine::TextureUsage::DepthAttachment:
-				case GameEngine::TextureUsage::SampledDepthAttachment:
+				}
+				if (testUsageBit(usage, GameEngine::TextureUsage::DepthAttachment | GameEngine::TextureUsage::SampledDepthAttachment))
+				{
 					attachments.Add(
 						vk::ClearAttachment()
 						.setAspectMask(vk::ImageAspectFlagBits::eDepth)
 						.setColorAttachment(VK_ATTACHMENT_UNUSED)
 						.setClearValue(vk::ClearDepthStencilValue(1.0f, 0)));
-					break;
-				case GameEngine::TextureUsage::StencilAttachment:
-				case GameEngine::TextureUsage::SampledStencilAttachment:
+				}
+				if (testUsageBit(usage, GameEngine::TextureUsage::StencilAttachment | GameEngine::TextureUsage::SampledStencilAttachment))
+				{
 					attachments.Add(
 						vk::ClearAttachment()
 						.setAspectMask(vk::ImageAspectFlagBits::eStencil)
 						.setColorAttachment(VK_ATTACHMENT_UNUSED)
 						.setClearValue(vk::ClearDepthStencilValue(1.0f, 0)));
-					break;
-				case GameEngine::TextureUsage::DepthStencilAttachment:
-				case GameEngine::TextureUsage::SampledDepthStencilAttachment:
+				}
+				if (testUsageBit(usage, GameEngine::TextureUsage::DepthStencilAttachment | GameEngine::TextureUsage::SampledDepthStencilAttachment))
+				{
 					attachments.Add(
 						vk::ClearAttachment()
 						.setAspectMask(vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil)
 						.setColorAttachment(VK_ATTACHMENT_UNUSED)
 						.setClearValue(vk::ClearDepthStencilValue(1.0f, 0)));
-					break;
-				default:
-					CORELIB_NOT_IMPLEMENTED("Texture usage");
 				}
 
 				rects.Add(
@@ -4425,12 +4423,9 @@ namespace VK
 			try
 			{
             	RendererState::RenderQueue().presentKHR(presentInfo);
-
 			}
 			catch (vk::OutOfDateKHRError)
 			{
-				printf("present exception\n");
-
 				CreateSwapchain();
 			}
         }

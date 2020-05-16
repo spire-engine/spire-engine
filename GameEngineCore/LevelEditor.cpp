@@ -246,7 +246,7 @@ namespace GameEngine
             dlgOpen->FileMustExist = true;
             dlgOpen->Filter = "Level file|*.level";
             dlgOpen->DefaultEXT = "level";
-            dlgOpen->FileName = Engine::Instance()->GetDirectory(false, ResourceType::Level) + "\\";
+            dlgOpen->FileName = Engine::Instance()->GetDirectory(false, ResourceType::Level) + Path::PathDelimiter;
             dlgSave = OsApplication::CreateFileDialog(Engine::Instance()->GetMainWindow());
             dlgSave->PathMustExist = true;
             dlgSave->OverwritePrompt = true;

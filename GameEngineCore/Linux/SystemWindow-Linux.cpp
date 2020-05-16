@@ -243,7 +243,6 @@ namespace GameEngine
     {
         if (w != currentWidth || h != currentHeight)
         {
-            printf("resize event %d %d\n", w, h);
             currentWidth = w;
             currentHeight = h;
             uiContext->SetSize(w, h);
