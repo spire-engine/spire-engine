@@ -170,13 +170,13 @@ RELATIVE_RPATH_INCANTATION := "-Wl,-rpath,"'$$'"ORIGIN/"
         }
         else if (head.Content == "cflags_gcc")
         {
-            makefileSb << "ifneq (,$(findstring \"g++\",$(CXX)))\n\tCFLAGS += "; 
+            makefileSb << "ifeq (g++,$(COMPILER_NAME))\n\tCFLAGS += "; 
             makefileSb << tokenReader.ReadStringLiteral();
             makefileSb << "\nendif\n";
         }
         else if (head.Content == "cflags_clang")
         {
-            makefileSb << "ifneq (,$(findstring clang,$(CXX)))\n\tCFLAGS += "; 
+            makefileSb << "ifeq (clang,$(COMPILER_NAME))\n\tCFLAGS += "; 
             makefileSb << tokenReader.ReadStringLiteral();
             makefileSb << "\nendif\n";
         }

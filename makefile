@@ -2,7 +2,17 @@ ifeq (,$(CONFIGURATION))
 	CONFIGURATION := release
 endif
 
-engine: makefile-gen ExternalLibs/Slang/bin/linux-x64 build/depinstall
+PLATFORM := $(shell uname -s | tr '[:upper:]' '[:lower:]')
+ARCHITECTURE := $(shell uname -p)
+
+ifeq (,$(CONFIGURATION))
+	CONFIGURATION := release
+endif
+
+TARGET := $(PLATFORM)-$(ARCHITECTURE)
+
+ENGINE := build/$(TARGET)/$(CONFIGURATION)/GameEngine
+$(ENGINE): makefile-gen ExternalLibs/Slang/bin/linux-x64 build/depinstall
 	@$(MAKE) -f makefile-gen GameEngine CONFIGURATION=$(CONFIGURATION)
 	@rm makefile-gen
 
@@ -38,7 +48,15 @@ build/depinstall: build_dir
 
 build_dir:
 	@mkdir -p build
+
+test: $(ENGINE)
+	@rm -f rendercommands.txt
+	-build/linux-x86_64/$(CONFIGURATION)/GameEngine -enginedir ./EngineContent -dir ./ExampleGame -no_renderer -headless -runforframes 3
+	@if test $(shell grep 'Present' rendercommands.txt | wc -l) = 3 ; then\
+		echo "passed test 'Integration Test'"; \
+    else echo "failed test 'Integration Test'" ; fi
+	@rm -f rendercommands.txt
 clean:
 	@rm -rf build
 	-@rm -f makefile-gen
-.PHONY: build_dir clean
+.PHONY: build_dir clean test
