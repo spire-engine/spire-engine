@@ -1,15 +1,6 @@
 # Our solution file is currently set up for VS2015
 image: Visual Studio 2019
 
-init:
-# The project uses a submodule for the "glslang" dependency,
-# so we need to make sure to pull that before building.
-install:
-  - ps: |
-      git submodule update --init --recursive
-      ./get_examplegame.ps1
-      ./prepare.ps1
-
 # We want to build the full matrix of platforms and configurations
 # that we support on Windows.
 #
