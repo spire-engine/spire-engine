@@ -4,3 +4,4 @@ text=auto
 *.hpp text
 *.h text
 *.sh text eol=lf
+*.yml text eol=crlf
