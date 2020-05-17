@@ -225,22 +225,28 @@ namespace CoreLib
 		void Application::Run(const BaseForm * MainForm, bool NonBlocking)
 		{
 			Application::uiThreadId = GetCurrentThreadId();
-			MSG msg;
-			mainForm = const_cast<BaseForm*>(MainForm);
-			mainFormHandle = MainForm->GetHandle();
-			ShowWindow(mainFormHandle, SW_SHOW);
-			UpdateWindow(mainFormHandle);
+			MSG msg = {};
+			if (MainForm)
+			{
+				mainForm = const_cast<BaseForm*>(MainForm);
+				mainFormHandle = MainForm->GetHandle();
+				ShowWindow(mainFormHandle, SW_SHOW);
+				UpdateWindow(mainFormHandle);
+			}
 			while (!terminate)
 			{
-				int HasMsg = 0;
-				do
+				if (MainForm)
 				{
-					HasMsg = (NonBlocking ? PeekMessage(&msg, NULL, 0, 0, TRUE) : GetMessage(&msg, NULL, 0, 0));
-					if (HasMsg)
+					int HasMsg = 0;
+					do
 					{
-						ProcessMessage(msg);
-					}
-				} while (!terminate && HasMsg);
+						HasMsg = (NonBlocking ? PeekMessage(&msg, NULL, 0, 0, TRUE) : GetMessage(&msg, NULL, 0, 0));
+						if (HasMsg)
+						{
+							ProcessMessage(msg);
+						}
+					} while (!terminate && HasMsg);
+				}
 				if (msg.message == WM_QUIT)
 					terminate = true;
 				if (onMainLoop)

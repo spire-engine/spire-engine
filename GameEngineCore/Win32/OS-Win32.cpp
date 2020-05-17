@@ -48,7 +48,10 @@ namespace GameEngine
 
     void OsApplication::Run(SystemWindow* mainWindow)
     {
-        WinForm::Application::Run(dynamic_cast<Win32SystemWindow*>(mainWindow), true);
+        auto win32Window = dynamic_cast<Win32SystemWindow*>(mainWindow);
+        if (!win32Window)
+            mainWindow->Show();
+        WinForm::Application::Run(win32Window, true);
     }
     void OsApplication::Quit()
     {
