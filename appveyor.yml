@@ -126,6 +126,10 @@ after_build:
 
     7z a "$env:ENGINE_BINARY_ARCHIVE" .\ExampleGame\
 
+    Set-Content -Path "RunGame.bat" -Value "GameEngine.exe -dir ExampleGame" -Encoding ASCII
+
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\RunGame.bat
+
 test_script:
 - ps: >-
     Start-Process -FilePath ".\$($env:PLATFORM)\$($env:CONFIGURATION)\GameEngine.exe" -ArgumentList @("-enginedir", "EngineContent", "-dir", "ExampleGame", "-no_renderer", "-headless", "-runforframes", "3") -Wait
