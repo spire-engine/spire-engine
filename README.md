@@ -5,7 +5,6 @@
 
 SpireEngine is a Vulkan-based, cross-platform mini game engine that uses Slang as its shader compiler.
 
-## Build Status
 | Platform | Build Status |
 |:--------:|:------------:|
 | Windows | [![Build status](https://ci.appveyor.com/api/projects/status/cde7o78cyqxbaius?svg=true)](https://ci.appveyor.com/project/csyonghe/spire-engine) |
