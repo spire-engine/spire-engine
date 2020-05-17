@@ -1,33 +1,150 @@
-# Our solution file is currently set up for VS2015
+version: 1.0.{build}
 image: Visual Studio 2019
-
-# We want to build the full matrix of platforms and configurations
-# that we support on Windows.
-#
-# Put Release|x64 first since that is the target which runs the most tests.
-platform:
-  - x64
-
 configuration:
-  - Release
-  - Debug
+- Debug
+- Release
+platform: x64
+init:
+- ps: >-
+    if ($env:APPVEYOR_REPO_TAG -eq "true")
 
-# In the interests of time, go ahead and immediately fail a build
-# if any job fails, rather than keep on building to discover the
-# full set of failures.
-matrix:
-  fast_finish: true
+    {
+       $env:ENGINE_VERSION = "$($env:APPVEYOR_REPO_TAG_NAME.TrimStart("v"))"
+    }
 
-# MSBUILD should ideally be able to find our solution file
-# automatically, but it seems to get confused, so we specify
-# the file name to use here.
+    else
+
+    {
+       $env:ENGINE_VERSION = "dev-$($env:APPVEYOR_REPO_COMMIT.Substring(0, 7))"
+    }
+install:
+- ps: >-
+    $assetDirName = "ExampleGame"
+
+    $fileName = "c:\projects\spire-engine\ExampleGame.zip"
+
+    Add-Type -assembly "system.io.compression.filesystem"
+
+
+    if (-NOT ((Test-Path $assetDirName)))
+
+    {
+        "ExampleGame directory not found, downloading..."
+        appveyor DownloadFile "https://github.com/spire-engine/spire-engine/releases/download/v0.2/ExampleGame.zip"
+        # Unzip.
+        Expand-Archive -Path $fileName -DestinationPath '.\'
+
+        # Delete downloaded zip file.
+        Remove-Item $fileName
+
+        "$assetDirName downloaded and updated."
+    }
+
+    else
+
+    {
+        "Directory $assetDirName already exists, aborted."
+    }
+
+
+    [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
+
+    "Downloading fbxsdk..."
+
+    appveyor DownloadFile "https://github.com/csyonghe/SpireMiniEngineExtBinaries/raw/master/fbxsdk.zip"
+
+
+    New-Item -ItemType directory -Path "ExternalLibs"
+
+    New-Item -ItemType directory -Path "ExternalLibs\FbxSDK"
+
+    Expand-Archive -Path "c:\projects\spire-engine\fbxsdk.zip" -DestinationPath '.\ExternalLibs\FbxSDK\'
+
+    if (Test-path '.\ExternalLibs\Slang\') {
+        Remove-Item -Recurse -Force '.\ExternalLibs\Slang\'
+    }
+
+    New-Item -ItemType directory -Path .\ExternalLibs\Slang\
+
+    $slangVersion='0.12.4'
+
+    appveyor DownloadFile "https://github.com/shader-slang/slang/releases/download/v$slangVersion/slang-$slangVersion-win64.zip"
+
+    Expand-Archive -Path "c:\projects\spire-engine\slang-$slangVersion-win64.zip" -DestinationPath '.\ExternalLibs\Slang\' -Force
+
+    if (-not (Test-path '.\x64\Debug')) {
+        New-Item .\x64\Debug -ItemType Directory
+    }
+
+    if (-not (Test-path '.\x64\Release')) {
+        New-Item .\x64\Release -ItemType Directory
+    }
+
+    Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang.dll" "x64\Debug\slang.dll"
+
+    Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang.dll" "x64\Release\slang.dll"
+
+    Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang-glslang.dll" "x64\Debug\slang-glslang.dll"
+
+    Copy-Item -Path ".\ExternalLibs\Slang\bin\windows-x64\release\slang-glslang.dll" "x64\Release\slang-glslang.dll"
 build:
-  project: GameEngine.sln
+  project: c:\projects\spire-engine\GameEngine.sln
   parallel: true
   verbosity: minimal
+after_build:
+- ps: >-
+    if ($env:PLATFORM -eq "x64")
 
-# Testing
+    {
+      $env:ENGINE_DEPLOY_PLATFORM = "win64"
+    }
 
+    else
+
+    {
+      $env:ENGINE_DEPLOY_PLATFORM = "win32"
+    }
+
+    $env:ENGINE_BINARY_ARCHIVE = "spire-engine-$($env:ENGINE_VERSION)-$($env:ENGINE_DEPLOY_PLATFORM).zip"
+
+
+    7z a "$env:ENGINE_BINARY_ARCHIVE" LICENSE
+
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\*\*\GameEngine.exe
+
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\*\*\slang.dll
+
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\*\*\slang-glslang.dll
+
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\*\*\libfbxsdk.dll
+
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\*\*\SkeletonRetargetTool.exe
 test_script:
-  - ps: |
-      .\run_test.ps1
+- ps: >-
+    Start-Process -FilePath ".\x64\$($env:CONFIGURATION)\GameEngine.exe" -ArgumentList @("-enginedir", "EngineContent", "-dir", "ExampleGame", "-no_renderer", "-headless", "-runforframes", "3") -Wait
+
+    $Matches = Select-String -Path "rendercommands.txt" -Pattern "Present" -AllMatches
+
+    if ($Matches.Matches.Count -eq 3)
+
+    {
+      Remove-Item rendercommands.txt
+      appveyor AddTest "Smoke" -FileName "Smoke" -Framework "SpireEngineTest" -Outcome "Passed"
+    }
+
+    else
+
+    {
+      "failed test 'Integration Test'"
+      appveyor AddTest "Smoke" -FileName "Smoke" -Framework "SpireEngineTest" -Outcome "Failed"
+    }
+artifacts:
+- path: $(ENGINE_BINARY_ARCHIVE)
+  name: binary_archive
+deploy:
+- provider: GitHub
+  release: v$(ENGINE_VERSION)
+  description: SpireEngine $(ENGINE_VERSION)
+  auth_token:
+    secure: 5cgZoiqPZrf9RWtzAEwGBMdIh5Enz2qnwQ5OjC1lQE1ZhA3SZRwt5T6u+eJKlV0a
+  artifact: binary_archive
