@@ -26,7 +26,7 @@ namespace GameEngine
 
     void ComputeTaskInstance::SetUniformData(void * data, int size)
     {
-        CoreLib::Diagnostics::DynamicAssert("uniform size mismatch.", size <= uniformBufferSize);
+        CORELIB_ASSERT(size <= uniformBufferSize && "uniform size mismatch.");
         manager->memory.SetDataAsync(uniformDataPtr + uniformBufferSize * version, data, size);
     }
 

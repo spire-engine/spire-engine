@@ -1,7 +1,7 @@
 #ifdef _WIN32
 
 #include <Windows.h>
-#include "OS.h"
+#include "../OS.h"
 
 namespace GameEngine
 {

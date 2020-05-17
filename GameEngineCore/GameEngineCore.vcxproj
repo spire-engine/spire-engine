@@ -114,12 +114,12 @@
     <ClCompile Include="Drawable.cpp" />
     <ClCompile Include="DrawCallStatForm.cpp" />
     <ClCompile Include="DummyHardwareRenderer.cpp" />
+    <ClCompile Include="DummySystemWindow.cpp" />
     <ClCompile Include="DynamicVariable.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="EngineActorClasses.cpp" />
     <ClCompile Include="EnvMapActor.cpp" />
-    <ClCompile Include="FontRasterizer-Generic.cpp" />
-    <ClCompile Include="FontRasterizer-Win32.cpp" />
+    <ClCompile Include="Win32\FontRasterizer-Win32.cpp" />
     <ClCompile Include="ForwardBaseRenderPass.cpp" />
     <ClCompile Include="FrameIdDisplayActor.cpp" />
     <ClCompile Include="FreeRoamCameraController.cpp" />
@@ -127,8 +127,7 @@
     <ClCompile Include="Gizmo.cpp" />
     <ClCompile Include="GizmoActor.cpp" />
     <ClCompile Include="GraphicsSettings.cpp" />
-    <ClCompile Include="HardwareInputInterface-Linux.cpp" />
-    <ClCompile Include="HardwareInputInterface-Win32.cpp" />
+    <ClCompile Include="Win32\HardwareInputInterface-Win32.cpp" />
     <ClCompile Include="InputDispatcher.cpp" />
     <ClCompile Include="Level.cpp" />
     <ClCompile Include="LevelEditor.cpp" />
@@ -148,8 +147,7 @@
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ObjectSpaceGBufferRenderer.cpp" />
     <ClCompile Include="ObjectSpaceMapSet.cpp" />
-    <ClCompile Include="OS-Linux.cpp" />
-    <ClCompile Include="OS-Win32.cpp" />
+    <ClCompile Include="Win32\OS-Win32.cpp" />
     <ClCompile Include="OutlinePostRenderPass.cpp" />
     <ClCompile Include="Physics.cpp" />
     <ClCompile Include="PipelineContext.cpp" />
@@ -171,18 +169,16 @@
     <ClCompile Include="StaticMeshActor.cpp" />
     <ClCompile Include="StaticScene.cpp" />
     <ClCompile Include="StaticSceneRenderer.cpp" />
-    <ClCompile Include="SystemWindow-Linux.cpp" />
-    <ClCompile Include="SystemWindow-Win32.cpp" />
+    <ClCompile Include="Win32\SystemWindow-Win32.cpp" />
     <ClCompile Include="TerrainActor.cpp" />
     <ClCompile Include="TextureCompressor.cpp" />
     <ClCompile Include="ToneMappingActor.cpp" />
-    <ClCompile Include="UISystem-Linux.cpp" />
     <ClCompile Include="UISystemBase.cpp" />
-    <ClCompile Include="UISystem-Win32.cpp" />
+    <ClCompile Include="Win32\UISystem-Win32.cpp" />
     <ClCompile Include="VideoEncoder.cpp" />
     <ClCompile Include="View.cpp" />
     <ClCompile Include="ViewResource.cpp" />
-    <ClCompile Include="VulkanAPI\volk.c" />
+    <ClCompile Include="VulkanAPI\volk.cpp" />
     <ClCompile Include="VulkanAPI\VulkanHardwareRenderer.cpp" />
     <ClCompile Include="WorldRenderPass.cpp" />
   </ItemGroup>
@@ -238,7 +234,6 @@
     <ClInclude Include="LightmapSet.h" />
     <ClInclude Include="LightmapUVGeneration.h" />
     <ClInclude Include="LightProbeRenderer.h" />
-    <ClInclude Include="LinuxVirtualKeys.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="MeshBuilder.h" />
@@ -270,9 +265,7 @@
     <ClInclude Include="StaticMeshActor.h" />
     <ClInclude Include="StaticScene.h" />
     <ClInclude Include="StaticSceneRenderer.h" />
-    <ClInclude Include="stb_truetype.h" />
-    <ClInclude Include="SystemWindow-Linux.h" />
-    <ClInclude Include="SystemWindow-Win32.h" />
+    <ClInclude Include="Win32\SystemWindow-Win32.h" />
     <ClInclude Include="TerrainActor.h" />
     <ClInclude Include="TextureCompressor.h" />
     <ClInclude Include="TextureTool\stb_dxt.h" />
@@ -281,16 +274,14 @@
     </ClCompile>
     <ClInclude Include="ToneMapping.h" />
     <ClInclude Include="ToneMappingActor.h" />
-    <ClInclude Include="UISystem-Linux.h" />
     <ClInclude Include="UISystemBase.h" />
-    <ClInclude Include="UISystem-Win32.h" />
+    <ClInclude Include="Win32\UISystem-Win32.h" />
     <ClInclude Include="VideoEncoder.h" />
     <ClInclude Include="View.h" />
     <ClInclude Include="ViewResource.h" />
     <ClInclude Include="VulkanAPI\volk.h" />
     <ClInclude Include="VulkanAPI\vulkan.h" />
     <ClInclude Include="VulkanAPI\vulkan.hpp" />
-    <ClInclude Include="Win32VirtualKeys.h" />
     <ClInclude Include="WorldRenderPass.h" />
   </ItemGroup>
   <ItemGroup>

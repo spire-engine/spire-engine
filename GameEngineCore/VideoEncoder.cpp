@@ -465,7 +465,6 @@ namespace GameEngine
             auto uPlane = yPlane + width * height;
             auto vPlane = uPlane + width * height / 4;
             auto hWidth = width >> 1;
-            auto hHeight = height >> 1;
             for (int i = 0; i < height; i++)
             {
                 for (int j = 0; j < width; j++)

@@ -2,13 +2,13 @@
 
 #include <Windows.h>
 #include "CoreLib/WinForm/WinCommonDlg.h"
-#include "OS.h"
+#include "../OS.h"
 #include "UISystem-Win32.h"
 #include "SystemWindow-Win32.h"
 #include "CoreLib/WinForm/WinApp.h"
 #include "CoreLib/WinForm/Debug.h"
 #include "CoreLib/WinForm/WinTimer.h"
-#include "HardwareRenderer.h"
+#include "../HardwareRenderer.h"
 
 namespace GameEngine
 {

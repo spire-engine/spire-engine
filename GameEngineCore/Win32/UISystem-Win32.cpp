@@ -4,8 +4,6 @@
 #include <Windows.h>
 #include <wingdi.h>
 #include "CoreLib/VectorMath.h"
-#include "HardwareRenderer.h"
-#include "OS.h"
 
 #pragma comment(lib,"imm32.lib")
 #ifndef GET_X_LPARAM
@@ -360,10 +358,12 @@ namespace GameEngine
 		case CursorType::SizeWE:
 			cursorName = IDC_SIZEWE;
 			break;
-		case CursorType::SizeNWSE:
+		case CursorType::SizeNWSE_Top:
+		case CursorType::SizeNWSE_Bottom:
 			cursorName = IDC_SIZENWSE;
 			break;
-		case CursorType::SizeNESW:
+		case CursorType::SizeNESW_Top:
+		case CursorType::SizeNESW_Bottom:
 			cursorName = IDC_SIZENESW;
 			break;
 		default:

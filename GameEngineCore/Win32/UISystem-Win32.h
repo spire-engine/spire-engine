@@ -3,7 +3,7 @@
 
 #ifdef _WIN32
 
-#include "UISystemBase.h"
+#include "../UISystemBase.h"
 #include <Windows.h>
 
 namespace GameEngine

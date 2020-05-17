@@ -5,9 +5,9 @@
 
 #include "CoreLib/WinForm/WinForm.h"
 #include "CoreLib/LibUI/LibUI.h"
-#include "UISystemBase.h"
-#include "OS.h"
-#include "HardwareRenderer.h"
+#include "../UISystemBase.h"
+#include "../OS.h"
+#include "../HardwareRenderer.h"
 
 namespace GameEngine
 {

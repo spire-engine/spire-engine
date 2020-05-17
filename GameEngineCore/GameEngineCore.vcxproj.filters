@@ -140,18 +140,6 @@
     <ClCompile Include="UISystemBase.cpp">
       <Filter>OS</Filter>
     </ClCompile>
-    <ClCompile Include="SystemWindow-Win32.cpp">
-      <Filter>OS\Win32</Filter>
-    </ClCompile>
-    <ClCompile Include="OS-Win32.cpp">
-      <Filter>OS\Win32</Filter>
-    </ClCompile>
-    <ClCompile Include="UISystem-Win32.cpp">
-      <Filter>OS\Win32</Filter>
-    </ClCompile>
-    <ClCompile Include="HardwareInputInterface-Win32.cpp">
-      <Filter>OS\Win32</Filter>
-    </ClCompile>
     <ClCompile Include="AmbientLightActor.cpp">
       <Filter>Actors</Filter>
     </ClCompile>
@@ -178,9 +166,6 @@
     </ClCompile>
     <ClCompile Include="StaticSceneRenderer.cpp">
       <Filter>LightmapBaking</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanAPI\volk.c">
-      <Filter>Renderer\RenderAPI\Vulkan API</Filter>
     </ClCompile>
     <ClCompile Include="DebugGraphicsRenderPass.cpp">
       <Filter>Renderer\WorldPasses</Filter>
@@ -216,27 +201,26 @@
     <ClCompile Include="LightmapDebugViewRenderProcedure.cpp">
       <Filter>Renderer\RenderProcedure</Filter>
     </ClCompile>
-    <ClCompile Include="FontRasterizer-Win32.cpp">
-      <Filter>OS\Win32</Filter>
-    </ClCompile>
-    <ClCompile Include="FontRasterizer-Generic.cpp">
-      <Filter>OS\Linux</Filter>
-    </ClCompile>
-    <ClCompile Include="HardwareInputInterface-Linux.cpp">
-      <Filter>OS\Linux</Filter>
-    </ClCompile>
-    <ClCompile Include="OS-Linux.cpp">
-      <Filter>OS\Linux</Filter>
-    </ClCompile>
-    <ClCompile Include="SystemWindow-Linux.cpp">
-      <Filter>OS\Linux</Filter>
-    </ClCompile>
-    <ClCompile Include="UISystem-Linux.cpp">
-      <Filter>OS\Linux</Filter>
-    </ClCompile>
     <ClCompile Include="DummyHardwareRenderer.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="Win32\FontRasterizer-Win32.cpp">
+      <Filter>OS\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\HardwareInputInterface-Win32.cpp">
+      <Filter>OS\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\SystemWindow-Win32.cpp">
+      <Filter>OS\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\UISystem-Win32.cpp">
+      <Filter>OS\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\OS-Win32.cpp">
+      <Filter>OS\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanAPI\volk.cpp" />
+    <ClCompile Include="DummySystemWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -393,12 +377,6 @@
     <ClInclude Include="UISystemBase.h">
       <Filter>OS</Filter>
     </ClInclude>
-    <ClInclude Include="SystemWindow-Win32.h">
-      <Filter>OS\Win32</Filter>
-    </ClInclude>
-    <ClInclude Include="UISystem-Win32.h">
-      <Filter>OS\Win32</Filter>
-    </ClInclude>
     <ClInclude Include="HardwareInputInterface.h">
       <Filter>OS</Filter>
     </ClInclude>
@@ -471,20 +449,11 @@
     <ClInclude Include="RenderProcedure.h">
       <Filter>Renderer\RenderProcedure</Filter>
     </ClInclude>
-    <ClInclude Include="stb_truetype.h">
-      <Filter>OS\Linux</Filter>
-    </ClInclude>
-    <ClInclude Include="UISystem-Linux.h">
-      <Filter>OS\Linux</Filter>
-    </ClInclude>
-    <ClInclude Include="SystemWindow-Linux.h">
-      <Filter>OS\Linux</Filter>
-    </ClInclude>
-    <ClInclude Include="Win32VirtualKeys.h">
+    <ClInclude Include="Win32\SystemWindow-Win32.h">
       <Filter>OS\Win32</Filter>
     </ClInclude>
-    <ClInclude Include="LinuxVirtualKeys.h">
-      <Filter>OS\Linux</Filter>
+    <ClInclude Include="Win32\UISystem-Win32.h">
+      <Filter>OS\Win32</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -526,9 +495,6 @@
     </Filter>
     <Filter Include="Renderer\RenderProcedure">
       <UniqueIdentifier>{4f8eb815-cd2c-44e6-bb48-4e38a72dacc7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="OS\Linux">
-      <UniqueIdentifier>{0748a16c-0d71-4ec2-b3a0-ee3348ccd891}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

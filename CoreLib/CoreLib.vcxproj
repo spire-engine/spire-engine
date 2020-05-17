@@ -60,7 +60,6 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;WINDOWS_PLATFORM;%(PreprocessorDefinitions);GLEW_STATIC</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <BrowseInformation>true</BrowseInformation>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -128,6 +127,7 @@
     <ClInclude Include="IntSet.h" />
     <ClInclude Include="LibIO.h" />
     <ClInclude Include="LibString.h" />
+    <ClInclude Include="LibUI\KeyCode.h" />
     <ClInclude Include="LibUI\LibUI.h" />
     <ClInclude Include="LibUI\UISystemInterface.h" />
     <ClInclude Include="Link.h" />

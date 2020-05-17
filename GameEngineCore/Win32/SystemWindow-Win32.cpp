@@ -2,7 +2,7 @@
 
 #include "SystemWindow-Win32.h"
 #include "UISystem-Win32.h"
-#include "Engine.h"
+#include "../Engine.h"
 #include "CoreLib/WinForm/WinApp.h"
 
 namespace GameEngine

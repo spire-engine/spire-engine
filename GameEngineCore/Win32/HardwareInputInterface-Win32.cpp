@@ -1,5 +1,5 @@
 #ifdef _WIN32
-#include "HardwareInputInterface.h"
+#include "../HardwareInputInterface.h"
 #include "CoreLib/Basic.h"
 #include <Windows.h>
 

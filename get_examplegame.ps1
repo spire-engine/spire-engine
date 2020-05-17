@@ -19,4 +19,5 @@ Remove-Item $fileName
 else {
 "Directory $assetDirName already exists, aborted."
 }
+"Press any key to exit."
 cmd /c pause | out-null
