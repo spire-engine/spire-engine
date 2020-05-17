@@ -15,6 +15,8 @@
 #define CORELIB_ABORT(x) {printf("Fatal error: %s\n", x); abort(); }
 #define CORELIB_NOT_IMPLEMENTED(x) {printf("Not impelmented: %s (%s:%d)\n", x, __FILE__, __LINE__); abort(); }
 #define CORELIB_UNREACHABLE(x) {printf("Unreachable path executed: %s\n", x); abort(); }
+template <typename... Args> inline void corelib_unused_f(Args&&...) {}
+#define CORELIB_UNUSED(...) corelib_unused_f(__VA_ARGS__)
 #define CORELIB_ASSERT(x) assert(x)
 #ifdef _DEBUG
 #define CORELIB_DEBUG_ASSERT(x) CORELIB_ASSERT(x)

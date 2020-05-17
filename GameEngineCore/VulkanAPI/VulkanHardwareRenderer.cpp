@@ -1575,6 +1575,7 @@ namespace VK
 
 		void GetData(int mipLevel, int arrayLayer, void* data, int bufSize)
 		{
+			CORELIB_UNUSED(bufSize);
 			// Set up staging buffer and copy data to new image
 			int bufferSize = 0;
 			if (format == StorageFormat::BC1 || format == StorageFormat::BC1_SRGB || format == StorageFormat::BC5 || format == StorageFormat::BC3)
