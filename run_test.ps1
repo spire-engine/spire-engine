@@ -1,7 +1,4 @@
-if (Test-Path "rendercommands.txt") {
-  Remove-Item rendercommands.txt
-}
-./x64/Release/GameEngine -enginedir ./EngineContent -dir ./ExampleGame -no_renderer -headless -runforframes 3
+./x64/Release/GameEngine -enginedir EngineContent -dir ExampleGame -no_renderer -headless -runforframes 3 | Out-Null
 $Matches = Select-String -Path "rendercommands.txt" -Pattern "Present" -AllMatches
 if ($Matches.Matches.Count -eq 3)
 {
