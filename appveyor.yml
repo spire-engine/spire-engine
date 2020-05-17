@@ -110,15 +110,17 @@ after_build:
 
     7z a "$env:ENGINE_BINARY_ARCHIVE" LICENSE
 
-    7z a "$env:ENGINE_BINARY_ARCHIVE" .\*\*\GameEngine.exe
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\$($env:PLATFORM)\$($env:CONFIGURATION)\GameEngine.exe
 
-    7z a "$env:ENGINE_BINARY_ARCHIVE" .\*\*\slang.dll
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\$($env:PLATFORM)\$($env:CONFIGURATION)\slang.dll
 
-    7z a "$env:ENGINE_BINARY_ARCHIVE" .\*\*\slang-glslang.dll
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\$($env:PLATFORM)\$($env:CONFIGURATION)\slang-glslang.dll
 
-    7z a "$env:ENGINE_BINARY_ARCHIVE" .\*\*\libfbxsdk.dll
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\$($env:PLATFORM)\$($env:CONFIGURATION)\libfbxsdk.dll
 
-    7z a "$env:ENGINE_BINARY_ARCHIVE" .\*\*\SkeletonRetargetTool.exe
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\$($env:PLATFORM)\$($env:CONFIGURATION)\SkeletonRetargetTool.exe
+
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\$($env:PLATFORM)\$($env:CONFIGURATION)\ModelImporter.exe
 
     7z a "$env:ENGINE_BINARY_ARCHIVE" .\EngineContent\*
 
@@ -126,7 +128,7 @@ after_build:
 
 test_script:
 - ps: >-
-    Start-Process -FilePath ".\x64\$($env:CONFIGURATION)\GameEngine.exe" -ArgumentList @("-enginedir", "EngineContent", "-dir", "ExampleGame", "-no_renderer", "-headless", "-runforframes", "3") -Wait
+    Start-Process -FilePath ".\$($env:PLATFORM)\$($env:CONFIGURATION)\GameEngine.exe" -ArgumentList @("-enginedir", "EngineContent", "-dir", "ExampleGame", "-no_renderer", "-headless", "-runforframes", "3") -Wait
 
     $Matches = Select-String -Path "rendercommands.txt" -Pattern "Present" -AllMatches
 
@@ -153,3 +155,9 @@ deploy:
   auth_token:
     secure: 5cgZoiqPZrf9RWtzAEwGBMdIh5Enz2qnwQ5OjC1lQE1ZhA3SZRwt5T6u+eJKlV0a
   artifact: binary_archive
+  prerelease: false
+  draft: false
+  force_update: true
+  on:
+    configuration: Release
+    appveyor_repo_tag: true        # deploy on tag push only
