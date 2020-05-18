@@ -16,7 +16,7 @@ GameEngine
     link "rt"
     include "GameEngineCore/"
     include "./"
-    cflags "-std=c++14 -msse4.1"
+    cflags "-std=c++17 -msse4.1"
     cflags_gcc "-Wno-init-list-lifetime -Wno-stringop-overflow"
     cflags_release "-fopenmp"
     link_release "-fopenmp"

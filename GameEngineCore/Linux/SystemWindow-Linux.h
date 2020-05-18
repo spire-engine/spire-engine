@@ -28,11 +28,14 @@ namespace GameEngine
         CoreLib::RefPtr<UIWindowContext> uiContext;
         uint32_t handle;
         bool visible = false;
+
     public:
         int cursorX = 0, cursorY = 0;
         int lastMouseDownX = 0, lastMouseDownY = 0;
         unsigned long lastMouseDownTime = 0;
         int currentWidth = 0, currentHeight = 0;
+        bool isEnabled = true;
+
     public:
         LinuxSystemWindow(UISystemBase* sysInterface, int log2UIBufferSize);
         ~LinuxSystemWindow();
@@ -56,12 +59,19 @@ namespace GameEngine
         virtual int GetCurrentDpi() override;
         virtual void Invoke(const CoreLib::Event<>& f) override;
         virtual void InvokeAsync(const CoreLib::Event<>& f) override;
-        virtual GameEngine::DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags) override;
+        virtual DialogResult ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags) override;
+        virtual DialogResult ShowModal(SystemWindow* parentWindow) override;
         void HandleKeyEvent(KeyEvent eventType, int keyCode, int keyChar, int state);
         void HandleMouseEvent(MouseEvent eventType, int x, int y, int delta, int button, int state, unsigned long time);
         void HandleResizeEvent(int w, int h);
+        void HandleCloseEvent();
+        void HandleExposeEvent();
+        void HandleFocus(bool focused);
+        void CheckAndRaiseModalWindow();
+        void SetFixedSize();
+        void SetDialogResult(DialogResult result);
+        void SetEnabled(bool val) { isEnabled = val; }
     };
-
 }
 
 #endif

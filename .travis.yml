@@ -3,7 +3,7 @@
 # This is the configuration file to drive Travis CI for Slang.
 
 language: cpp
-
+dist: bionic
 # Build and test (clang, gcc) x (debug, release)
 
 matrix:

@@ -728,6 +728,10 @@ namespace GraphicsUI
 			invalidateScreen = true;
 			Container::DoDpiChanged();
 		}
+		virtual void SetBackgroundColor(Color backgroundColor) override
+		{
+			content->BackColor = backgroundColor;
+		}
 		virtual void SetReadOnly(bool value) override
 		{
 			readOnly = value;

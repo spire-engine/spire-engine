@@ -1423,6 +1423,7 @@ namespace GraphicsUI
 		virtual void SetCaretPos(const CaretPos & pCaretPos) = 0;
 		virtual void ScrollToCaret() = 0;
 		virtual CaretPos GetCaretPos() = 0;
+		virtual void SetBackgroundColor(Color c) = 0;
 		virtual CoreLib::String GetText() = 0;
 		virtual void SetText(const CoreLib::String & pText) = 0;
 		virtual void SetWordWrap(bool pValue) = 0;

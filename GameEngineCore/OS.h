@@ -66,6 +66,7 @@ namespace GameEngine
         virtual void SetText(CoreLib::String text) = 0;
         virtual bool IsVisible() = 0;
         virtual void Show() = 0;
+        virtual DialogResult ShowModal(SystemWindow* parent) = 0;
         virtual void Hide() = 0;
         virtual void Invoke(const CoreLib::Event<> & func) = 0;
         virtual void InvokeAsync(const CoreLib::Event<> & func) = 0;

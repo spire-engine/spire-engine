@@ -70,7 +70,8 @@ namespace GameEngine
 		float fixedFrameDuration = 1.0f / 30.0f;
 		unsigned int frameCounter = 0;
 		bool inDataTransfer = false;
-        TargetShadingLanguage targetShadingLanguage = TargetShadingLanguage::SPIRV;
+		bool isRunning = false;
+		TargetShadingLanguage targetShadingLanguage = TargetShadingLanguage::SPIRV;
 		WindowBounds currentViewport;
 		GraphicsSettings graphicsSettings;
 		CoreLib::String levelToLoad;
@@ -126,7 +127,11 @@ namespace GameEngine
 			else
 				return frameCounter * fixedFrameDuration;
 		}
-        int GetFrameId()
+		bool IsRunning()
+		{
+			return isRunning;
+		}
+		int GetFrameId()
         {
             return frameCounter;
         }

@@ -14,6 +14,8 @@ namespace GameEngine
 
     struct UIThreadTask
     {
+        void *ownerId = nullptr;
+        bool cancelled = false;
         CoreLib::RefPtr<CoreLib::Event<>> callback;
     };
 
@@ -32,19 +34,31 @@ namespace GameEngine
         Display* xdisplay = nullptr;
         SystemWindow* mainWindow = nullptr;
         SystemWindow* currentMouseEventWindow = nullptr;
-        CoreLib::EnumerableDictionary<Window, LinuxSystemWindow*> systemWindows;
+        CoreLib::List<LinuxSystemWindow *> modalWindowStack;
+        CoreLib::EnumerableDictionary<Window, LinuxSystemWindow *> systemWindows;
+        GameEngine::DialogResult modalDialogResult = GameEngine::DialogResult::Undefined;
         KeyState keyStates[KeyStateTableSize] = {};
         bool terminate = false;
         CoreLib::Procedure<> mainLoopEventHandler;
         CoreLib::Threading::Mutex uiThreadTaskQueueMutex;
         CoreLib::List<UIThreadTask> uiThreadTaskQueue;
         CoreLib::List<Cursor> cursors;
+        CoreLib::String clipboardString;
+        bool clipboardStringReady = false;
+        Window clipboardWindow = 0;
+        LinuxSystemWindow *GetModalWindow()
+        {
+            if (modalWindowStack.Count())
+                return modalWindowStack.Last();
+            return nullptr;
+        }
         void Free()
         {
             uiThreadTaskQueue = decltype(uiThreadTaskQueue)();
             systemWindows = decltype(systemWindows)();
             mainLoopEventHandler = decltype(mainLoopEventHandler)();
             cursors = decltype(cursors)();
+            modalWindowStack = decltype(modalWindowStack)();
         }
         KeyState CheckKeyState(int keyCode)
         {
@@ -53,10 +67,11 @@ namespace GameEngine
             else
                 return KeyState::Released;
         }
-        void QueueTask(const CoreLib::Event<>& f)
+        void QueueTask(const CoreLib::Event<> &f, void *owner)
         {
             uiThreadTaskQueueMutex.Lock();
             UIThreadTask task;
+            task.ownerId = owner;
             task.callback = new CoreLib::Event<>(f);
             uiThreadTaskQueue.Add(CoreLib::_Move(task));
             uiThreadTaskQueueMutex.Unlock();

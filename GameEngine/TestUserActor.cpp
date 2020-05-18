@@ -32,22 +32,26 @@ public:
 
         auto uiForm = sysWindow->GetUIEntry();
         auto top = new Container(uiForm);
-        top->SetHeight(120);
+        top->SetHeight(EM(8.0f));
         top->DockStyle = GraphicsUI::Control::dsTop;
 		auto btnRed = new Button(top);
 		btnRed->SetText("Red");
 		btnRed->Posit(EM(1.0f), EM(1.5f), EM(3.0f), EM(1.5f));
-		btnRed->OnClick.Bind([this](UI_Base*)
-		{
-			material.SetVariable("solidColor", DynamicVariable(Vec3::Create(1.0f, 0.0f, 0.0f)));
-		});
+        btnRed->OnClick.Bind([this](UI_Base *) {
+            CoreLib::RefPtr<SystemWindow> wnd = Engine::Instance()->CreateSystemWindow();
+            wnd->ShowModal(sysWindow.Ptr());
+            material.SetVariable("solidColor", DynamicVariable(Vec3::Create(1.0f, 0.0f, 0.0f)));
+        });
 
-		auto btnBlue = new Button(top);
+        auto btnBlue = new Button(top);
 		btnBlue->SetText("Blue");
 		btnBlue->Posit(EM(4.5f), EM(1.5f), EM(3.0f), EM(1.5f));
 		btnBlue->OnClick.Bind([this](UI_Base*)
 		{
-			material.SetVariable("solidColor", DynamicVariable(Vec3::Create(0.0f, 0.0f, 1.0f)));
+            if (OsApplication::ShowMessage("Set to blue?", "Color", MessageBoxFlags::YesNo) == DialogResult::Yes)
+            {
+			    material.SetVariable("solidColor", DynamicVariable(Vec3::Create(0.0f, 0.0f, 1.0f)));
+            }
 		});
 
         auto cmb = new ComboBox(top);

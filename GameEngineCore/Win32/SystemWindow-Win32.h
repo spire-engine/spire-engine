@@ -107,6 +107,24 @@ namespace GameEngine
         {
             BaseForm::Show();
         }
+        virtual GameEngine::DialogResult ShowModal(SystemWindow* parentWindow) override
+        {
+            auto result = BaseForm::ShowModal(dynamic_cast<CoreLib::WinForm::BaseForm*>(parentWindow));
+            switch (result)
+            {
+            case BaseForm::OK:
+                return GameEngine::DialogResult::OK;
+            case BaseForm::Cancel:
+                return GameEngine::DialogResult::Cancel;
+            case BaseForm::Yes:
+                return GameEngine::DialogResult::Yes;
+            case BaseForm::No:
+                return GameEngine::DialogResult::No;
+            default:
+                CORELIB_UNREACHABLE("Unsupported dialog result.");
+            }
+            return GameEngine::DialogResult::Undefined;
+        }
         virtual void Hide() override
         {
             BaseForm::SetVisible(false);

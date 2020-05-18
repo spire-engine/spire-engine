@@ -2,6 +2,7 @@
 
 #include "SystemWindow-Linux.h"
 #include "OsApplicationContext-Linux.h"
+#include "MessageBoxWindow-Linux.h"
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xresource.h>
@@ -23,14 +24,13 @@ namespace GameEngine
         context->systemWindows[handle] = this;
         Atom wmDelete = XInternAtom(context->xdisplay, "WM_DELETE_WINDOW", True);
         XSetWMProtocols(context->xdisplay, handle, &wmDelete, 1);
-        XSelectInput(context->xdisplay, handle, StructureNotifyMask | KeyPressMask | KeyReleaseMask 
-            | PointerMotionMask | ButtonPressMask | ButtonReleaseMask);
+        XSelectInput(context->xdisplay, handle, StructureNotifyMask | KeyPressMask | KeyReleaseMask | PointerMotionMask |
+            ButtonPressMask | ButtonReleaseMask | ExposureMask | FocusChangeMask);
         this->uiContext = pSysInterface->CreateWindowContext(this, GetClientWidth(), GetClientHeight(), log2UIBufferSize);
     }
 
     LinuxSystemWindow::~LinuxSystemWindow()
     {
-        uiContext = nullptr;
         Close();
     }
     GraphicsUI::UIEntry* LinuxSystemWindow::GetUIEntry()
@@ -39,12 +39,12 @@ namespace GameEngine
     }
     void LinuxSystemWindow::SetClientWidth(int w)
     {
-        XResizeWindow(GetLinuxApplicationContext()->xdisplay, handle, w, GetClientHeight());
+        XResizeWindow(GetLinuxApplicationContext()->xdisplay, handle, w, currentHeight);
         currentWidth = w;
     }
     void LinuxSystemWindow::SetClientHeight(int h)
     {
-        XResizeWindow(GetLinuxApplicationContext()->xdisplay, handle, GetClientWidth(), h);
+        XResizeWindow(GetLinuxApplicationContext()->xdisplay, handle, currentWidth, h);
         currentHeight = h;
     }
     int LinuxSystemWindow::GetClientWidth()
@@ -75,15 +75,25 @@ namespace GameEngine
     }
     void LinuxSystemWindow::CenterScreen()
     {
+        auto context = GetLinuxApplicationContext();
+        XWindowAttributes attributes;
+        XGetWindowAttributes(context->xdisplay, handle, &attributes);
+        int screenWidth = WidthOfScreen(attributes.screen);
+        int screenHeight = HeightOfScreen(attributes.screen);
+        int x = (screenWidth - currentWidth) / 2;
+        int y = (screenHeight - currentHeight) / 2;
+        XMoveWindow(context->xdisplay, handle, x, y);
     }
     void LinuxSystemWindow::Close()
     {
         if (handle)
         {
+            uiContext = nullptr;
             auto context = GetLinuxApplicationContext();
             context->systemWindows.Remove(handle);
             XDestroyWindow(context->xdisplay, handle);
             handle = 0;
+            visible = false;
         }
     }
     bool LinuxSystemWindow::Focused()
@@ -109,8 +119,8 @@ namespace GameEngine
         auto context = GetLinuxApplicationContext();
         XStoreName(context->xdisplay, handle, text.Buffer());
         XClassHint* hint = XAllocClassHint();
-        hint->res_class = (char *)text.Buffer();
-        hint->res_name = (char *)text.Buffer();
+        hint->res_class = (char *)"Game Engine";
+        hint->res_name = (char *)"Game Engine";
         XSetClassHint(context->xdisplay, handle, hint);
         XFree(hint);
     }
@@ -161,12 +171,13 @@ namespace GameEngine
     void LinuxSystemWindow::InvokeAsync(const CoreLib::Event<>& f)
     {
         auto context = GetLinuxApplicationContext();
-        context->QueueTask(f);
+        context->QueueTask(f, this);
     }
 
     DialogResult LinuxSystemWindow::ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags)
     {
-        return OsApplication::ShowMessage(msg, title, flags);
+        CoreLib::RefPtr<MessageBoxWindow> messageBoxWindow = new MessageBoxWindow(msg, title, flags);
+        return messageBoxWindow->Show(this);
     }
 
     GraphicsUI::SHIFTSTATE GetShiftState(int state)
@@ -183,6 +194,11 @@ namespace GameEngine
 
     void LinuxSystemWindow::HandleKeyEvent(KeyEvent eventType, int keyCode, int keyChar, int state)
     {
+        if (!isEnabled)
+        {
+            CheckAndRaiseModalWindow();
+            return;
+        }
         auto context = GetLinuxApplicationContext();
         auto shiftstate = GetShiftState(state);
         if (eventType == KeyEvent::Press)
@@ -203,6 +219,12 @@ namespace GameEngine
 
     void LinuxSystemWindow::HandleMouseEvent(MouseEvent eventType, int x, int y, int delta, int button, int state, unsigned long time)
     {
+        if (!isEnabled)
+        {
+            CheckAndRaiseModalWindow();
+            return;
+        }   
+        
         auto shiftstate = GetShiftState(state);
         if (button == Button1)
             shiftstate |= GraphicsUI::SS_BUTTONLEFT;
@@ -252,7 +274,110 @@ namespace GameEngine
             currentHeight = h;
             uiContext->SetSize(w, h);
             SystemWindow::SizeChanged();
+            CheckAndRaiseModalWindow();
         }
+    }
+
+    void LinuxSystemWindow::HandleCloseEvent()
+    {
+        if (isEnabled)
+        {
+            Hide();
+            auto context = GetLinuxApplicationContext();
+            if (context->mainWindow == this)
+                context->terminate = true;
+        }
+        else
+        {
+            CheckAndRaiseModalWindow();
+        }
+    }
+
+    void LinuxSystemWindow::HandleExposeEvent()
+    {
+        CheckAndRaiseModalWindow();
+    }
+
+    void LinuxSystemWindow::HandleFocus(bool focus)
+    {
+        if (!focus)
+        {
+            CheckAndRaiseModalWindow();
+            auto context = GetLinuxApplicationContext();
+            if (context->GetModalWindow() == this)
+            {
+                XSetInputFocus(context->xdisplay, handle, 1, CurrentTime);
+            }
+        }
+    }
+
+    void LinuxSystemWindow::CheckAndRaiseModalWindow()
+    {
+        auto context = GetLinuxApplicationContext();
+        auto modalWindow = context->GetModalWindow();
+        if (modalWindow && modalWindow != this)
+        {
+            XRaiseWindow(context->xdisplay, modalWindow->handle);
+        }
+    }
+
+    void LinuxSystemWindow::SetFixedSize()
+    {
+        auto context = GetLinuxApplicationContext();
+        auto sizeHints = XAllocSizeHints();
+        sizeHints->flags = PMinSize | PMaxSize;
+        sizeHints->min_width = sizeHints->max_width = currentWidth;
+        sizeHints->min_height = sizeHints->max_height = currentHeight;
+        XSetWMNormalHints(context->xdisplay, handle, sizeHints);
+        XFree(sizeHints);
+    }
+
+    void SetCurrentWindowsEnabled(bool val)
+    {
+        auto& appContext = *GetLinuxApplicationContext();
+        if (appContext.modalWindowStack.Count())
+        {
+            appContext.modalWindowStack.Last()->SetEnabled(val);
+        }
+        else
+        {
+            for (auto window : appContext.systemWindows)
+            {
+                window.Value->SetEnabled(val);
+            }
+        }
+    }
+
+    DialogResult LinuxSystemWindow::ShowModal(SystemWindow* parentWindow)
+    {
+        auto linuxParentWindow = dynamic_cast<LinuxSystemWindow *>(parentWindow);
+        auto context = GetLinuxApplicationContext();
+        CORELIB_ASSERT(std::this_thread::get_id() == context->uiThreadId && "ShowModal must be called from UI thread.");
+        SetCurrentWindowsEnabled(false);
+        SetEnabled(true);
+        if (linuxParentWindow)
+           XSetTransientForHint(context->xdisplay, handle, linuxParentWindow->handle);
+        context->modalWindowStack.Add(this);
+        context->modalDialogResult = DialogResult::Undefined;
+        Show();
+        CenterScreen();
+        while (context->modalDialogResult == DialogResult::Undefined && visible)
+        {
+            OsApplication::DoEvents();
+             if (!context->terminate)
+                context->mainLoopEventHandler();
+        }
+        context->modalWindowStack.SetSize(context->modalWindowStack.Count() - 1);
+        SetCurrentWindowsEnabled(true);
+        auto dlgResult = context->modalDialogResult;
+        context->modalDialogResult = DialogResult::Undefined;
+        return dlgResult;
+    };
+
+    void LinuxSystemWindow::SetDialogResult(GameEngine::DialogResult result)
+    {
+        auto context = GetLinuxApplicationContext();
+        context->modalDialogResult = result;
     }
 
     SystemWindow* CreateLinuxSystemWindow(UISystemBase* sysInterface, int log2BufferSize)

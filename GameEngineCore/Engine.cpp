@@ -745,8 +745,10 @@ namespace GameEngine
 	}
     void Engine::Run()
     {
-        OsApplication::Run(Engine::Instance()->mainWindow.Ptr());
-    }
+		instance->isRunning = true;
+		OsApplication::Run(Engine::Instance()->mainWindow.Ptr());
+		instance->isRunning = false;
+	}
 	void Engine::Destroy()
 	{
 		delete instance;

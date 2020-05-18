@@ -42,7 +42,9 @@ namespace GameEngine
 
 		virtual void SetCursorPosition(int x, int y) override
 		{
-			
+			auto context = GetLinuxApplicationContext();
+			XWarpPointer(context->xdisplay, None, sysWindow->GetNativeHandle().window,
+						 0, 0, 0, 0, x, y);
 		}
 
 		virtual void SetCursorVisiblity(bool visible) override

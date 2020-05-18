@@ -55,6 +55,10 @@ namespace GameEngine
         {
             visible = true;
         }
+        virtual DialogResult ShowModal(SystemWindow* /*parent*/) override
+        {
+            return DialogResult::Cancel;
+        }
         virtual void Hide() override
         {
             visible = false;
