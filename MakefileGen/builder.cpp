@@ -193,48 +193,42 @@ RELATIVE_RPATH_INCANTATION := "-Wl,-rpath,"'$$'"ORIGIN/"
     int dirId = 0;
     for (auto blob : blobs)
     {
-        DIR* dir;
-        struct dirent* ent;
-        if ((dir = opendir(blob.Buffer())) != NULL)
+        auto dirDepName = "dir_" + String(dirId);
+        auto buildTargetName = "TARGET_" + EscapeStr(blob);
+        makefileSb << "BD_" << dirId << " := " << "$(INTERMEDIATEDIR)" << blob << "\n";
+        makefileSb << dirDepName << ":\n\t@mkdir -p $(BD_" << dirId << ")\n";
+        makefileSb << buildTargetName << ": ";
+        for (auto f : CoreLib::IO::DirectoryIterator(blob))
         {
-            auto dirDepName = "dir_" + String(dirId);
-            auto buildTargetName = "TARGET_" + EscapeStr(blob);
-            makefileSb << "BD_" << dirId << " := " << "$(INTERMEDIATEDIR)" << blob << "\n";
-            makefileSb << dirDepName << ":\n\t@mkdir -p $(BD_" << dirId << ")\n";
-            makefileSb << buildTargetName << ": ";
-            while ((ent = readdir(dir)) != NULL)
+            RefPtr<FileTarget> target = new FileTarget();
+            target->fileName = f.fullPath;
+            target->dirDependency = dirDepName;
+            target->dirId = dirId;
+            auto shortName = f.name;
+            if (target->fileName.EndsWith(".cpp") || target->fileName.EndsWith(".c"))
             {
-                RefPtr<FileTarget> target = new FileTarget();
-                target->fileName = blob + ent->d_name;
-                target->dirDependency = dirDepName;
-                target->dirId = dirId;
-                auto shortName = ent->d_name;
-                if (target->fileName.EndsWith(".cpp") || target->fileName.EndsWith(".c"))
-                {
-                    makefileSb << " $(BD_" << dirId << ")" << IO::Path::GetFileNameWithoutEXT(target->fileName) + ".o";
-                    target->isHeader = false;
-                }
-                else if (target->fileName.EndsWith(".h") || target->fileName.EndsWith(".hpp") || target->fileName.EndsWith(".inc"))
-                {
-                    target->isHeader = true;
-                }
-                else
-                {
-                    continue;
-                }
-                sourceFiles[target->fileName] = target;
-                auto mappingList = shortNameMapping.TryGetValue(shortName);
-                if (!mappingList)
-                {
-                    shortNameMapping[shortName] = List<FileTarget*>();
-                    mappingList = shortNameMapping.TryGetValue(shortName);
-                }
-                mappingList->Add(target.Ptr());
+                makefileSb << " $(BD_" << dirId << ")" << IO::Path::GetFileNameWithoutEXT(target->fileName) + ".o";
+                target->isHeader = false;
             }
-            dirId++;
-            makefileSb << "\n";
-            closedir (dir);
+            else if (target->fileName.EndsWith(".h") || target->fileName.EndsWith(".hpp") || target->fileName.EndsWith(".inc"))
+            {
+                target->isHeader = true;
+            }
+            else
+            {
+                continue;
+            }
+            sourceFiles[target->fileName] = target;
+            auto mappingList = shortNameMapping.TryGetValue(shortName);
+            if (!mappingList)
+            {
+                shortNameMapping[shortName] = List<FileTarget*>();
+                mappingList = shortNameMapping.TryGetValue(shortName);
+            }
+            mappingList->Add(target.Ptr());
         }
+        dirId++;
+        makefileSb << "\n";
     }
 
     makefileSb << "\n";

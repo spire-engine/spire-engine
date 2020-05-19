@@ -20,6 +20,52 @@ namespace CoreLib
             static void WriteAllBytes(const CoreLib::Basic::String & fileName, void * buffer, size_t size);
 		};
 
+		enum class DirectoryEntryType
+		{
+			Unknown,
+			File,
+			Directory
+		};
+
+		class DirectoryEntry
+		{
+		public:
+			CoreLib::String name;
+			CoreLib::String fullPath;
+			DirectoryEntryType type;
+		};
+
+		struct DirectoryIteratorContext;
+
+		class DirectoryIterator
+		{
+		public:
+			CoreLib::ObjPtr<DirectoryIteratorContext> context;
+		public:
+			DirectoryIterator();
+			DirectoryIterator(const DirectoryIterator& other);
+			DirectoryIterator(DirectoryIterator &&other);
+
+			DirectoryIterator(String path);
+			~DirectoryIterator();
+
+			DirectoryIterator begin()
+			{
+				return *this;
+			}
+			DirectoryIterator end()
+			{
+				return DirectoryIterator();
+			}
+			DirectoryEntry operator*();
+			DirectoryIterator& operator++();
+			bool operator==(const DirectoryIterator& other);
+			bool operator!=(const DirectoryIterator& other)
+			{
+				return !(*this == other);
+			}
+		};
+
 		class Path
 		{
 		public:
@@ -46,6 +92,7 @@ namespace CoreLib
 			static bool IsSubPathOf(String path, String parentPath);
 			static String GetRelativePath(String path, String referencePath);
 			static bool IsDirectory(String path);
+			static bool IsAbsolute(String path);
 		};
 
 		class CommandLineWriter : public Object
