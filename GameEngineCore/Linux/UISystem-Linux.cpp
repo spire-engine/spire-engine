@@ -10,11 +10,31 @@ namespace GameEngine
 
     void LinuxUISystem::SetClipboardText(const CoreLib::String& text)
     {
+        auto context = GetLinuxApplicationContext();
+        auto display = context->xdisplay;
+        GetLinuxApplicationContext()->clipboardString = text;
+        XSetSelectionOwner(display,
+                           XInternAtom(display, "CLIPBOARD", False),
+                           context->clipboardWindow,
+                           CurrentTime);
     }
+
     CoreLib::String LinuxUISystem::GetClipboardText()
     {
-        return CoreLib::String();
+        auto context = GetLinuxApplicationContext();
+        auto display = GetLinuxApplicationContext()->xdisplay;
+        Atom clipboardAtom = XInternAtom(display, "CLIPBOARD", False);
+        Atom formatAtom = XInternAtom(display, "UTF8_STRING", False);
+        Atom propAtom = XInternAtom(display, "XSEL_DATA", False);
+        XConvertSelection(display, clipboardAtom, formatAtom, propAtom, context->clipboardWindow, CurrentTime);
+        context->clipboardStringReady = false;
+        do
+        {
+            OsApplication::DoEvents();
+        } while (!context->clipboardStringReady);
+        return context->clipboardString;
     }
+
     GraphicsUI::IFont* LinuxUISystem::LoadDefaultFont(GraphicsUI::UIWindowContext* ctx, GraphicsUI::DefaultFontType dt)
     {
         switch (dt)
@@ -41,6 +61,6 @@ namespace GameEngine
         : UISystemBase(ctx)
     {
     }
-}
+} // namespace GameEngine
 
 #endif

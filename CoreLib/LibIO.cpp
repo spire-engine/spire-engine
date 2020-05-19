@@ -78,7 +78,11 @@ namespace CoreLib
 			int pos = path.LastIndexOf('/');
 			pos = Math::Max(path.LastIndexOf('\\'), pos);
 			if (pos != -1)
+			{
+				if (path.Length() == 1) // root
+					return path;
 				return path.SubString(0, pos);
+			}
 			else
 				return "";
 		}
@@ -226,6 +230,27 @@ namespace CoreLib
 				}
 			}
 			return path;
+		}
+
+		bool Path::IsDirectory(CoreLib::String path)
+		{
+			if (path.EndsWith(Path::PathDelimiter) || path.EndsWith(Path::AltPathDelimiter))
+				return true;
+#if defined(__linux__)
+			struct stat s;
+			if (stat(path.Buffer(), &s) == 0)
+			{
+				return (s.st_mode & S_IFDIR);
+			}
+			return false;
+#elif defined(_WIN32)
+			struct _stat s;
+			if (_wstat(path.ToWString(), &s) == 0)
+			{
+				return (s.st_mode & _S_IFDIR);
+			}
+			return false;
+#endif
 		}
 
 		CoreLib::Basic::String File::ReadAllText(const CoreLib::Basic::String & fileName)

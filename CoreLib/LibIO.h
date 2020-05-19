@@ -45,6 +45,7 @@ namespace CoreLib
 			static String Normalize(String path);
 			static bool IsSubPathOf(String path, String parentPath);
 			static String GetRelativePath(String path, String referencePath);
+			static bool IsDirectory(String path);
 		};
 
 		class CommandLineWriter : public Object

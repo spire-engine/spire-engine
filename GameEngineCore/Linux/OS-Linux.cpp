@@ -2,14 +2,20 @@
 
 #include "OS.h"
 #include "HardwareRenderer.h"
+#include "Engine.h"
 #include "Linux/UISystem-Linux.h"
 #include "Linux/OsApplicationContext-Linux.h"
 #include "Linux/SystemWindow-Linux.h"
 #include "CoreLib/Tokenizer.h"
-#include "Linux/tinyfiledialogs.h"
-#include <signal.h>
+#include "Linux/MessageBoxWindow-Linux.h"
+#include "Linux/FileDialog-Linux.h"
 #include <time.h>
+#include <future>
+#include <sys/timerfd.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <X11/cursorfont.h>
 
 namespace GameEngine
@@ -94,6 +100,19 @@ namespace GameEngine
         }
     }
 
+    void InitClipboard()
+    {
+        auto display = appContext.xdisplay;
+        unsigned long color = BlackPixel(display, DefaultScreen(display));
+        XSetWindowAttributes wa;
+        wa.event_mask = PropertyChangeMask;
+        appContext.clipboardWindow = XCreateWindow(display, DefaultRootWindow(display),
+                            0, 0, 1, 1, 0, 0,
+                            InputOnly,
+                            DefaultVisual(display, DefaultScreen(display)),
+                            CWEventMask, &wa);
+    }
+
     void OsApplication::Quit()
     {
         appContext.terminate = true;
@@ -108,6 +127,7 @@ namespace GameEngine
             appContext.xdisplay = XOpenDisplay(nullptr);
             InitKeyCodeTranslationTable(appContext.xdisplay);
             InitCursors();
+            InitClipboard();
             if (!appContext.xdisplay)
                 printf("Failed to open XDisplay.\n");
         }
@@ -192,19 +212,83 @@ namespace GameEngine
                     sysWindow->HandleResizeEvent(nextEvent.xconfigure.width, nextEvent.xconfigure.height);
                 }
                 break;
-            case ClientMessage:
-                if (appContext.mainWindow->GetNativeHandle().window == nextEvent.xclient.window)
+            case Expose:
+                if (appContext.systemWindows.TryGetValue(nextEvent.xexpose.window, sysWindow))
                 {
-                    Atom wmDelete = XInternAtom(appContext.xdisplay, "WM_DELETE_WINDOW", True);
-                    if (nextEvent.xclient.data.l[0] == wmDelete)
-                        appContext.terminate = true;
+                    sysWindow->HandleExposeEvent();
                 }
-                if (appContext.systemWindows.TryGetValue(nextEvent.xbutton.window, sysWindow))
+                break;
+            case ClientMessage:
+                if (appContext.systemWindows.TryGetValue(nextEvent.xclient.window, sysWindow))
                 {
                     Atom wmDelete = XInternAtom(appContext.xdisplay, "WM_DELETE_WINDOW", True);
                     if (nextEvent.xclient.data.l[0] == wmDelete)
                     {
-                        sysWindow->Hide();
+                        sysWindow->HandleCloseEvent();
+                    }
+                }
+                break;
+            case FocusIn:
+                if (appContext.systemWindows.TryGetValue(nextEvent.xfocus.window, sysWindow))
+                {
+                    sysWindow->HandleFocus(true);
+                }
+                break;
+            case FocusOut:
+                if (appContext.systemWindows.TryGetValue(nextEvent.xfocus.window, sysWindow))
+                {
+                    sysWindow->HandleFocus(false);
+                }
+                break;
+            case SelectionRequest:
+                {
+                    Window owner = nextEvent.xselectionrequest.owner;
+                    Atom selection = nextEvent.xselectionrequest.selection;
+                    Atom target = nextEvent.xselectionrequest.target;
+                    Atom property = nextEvent.xselectionrequest.property;
+                    Window requestor = nextEvent.xselectionrequest.requestor;
+                    Time timestamp = nextEvent.xselectionrequest.time;
+                    Display *disp = nextEvent.xselection.display;
+
+                    XEvent s;
+                    s.xselection.type      = SelectionNotify;
+                    s.xselection.requestor = requestor;
+                    s.xselection.selection = selection;
+                    s.xselection.target    = target;
+                    s.xselection.property  = None;
+                    s.xselection.time      = timestamp;
+                    auto XA_text = XInternAtom(appContext.xdisplay, "TEXT", 0);
+                    if (appContext.clipboardString.Length() && (target == XA_STRING || target == XA_text))
+                    {
+                        s.xselection.property = property;
+                        XChangeProperty(disp, requestor, property, target, 8, PropModeReplace,
+                                        reinterpret_cast<const unsigned char*>(appContext.clipboardString.Buffer()), appContext.clipboardString.Length());
+                    }
+                    XSendEvent(disp, nextEvent.xselectionrequest.requestor, True, 0, &s);
+                }
+                break;
+            case SelectionNotify:
+                {
+                    Atom clipboardAtom = XInternAtom(appContext.xdisplay, "CLIPBOARD", False);
+                    if (nextEvent.xselection.selection == clipboardAtom)
+                    {
+                        if (nextEvent.xselection.property)
+                        {
+                            Atom formatAtom = XInternAtom(appContext.xdisplay, "UTF8_STRING", False);
+                            Atom propertyAtom = XInternAtom(appContext.xdisplay, "XSEL_DATA", False);
+                            Atom incrAtom = XInternAtom(appContext.xdisplay, "INCR", False);
+                            char *result;
+                            unsigned long ressize, restail;
+                            int resbits;
+                            XGetWindowProperty(appContext.xdisplay, appContext.clipboardWindow, propertyAtom, 0, 1<<27, False, AnyPropertyType,
+                                &incrAtom, &resbits, &ressize, &restail, (unsigned char**)&result);
+
+                            if (formatAtom == incrAtom)
+                                appContext.clipboardString = result;
+
+                            XFree(result);
+                        }
+                        appContext.clipboardStringReady = true;
                     }
                 }
                 break;
@@ -217,7 +301,8 @@ namespace GameEngine
             {
                 for (auto & task : appContext.uiThreadTaskQueue)
                 {
-                    task.callback->Invoke();
+                    if (!task.cancelled)
+                        task.callback->Invoke();
                     task.callback = nullptr;
                 }
                 appContext.uiThreadTaskQueue.Clear();
@@ -239,12 +324,15 @@ namespace GameEngine
                 appContext.mainLoopEventHandler();
         }
     }
+
     void OsApplication::Dispose()
     {
         commandlineParser = CoreLib::Text::CommandLineParser();
         FreeKeyCodeTranslationTable();
         for (auto cursor : appContext.cursors)
             XFreeCursor(appContext.xdisplay, cursor);
+        if (appContext.clipboardWindow)
+            XDestroyWindow(appContext.xdisplay, appContext.clipboardWindow);
 #if 0
         if (appContext.xdisplay)
             XCloseDisplay(appContext.xdisplay);
@@ -257,30 +345,21 @@ namespace GameEngine
         printf("%s", buffer);
 #endif
     }
+
     GameEngine::DialogResult OsApplication::ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags)
     {
-        int dialogResult = 0;
-        switch (flags)
+        if (!Engine::Instance()->IsRunning())
         {
-        case MessageBoxFlags::OKOnly:
-            tinyfd_messageBox(title.Buffer(), msg.Buffer(), "ok", "warning", 0);
-            return GameEngine::DialogResult::OK;
-        case MessageBoxFlags::OKCancel:
-            dialogResult = tinyfd_messageBox(title.Buffer(), msg.Buffer(), "okcancel", "warning", 0);
-            return dialogResult == 0 ? GameEngine::DialogResult::Cancel : GameEngine::DialogResult::OK;
-        case MessageBoxFlags::YesNo:
-            dialogResult = tinyfd_messageBox(title.Buffer(), msg.Buffer(), "yesno", "warning", 0);
-            return dialogResult == 1 ? DialogResult::Yes : DialogResult::No;
-        case MessageBoxFlags::YesNoCancel:
-            dialogResult = tinyfd_messageBox(title.Buffer(), msg.Buffer(), "yesnocancel", "warning", 0);
-            if (dialogResult == 0)
-                return DialogResult::Cancel;
-            else if (dialogResult == 1)
-                return DialogResult::Yes;
-            else
-                return DialogResult::No;
-        default:
-            return GameEngine::DialogResult::OK;
+            // Print the message to console to std out if engine has not been initialized.
+            Engine::Print("%s\n", msg.Buffer());
+            if (flags == MessageBoxFlags::OKOnly)
+                return DialogResult::OK;
+            CORELIB_UNREACHABLE("Unsupported MessageBoxFlag.");
+        }
+        else
+        {
+            CoreLib::RefPtr<MessageBoxWindow> messageBoxWindow = new MessageBoxWindow(msg, title, flags);
+            return messageBoxWindow->Show(Engine::Instance()->GetMainWindow());
         }
     }
 
@@ -288,16 +367,46 @@ namespace GameEngine
     {
     private:
         int interval = 0;
-        timer_t timerid = 0;
+        int timerfd = 0;
+        std::atomic<bool> cancelled;
+        std::thread timerThread;
 
+        void TimerThreadFunc()
+        {
+            uint64_t val = 0;
+            while (!cancelled && read(timerfd, &val, sizeof(val)) == sizeof(val))
+            {
+                if (val && !cancelled)
+                    appContext.QueueTask(Tick, this);
+            }
+        }
     public:
         LinuxOsTimer()
         {
+            cancelled = false;
+            timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
+            timerThread = std::thread([this](){ TimerThreadFunc();});
         }
-        static void SignalHandler(sigval_t sigVal)
+        ~LinuxOsTimer()
         {
-            auto timer = (LinuxOsTimer *)sigVal.sival_ptr;
-            appContext.QueueTask(timer->Tick);
+            cancelled = true;
+            struct itimerspec its;
+            its.it_value.tv_sec = 0;
+            its.it_value.tv_nsec = 1;
+            its.it_interval.tv_sec = 0;
+            its.it_interval.tv_nsec = 0;
+            timerfd_settime(timerfd, 0, &its, nullptr);
+            timerThread.join();
+            // Cancell all in-flight tasks
+            if (std::this_thread::get_id() != appContext.uiThreadId)
+                appContext.uiThreadTaskQueueMutex.Lock();
+            for (auto& task : appContext.uiThreadTaskQueue)
+            {
+                if (task.ownerId == this)
+                    task.cancelled = true;
+            }
+            if (std::this_thread::get_id() != appContext.uiThreadId)
+                appContext.uiThreadTaskQueueMutex.Unlock();
         }
         virtual void SetInterval(int val) override
         {
@@ -305,29 +414,22 @@ namespace GameEngine
         }
         virtual void Start() override
         {
-            if (timerid != 0)
-                Stop();
-            sigevent_t sev = {};
-            sev.sigev_notify = SIGEV_THREAD;
-            sev.sigev_value.sival_ptr = this;
-            sev._sigev_un._sigev_thread._attribute = nullptr;
-            sev._sigev_un._sigev_thread._function = SignalHandler;
-            timer_create(CLOCK_REALTIME, &sev, &timerid);
             struct itimerspec its;
             long long freq_nanosecs = interval * 1000000;
             its.it_value.tv_sec = freq_nanosecs / 1000000000;
             its.it_value.tv_nsec = freq_nanosecs % 1000000000;
             its.it_interval.tv_sec = its.it_value.tv_sec;
             its.it_interval.tv_nsec = its.it_value.tv_nsec;
-            timer_settime(timerid, 0, &its, nullptr);
+            timerfd_settime(timerfd, 0, &its, nullptr);
         }
         virtual void Stop() override
         {
-            if (timerid != 0)
-            {
-                timer_delete(timerid);
-                timerid = 0;
-            }
+            struct itimerspec its;
+            its.it_value.tv_sec = 0;
+            its.it_value.tv_nsec = 0;
+            its.it_interval.tv_sec = its.it_value.tv_sec;
+            its.it_interval.tv_nsec = its.it_value.tv_nsec;
+            timerfd_settime(timerfd, 0, &its, nullptr);
         }
     };
 
@@ -336,42 +438,23 @@ namespace GameEngine
     public:
         virtual bool ShowOpen() override
         {
-            auto patterns = CoreLib::Text::Split(this->Filter, '|');
-            CoreLib::List<const char*> patternList;
-            for (auto & pattern : patterns)
+            CoreLib::RefPtr<FileDialogWindow> dlgWindow = new FileDialogWindow(CoreLib::IO::Path::GetDirectoryName(FileName),
+                                                                               Filter, FileDialogType::Open);
+            if (dlgWindow->Show(Engine::Instance()->GetMainWindow()) == DialogResult::OK)
             {
-                if (pattern.StartsWith("*."))
-                    patternList.Add(pattern.Buffer());
-            }
-            auto selectResult = tinyfd_openFileDialog("Open", this->FileName.Buffer(), patternList.Count(), patternList.Buffer(),
-                nullptr, this->MultiSelect ? 1 : 0);
-            FileName = "";
-            FileNames.Clear();
-            if (selectResult)
-            {
-                FileNames = CoreLib::Text::Split(selectResult, '|');
-                if (FileNames.Count())
-                    FileName = FileNames[0];
+                FileName = dlgWindow->GetFileName();
                 return true;
             }
             return false;
         }
         virtual bool ShowSave() override
         {
-            auto patterns = CoreLib::Text::Split(this->Filter, '|');
-            CoreLib::List<const char*> patternList;
-            for (auto & pattern : patterns)
+            CoreLib::RefPtr<FileDialogWindow> dlgWindow = new FileDialogWindow(CoreLib::IO::Path::GetDirectoryName(FileName),
+                                                                               Filter, FileDialogType::Save);
+            dlgWindow->defaultExt = DefaultEXT;
+            if (dlgWindow->Show(Engine::Instance()->GetMainWindow()) == DialogResult::OK)
             {
-                if (pattern.StartsWith("*."))
-                    patternList.Add(pattern.Buffer());
-            }
-            auto selectResult = tinyfd_saveFileDialog("Save", this->FileName.Buffer(), patternList.Count(), patternList.Buffer(),
-                nullptr);
-            FileName = "";
-            FileNames.Clear();
-            if (selectResult)
-            {
-                FileName = selectResult;
+                FileName = dlgWindow->GetFileName();
                 return true;
             }
             return false;

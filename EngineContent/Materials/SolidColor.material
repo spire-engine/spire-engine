@@ -1,5 +1,5 @@
  material
 {
-    shader "SolidColor.shader"
+    shader "SolidColor.slang"
     var solidColor = vec3[0.7 0.7 0.7]
 }

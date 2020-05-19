@@ -165,6 +165,7 @@ namespace GameEngine
     {
         tmrTick->Stop();
         sysInterface->UnregisterWindowContext(this);
+        hwRenderer->Wait();
     }
 
     class GLUIRenderer
