@@ -7,6 +7,11 @@
 #if __has_include(<filesystem>)
 #define CPP17_FILESYSTEM 1
 #include <filesystem>
+namespace filesystem = std::filesystem;
+#elif __has_include(<experimental/filesystem>)
+#define CPP17_FILESYSTEM 1
+#include <experimental/filesystem>
+namespace filesystem = std::experimental::filesystem;
 #else
 #warning "C++17 filesystem not provided by the compiler. FileDialog will not function correctly."
 #endif
@@ -170,9 +175,9 @@ namespace GameEngine
             txtPath->SetText(currentDir);
             lstFiles->Clear();
 #ifdef CPP17_FILESYSTEM
-            for (auto f : std::filesystem::directory_iterator(dir.Buffer()))
+            for (auto f : filesystem::directory_iterator(dir.Buffer()))
             {
-                if (f.is_directory())
+                if (filesystem::is_directory(f.path()))
                 {
                     lstFiles->AddTextItem(CoreLib::IO::Path::GetFileName(f.path().c_str()) + CoreLib::IO::Path::PathDelimiter);
                 }
@@ -188,7 +193,7 @@ namespace GameEngine
     void FileDialogWindow::btnOK_Click(GraphicsUI::UI_Base* sender)
     {
 #ifdef CPP17_FILESYSTEM
-        if (std::filesystem::path(txtFileName->GetText().Buffer()).is_absolute())
+        if (filesystem::path(txtFileName->GetText().Buffer()).is_absolute())
         {
             TryCommitSelection(txtFileName->GetText());
             return;
