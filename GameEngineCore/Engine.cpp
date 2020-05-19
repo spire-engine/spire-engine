@@ -679,10 +679,10 @@ namespace GameEngine
 			return fileName;
 		if (File::Exists(fileName))
 			return fileName;
-		auto localFile = Path::Combine(GetDirectory(false, type), fileName);
+		auto localFile = Path::Normalize(Path::Combine(GetDirectory(false, type), fileName));
 		if (File::Exists(localFile))
 			return localFile;
-		auto engineFile = Path::Combine(GetDirectory(true, type), fileName);
+		auto engineFile = Path::Normalize(Path::Combine(GetDirectory(true, type), fileName));
 		if (File::Exists(engineFile))
 			return engineFile;
 		if (type == ResourceType::Shader)
