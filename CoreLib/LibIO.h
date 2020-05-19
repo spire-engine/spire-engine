@@ -29,7 +29,7 @@ namespace CoreLib
 
 #else
 			static const char PathDelimiter = '/';
-			static const char AltPathDelimiter = '/';
+			static const char AltPathDelimiter = '\\';
 
 #endif
 			static String TruncateExt(const String & path);
