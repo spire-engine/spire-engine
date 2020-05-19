@@ -123,7 +123,6 @@ namespace GameEngine
             default:
                 CORELIB_UNREACHABLE("Unsupported dialog result.");
             }
-            return GameEngine::DialogResult::Undefined;
         }
         virtual void Hide() override
         {

@@ -3,9 +3,20 @@
 #ifndef __STDC__
 #define __STDC__ 1
 #endif
+
+#if __has_include(<filesystem>)
+#define CPP17_FILESYSTEM 1
+#include <filesystem>
+namespace filesystem = std::filesystem;
+#else
+// Non-C++17: use posix headers
 #include <sys/stat.h>
+#ifdef __linux__
+#include <dirent.h>
+#endif
 #ifdef _WIN32
 #include <direct.h>
+#endif
 #endif
 namespace CoreLib
 {
@@ -22,7 +33,9 @@ namespace CoreLib
 
 		bool File::Exists(const String & fileName)
 		{
-#ifdef _WIN32
+#if defined(CPP17_FILESYSTEM)
+			return filesystem::exists(filesystem::u8path(fileName.Buffer()));
+#elif defined(_WIN32)
 			struct _stat32 statVar;
 			return ::_wstat32(((String)fileName).ToWString(), &statVar) != -1;
 #else
@@ -111,7 +124,9 @@ namespace CoreLib
 
 		bool Path::CreateDir(const String & path)
 		{
-#if defined(_WIN32)
+#if defined(CPP17_FILESYSTEM)
+			return filesystem::create_directory(filesystem::u8path(path.Buffer()));
+#elif defined(_WIN32)
 			return _wmkdir(path.ToWString()) == 0;
 #else 
 			return mkdir(path.Buffer(), 0777) == 0;
@@ -236,7 +251,9 @@ namespace CoreLib
 		{
 			if (path.EndsWith(Path::PathDelimiter) || path.EndsWith(Path::AltPathDelimiter))
 				return true;
-#if defined(__linux__)
+#if defined(CPP17_FILESYSTEM)
+			return filesystem::is_directory(filesystem::u8path(path.Buffer()));
+#elif defined(__linux__)
 			struct stat s;
 			if (stat(path.Buffer(), &s) == 0)
 			{
@@ -250,6 +267,17 @@ namespace CoreLib
 				return (s.st_mode & _S_IFDIR);
 			}
 			return false;
+#endif
+		}
+
+		bool Path::IsAbsolute(CoreLib::String path)
+		{
+#if defined(CPP17_FILESYSTEM)
+			return filesystem::u8path(path.Buffer()).is_absolute();
+#elif defined(__linux__)
+			return path.StartsWith(Path::PathDelimiter);
+#else
+			return path.IndexOf(':') != -1 || path.StartsWith("\\\\");
 #endif
 		}
 
@@ -286,5 +314,135 @@ namespace CoreLib
 			StreamWriter writer(new FileStream(fileName, FileMode::Create));
 			writer.Write(text);
 		}
+
+		DirectoryIterator::~DirectoryIterator()
+		{
+		}
+
+		DirectoryIterator::DirectoryIterator(const DirectoryIterator &other)
+			: context(other.context)
+		{
+		}
+
+		DirectoryIterator::DirectoryIterator(DirectoryIterator &&other)
+			: context(_Move(other.context))
+		{
+		}
+
+#ifdef CPP17_FILESYSTEM
+		struct DirectoryIteratorContext : public RefObject
+		{
+			filesystem::directory_iterator iter;
+			~DirectoryIteratorContext()
+			{
+			}
+		};
+
+		DirectoryIterator::DirectoryIterator()
+		{
+			context = new DirectoryIteratorContext();
+		}
+
+		DirectoryIterator::DirectoryIterator(CoreLib::String path)
+		{
+			context = new DirectoryIteratorContext();
+			context->iter = filesystem::directory_iterator(filesystem::u8path(path.Buffer()));
+		}
+
+		DirectoryEntry DirectoryIterator::operator*()
+		{
+			auto& entry = *context->iter;
+			DirectoryEntry result;
+			if (filesystem::is_directory(entry.path()))
+				result.type = DirectoryEntryType::Directory;
+			else if (filesystem::is_regular_file(entry.path()))
+				result.type = DirectoryEntryType::File;
+			else
+				result.type = DirectoryEntryType::Unknown;
+			auto u8str = entry.path().u8string();
+			result.fullPath = CoreLib::String(u8str.data(), (int)u8str.length());
+			result.name = Path::GetFileName(result.fullPath);
+			return result;
+		}
+		DirectoryIterator &DirectoryIterator::operator++()
+		{
+			++context->iter;
+			return *this;
+		}
+
+		bool DirectoryIterator::operator==(const DirectoryIterator &other)
+		{
+			return context->iter == other.context->iter;
+		}
+#else
+		struct DirectoryIteratorContext : public RefObject
+		{
+			DIR *dir;
+			struct dirent* ent;
+			CoreLib::String dirPath;
+			~DirectoryIteratorContext()
+			{
+				closedir(dir);
+			}
+		};
+
+		DirectoryIterator::DirectoryIterator()
+		{
+		}
+
+		DirectoryIterator::DirectoryIterator(CoreLib::String path)
+		{
+			DIR* dir = opendir(path.Buffer());
+			if (dir)
+			{
+				context = new DirectoryIteratorContext();
+				context->dir = dir;
+				context->ent = readdir(dir);
+				context->dirPath = path;
+			}
+		}
+
+		DirectoryEntry DirectoryIterator::operator*()
+		{
+			CORELIB_ASSERT(context->ent);
+			DirectoryEntry ent;
+			ent.name = context->ent->d_name;
+			ent.fullPath = Path::Combine(context->dirPath, ent.name);
+			if (context->ent->d_type == DT_DIR)
+				ent.type = DirectoryEntryType::Directory;
+			else if (context->ent->d_type == DT_REG)
+				ent.type = DirectoryEntryType::File;
+			else
+				ent.type = DirectoryEntryType::Unknown;
+			if (ent.name == "." || ent.name == "..")
+				ent.type = DirectoryEntryType::Unknown;
+			return ent;
+		}
+
+		DirectoryIterator& DirectoryIterator::operator++()
+		{
+			context->ent = readdir(context->dir);
+			return *this;
+		}
+
+		bool DirectoryIterator::operator==(const DirectoryIterator &other)
+		{
+			if (!context)
+			{
+				return !other.context || other.context->ent == nullptr;
+			}
+			else
+			{
+				if (other.context)
+				{
+					return context->ent == other.context->ent;
+				}
+				else
+				{
+					return context->ent == nullptr;
+				}
+			}
+		}
+#endif
 	}
 }

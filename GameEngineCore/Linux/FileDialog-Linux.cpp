@@ -2,14 +2,8 @@
 #include "FileDialog-Linux.h"
 #include "CoreLib/LibUI/LibUI.h"
 #include "CoreLib/LibUI/KeyCode.h"
+#include "CoreLib/LibIO.h"
 #include "Engine.h"
-
-#if __has_include(<filesystem>)
-#define CPP17_FILESYSTEM 1
-#include <filesystem>
-#else
-#warning "C++17 filesystem not provided by the compiler. FileDialog will not function correctly."
-#endif
 
 namespace GameEngine
 {
@@ -167,28 +161,28 @@ namespace GameEngine
             {
                 currentDir = dir;
             }
-            txtPath->SetText(currentDir);
+            if (currentDir.EndsWith(CoreLib::IO::Path::PathDelimiter))
+                txtPath->SetText(currentDir);
+            else
+                txtPath->SetText(currentDir + CoreLib::IO::Path::PathDelimiter);
             lstFiles->Clear();
-#ifdef CPP17_FILESYSTEM
-            for (auto f : std::filesystem::directory_iterator(dir.Buffer()))
+            for (auto f : CoreLib::IO::DirectoryIterator(dir.Buffer()))
             {
-                if (f.is_directory())
+                if (f.type == CoreLib::IO::DirectoryEntryType::Directory)
                 {
-                    lstFiles->AddTextItem(CoreLib::IO::Path::GetFileName(f.path().c_str()) + CoreLib::IO::Path::PathDelimiter);
+                    lstFiles->AddTextItem(f.name + CoreLib::IO::Path::PathDelimiter);
                 }
-                else
+                else if (f.type == CoreLib::IO::DirectoryEntryType::File)
                 {
-                    lstFiles->AddTextItem(CoreLib::IO::Path::GetFileName(f.path().c_str()));
+                    lstFiles->AddTextItem(f.name);
                 }
             }
-#endif
         }
     }
 
     void FileDialogWindow::btnOK_Click(GraphicsUI::UI_Base* sender)
     {
-#ifdef CPP17_FILESYSTEM
-        if (std::filesystem::path(txtFileName->GetText().Buffer()).is_absolute())
+        if (CoreLib::IO::Path::IsAbsolute(txtFileName->GetText()))
         {
             TryCommitSelection(txtFileName->GetText());
             return;
@@ -199,7 +193,6 @@ namespace GameEngine
             TryCommitSelection(combinedPath);
             return;
         }
-#endif
     }
 
     void FileDialogWindow::btnBack_Click(GraphicsUI::UI_Base* sender)

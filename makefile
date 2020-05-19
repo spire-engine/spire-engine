@@ -24,7 +24,7 @@ FORCE:
 # Build makefilegen
 MAKEFILEGEN_DEP = CoreLib/LibString.cpp CoreLib/LibIO.cpp CoreLib/Stream.cpp CoreLib/Tokenizer.cpp CoreLib/TextIO.cpp
 build/makefilegen: MakefileGen/builder.cpp | build_dir
-	@$(CXX) MakefileGen/builder.cpp $(MAKEFILEGEN_DEP) -g -o $@ -std=c++14
+	@$(CXX) MakefileGen/builder.cpp $(MAKEFILEGEN_DEP) -g -o $@ -std=c++17
 
 SLANG_VERSION=0.12.4
 ExternalLibs/Slang ExternalLibs/Slang/bin/linux-x64 :
