@@ -70,6 +70,12 @@
     <Lib>
       <AdditionalDependencies>%(AdditionalDependencies);$(SolutionDir)ExternalLibs\Slang\bin\windows-x64\release\slang.lib;</AdditionalDependencies>
     </Lib>
+    <PreBuildEvent>
+      <Command>cd "$(SolutionDir)"
+powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive "$(SolutionDir)prepare.ps1"
+
+</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -93,6 +99,12 @@
     <Lib>
       <AdditionalDependencies>%(AdditionalDependencies);$(SolutionDir)ExternalLibs\Slang\bin\windows-x64\release\slang.lib;</AdditionalDependencies>
     </Lib>
+    <PreBuildEvent>
+      <Command>cd "$(SolutionDir)"
+powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive "$(SolutionDir)prepare.ps1"
+
+</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Actor.cpp" />

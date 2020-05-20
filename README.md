@@ -15,15 +15,20 @@ SpireEngine is a Vulkan-based, cross-platform mini game engine that uses Slang a
 ## Build
 SpireEngine currently runs on both Windows and Linux.
 ### Windows
-- Run "prepare.ps1" script, which downloads the Autodesk FBX SDK binaries required for building ModelImporter.
 - Open "GameEngine.sln" in Visual Studio 2019.
 - Build the solution. 
+
+The solution file has been setup to automatically download the following dependencies:
+- Slang
+- Autodesk FBX SDK (for ModelImporter)
+You can also setup the solution directory manually by running "prepare.ps1".
+
 ### Linux
-SpireEngine does not depend on any additional libraries except Xlib on Linux platforms. Just run `make` in the project root directory.
+SpireEngine's Linux build currently does not include ModelImporter. Just run `make` in the project root directory.
 ```
 make -j16
 ```
-The makefile script will automatically check and install Xlib if it does not exist on the system.
+The makefile script will automatically check and install Xlib if it does not exist on the system, and download Slang prebuilt binaries to `ExternalLibs/Slang` if they are not already there.
 
 SpireEngine can be built by both `g++` and `clang++`. You can use the `CXX` environment variable to explicitly specify which compiler to use, for example:
 ```
