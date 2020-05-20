@@ -21,7 +21,6 @@ SpireEngine currently runs on both Windows and Linux.
 The solution file has been setup to automatically download the following dependencies:
 - Slang
 - Autodesk FBX SDK (for ModelImporter)
-You can also setup the solution directory manually by running "prepare.ps1".
 
 ### Linux
 SpireEngine's Linux build currently does not include ModelImporter. Just run `make` in the project root directory.
