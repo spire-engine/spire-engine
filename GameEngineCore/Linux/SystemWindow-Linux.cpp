@@ -40,12 +40,12 @@ namespace GameEngine
     void LinuxSystemWindow::SetClientWidth(int w)
     {
         XResizeWindow(GetLinuxApplicationContext()->xdisplay, handle, w, currentHeight);
-        currentWidth = w;
+        HandleResizeEvent(w, currentHeight);
     }
     void LinuxSystemWindow::SetClientHeight(int h)
     {
         XResizeWindow(GetLinuxApplicationContext()->xdisplay, handle, currentWidth, h);
-        currentHeight = h;
+        HandleResizeEvent(currentWidth, h);
     }
     int LinuxSystemWindow::GetClientWidth()
     {
@@ -176,8 +176,11 @@ namespace GameEngine
 
     DialogResult LinuxSystemWindow::ShowMessage(CoreLib::String msg, CoreLib::String title, MessageBoxFlags flags)
     {
-        CoreLib::RefPtr<MessageBoxWindow> messageBoxWindow = new MessageBoxWindow(msg, title, flags);
-        return messageBoxWindow->Show(this);
+        auto context = GetLinuxApplicationContext();
+        if (!context->msgboxWindow)
+            context->msgboxWindow = new MessageBoxWindow();
+        context->msgboxWindow->Config(msg, title, flags);
+        return context->msgboxWindow->Show(this);
     }
 
     GraphicsUI::SHIFTSTATE GetShiftState(int state)
@@ -378,6 +381,7 @@ namespace GameEngine
     {
         auto context = GetLinuxApplicationContext();
         context->modalDialogResult = result;
+        Hide();
     }
 
     SystemWindow* CreateLinuxSystemWindow(UISystemBase* sysInterface, int log2BufferSize)
