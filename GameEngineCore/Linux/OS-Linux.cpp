@@ -323,6 +323,7 @@ namespace GameEngine
             if (!appContext.terminate)
                 appContext.mainLoopEventHandler();
         }
+        appContext.msgboxWindow = nullptr;
     }
 
     void OsApplication::Dispose()
@@ -358,8 +359,10 @@ namespace GameEngine
         }
         else
         {
-            CoreLib::RefPtr<MessageBoxWindow> messageBoxWindow = new MessageBoxWindow(msg, title, flags);
-            return messageBoxWindow->Show(Engine::Instance()->GetMainWindow());
+            if (!appContext.msgboxWindow)
+                appContext.msgboxWindow = new MessageBoxWindow();
+            appContext.msgboxWindow->Config(msg, title, flags);
+            return appContext.msgboxWindow->Show(Engine::Instance()->GetMainWindow());
         }
     }
 

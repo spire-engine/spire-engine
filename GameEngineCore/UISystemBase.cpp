@@ -135,7 +135,6 @@ namespace GameEngine
         orthoMatrix.m[1][1] = 2.0f / screenHeight;
         orthoMatrix.m[3][0] = orthoMatrix.m[3][1] = -1.0f;
         uniformBuffer->SetData(&orthoMatrix, sizeof(orthoMatrix));
-        hwRenderer->Wait();
     }
 
     GraphicsUI::IFont* UISystemBase::LoadFont(UIWindowContext* ctx, const Font& f)

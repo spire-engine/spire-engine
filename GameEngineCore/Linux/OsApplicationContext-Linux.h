@@ -4,13 +4,16 @@
 #define OS_APPLICATION_CONTEXT_LINUX_H
 
 #include "CoreLib/Basic.h"
-#include <thread>
 #include "CoreLib/Threading.h"
+#include "MessageBoxWindow-Linux.h"
+
+#include <thread>
 #include <X11/Xlib.h>
 
 namespace GameEngine
 {
     class LinuxSystemWindow;
+    class MessageBoxWindow;
 
     struct UIThreadTask
     {
@@ -34,6 +37,7 @@ namespace GameEngine
         Display* xdisplay = nullptr;
         SystemWindow* mainWindow = nullptr;
         SystemWindow* currentMouseEventWindow = nullptr;
+        CoreLib::RefPtr<MessageBoxWindow> msgboxWindow;
         CoreLib::List<LinuxSystemWindow *> modalWindowStack;
         CoreLib::EnumerableDictionary<Window, LinuxSystemWindow *> systemWindows;
         GameEngine::DialogResult modalDialogResult = GameEngine::DialogResult::Undefined;

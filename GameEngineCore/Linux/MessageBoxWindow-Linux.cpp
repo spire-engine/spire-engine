@@ -5,32 +5,39 @@
 
 namespace GameEngine
 {
-    MessageBoxWindow::MessageBoxWindow(CoreLib::String text, CoreLib::String title, MessageBoxFlags msgBoxFlags)
+    MessageBoxWindow::MessageBoxWindow()
     {
-        flags = msgBoxFlags;
         internalWindow = dynamic_cast<LinuxSystemWindow*>(Engine::Instance()->CreateSystemWindow());
-        internalWindow->SetText(title);
         auto uiEntry = internalWindow->GetUIEntry();
         uiEntry->Padding = EM(1.0f);
-        auto bottomPanel = new GraphicsUI::Container(uiEntry);
+        bottomPanel = new GraphicsUI::Container(uiEntry);
         bottomPanel->SetHeight(EM(2.0f));
         bottomPanel->DockStyle = GraphicsUI::Control::dsBottom;
-        auto textBox = GraphicsUI::CreateMultiLineTextBox(uiEntry);
-        textBox->SetText(text);
-        textBox->Enabled = false;
-        auto textSize = textBox->GetFont()->MeasureString(text, GraphicsUI::DrawTextOptions());
-        const int maxWidth = EM(30.0f);
-        int width = CoreLib::Math::Min(maxWidth, textSize.w + EM(4.0f));
-        width = CoreLib::Math::Max(width, EM(20.0f));
-        internalWindow->SetClientWidth(width);
-        internalWindow->SetClientHeight(EM(8.0f));
-        internalWindow->SetFixedSize();
+        textBox = GraphicsUI::CreateMultiLineTextBox(uiEntry);
         textBox->SetScrollBars(false, false);
         textBox->SetReadOnly(true);
         textBox->SetBackgroundColor(uiEntry->BackColor);
         textBox->TabStop = false;
+        textBox->Enabled = false;
         textBox->BorderStyle = GraphicsUI::BS_NONE;
         textBox->DockStyle = GraphicsUI::Control::dsFill;
+    }
+    void MessageBoxWindow::Config(CoreLib::String text, CoreLib::String title, MessageBoxFlags msgBoxFlags)
+    {
+        flags = msgBoxFlags;
+        internalWindow->SetText(title);
+        auto uiEntry = internalWindow->GetUIEntry();
+        textBox->SetText(text);
+        auto textSize = textBox->GetFont()->MeasureString(text, GraphicsUI::DrawTextOptions());
+        const int maxWidth = EM(30.0f);
+        int width = CoreLib::Math::Min(maxWidth, textSize.w + EM(4.0f));
+        width = CoreLib::Math::Max(width, EM(20.0f));
+        int height = EM(8.0f);
+        internalWindow->SetClientWidth(width);
+        internalWindow->SetClientHeight(height);
+        internalWindow->SetFixedSize();
+        bottomPanel->FreeChildren();
+        buttons.Clear();
         switch (flags)
         {
         case MessageBoxFlags::OKOnly:
@@ -83,6 +90,7 @@ namespace GameEngine
             buttons[i]->Posit(buttonLeft + (buttonWidth + EM(0.5f)) * i, EM(0.5f), buttonWidth, EM(1.5f));
         }
         buttons[0]->SetFocus();
+        internalWindow->HandleResizeEvent(width, height);
     }
 
     void MessageBoxWindow::OnButtonClick(GraphicsUI::UI_Base* sender)

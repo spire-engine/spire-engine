@@ -14,12 +14,14 @@ namespace GameEngine
         CoreLib::RefPtr<LinuxSystemWindow> internalWindow = nullptr;
         CoreLib::Array<GraphicsUI::Button *, 3> buttons;
         MessageBoxFlags flags;
-
-        void OnButtonClick(GraphicsUI::UI_Base* sender);
+        GraphicsUI::Container *bottomPanel;
+        GraphicsUI::MultiLineTextBox *textBox;
+        void OnButtonClick(GraphicsUI::UI_Base *sender);
 
     public:
-        MessageBoxWindow(CoreLib::String text, CoreLib::String title, MessageBoxFlags msgBoxFlags);
-        DialogResult Show(SystemWindow* parentWindow);
+        MessageBoxWindow();
+        void Config(CoreLib::String text, CoreLib::String title, MessageBoxFlags msgBoxFlags);
+        DialogResult Show(SystemWindow *parentWindow);
     };
 } // namespace GameEngine
 
