@@ -38,6 +38,7 @@ namespace GameEngine
         bool NoConsole = false;
 		int Width = 400, Height = 400;
 		int GpuId = 0;
+		bool UseSoftwareRenderer = false;
 		bool RecompileShaders = false;
 		CoreLib::String GameDirectory, EngineDirectory, StartupLevelName;
         AppLaunchParameters LaunchParams;
@@ -71,6 +72,7 @@ namespace GameEngine
 		unsigned int frameCounter = 0;
 		bool inDataTransfer = false;
 		bool isRunning = false;
+		bool useSoftwareRenderer = false;
 		TargetShadingLanguage targetShadingLanguage = TargetShadingLanguage::SPIRV;
 		WindowBounds currentViewport;
 		GraphicsSettings graphicsSettings;
@@ -130,6 +132,10 @@ namespace GameEngine
 		bool IsRunning()
 		{
 			return isRunning;
+		}
+		bool UseSoftwareRenderer()
+		{
+			return useSoftwareRenderer;
 		}
 		int GetFrameId()
         {

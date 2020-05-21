@@ -125,7 +125,14 @@ namespace CoreLib
 		bool Path::CreateDir(const String & path)
 		{
 #if defined(CPP17_FILESYSTEM)
-			return filesystem::create_directory(filesystem::u8path(path.Buffer()));
+			try
+			{
+				return filesystem::create_directory(filesystem::u8path(path.Buffer()));
+			}
+			catch (std::filesystem::filesystem_error)
+			{
+				return false;
+			}
 #elif defined(_WIN32)
 			return _wmkdir(path.ToWString()) == 0;
 #else 

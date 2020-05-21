@@ -30,7 +30,7 @@ namespace GameEngine
 #endif
 	enum class RenderAPI
 	{
-		Vulkan, Dummy
+		Vulkan, D3D12, Dummy
 	};
 
     class HardwareRenderer;

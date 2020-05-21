@@ -201,9 +201,6 @@
     <ClCompile Include="LightmapDebugViewRenderProcedure.cpp">
       <Filter>Renderer\RenderProcedure</Filter>
     </ClCompile>
-    <ClCompile Include="DummyHardwareRenderer.cpp">
-      <Filter>Renderer</Filter>
-    </ClCompile>
     <ClCompile Include="Win32\FontRasterizer-Win32.cpp">
       <Filter>OS\Win32</Filter>
     </ClCompile>
@@ -221,6 +218,12 @@
     </ClCompile>
     <ClCompile Include="VulkanAPI\volk.cpp" />
     <ClCompile Include="DummySystemWindow.cpp" />
+    <ClCompile Include="DummyHardwareRenderer.cpp">
+      <Filter>Renderer\RenderAPI</Filter>
+    </ClCompile>
+    <ClCompile Include="D3DHardwareRenderer.cpp">
+      <Filter>Renderer\RenderAPI</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />

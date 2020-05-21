@@ -874,6 +874,7 @@ namespace GameEngine
 
 	// HardwareRenderer instance constructors
 	HardwareRenderer* CreateVulkanHardwareRenderer(int gpuId, CoreLib::String cacheLocation);
+	HardwareRenderer* CreateD3DHardwareRenderer(int gpuId, bool useSoftwareRenderer, CoreLib::String cacheLocation);
 	HardwareRenderer* CreateDummyHardwareRenderer();
 }
 

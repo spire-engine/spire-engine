@@ -118,6 +118,7 @@ powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive "$(SolutionDir
     <ClCompile Include="CatmullSpline.cpp" />
     <ClCompile Include="ComputeTaskManager.cpp" />
     <ClCompile Include="CustomDepthRenderPass.cpp" />
+    <ClCompile Include="D3DHardwareRenderer.cpp" />
     <ClCompile Include="DebugGraphics.cpp" />
     <ClCompile Include="DebugGraphicsRenderPass.cpp" />
     <ClCompile Include="DeviceLightmapSet.cpp" />

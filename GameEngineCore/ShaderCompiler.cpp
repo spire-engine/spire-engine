@@ -311,6 +311,8 @@ namespace GameEngine
                     auto ep = entryPoints[eid];
                     int unit = 0;
                     auto path = Engine::Instance()->FindFile(ep->FileName, ResourceType::Shader);
+                    if (path.Length() == 0)
+                        throw IOException(String("Shader file not found: ") + ep->FileName + String("\nDid you forget to specify '-enginedir'?"));
                     if (!addedTUs.TryGetValue(path, unit))
                     {
                         unit = spAddTranslationUnit(req, SLANG_SOURCE_LANGUAGE_SLANG, ep->FileName.Buffer());
