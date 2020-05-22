@@ -294,6 +294,11 @@ namespace GameEngine
 		}
 	}
 
+	inline DataType GetDataTypeElementType(DataType type)
+	{
+		return (DataType)((int)(type) & (~3));
+	}
+
 	// Returns number of elements for a specific DataType
 	inline int NumDataTypeElems(DataType type)
 	{

@@ -12,6 +12,8 @@
 
 #define CHECK_DX(x) CORELIB_ASSERT(SUCCEEDED(x) && "Direct3D call error check");
 
+using namespace CoreLib;
+
 namespace GameEngine
 {
     namespace D3DRenderer
@@ -27,7 +29,7 @@ namespace GameEngine
         // Max data size allowed to use the shared staging buffer for CPU-GPU upload.
         static constexpr int SharedStagingBufferDataSizeThreshold = 1 << 20;
 
-        int AlignBufferSize(int size, int alignment)
+        int Align(int size, int alignment)
         {
             return (size + alignment - 1) / alignment * alignment;
         }
@@ -106,7 +108,7 @@ namespace GameEngine
                 D3D12_RESOURCE_STATES resState = D3D12_RESOURCE_STATE_COMMON;
                 if (heapType == D3D12_HEAP_TYPE_UPLOAD)
                     resState = D3D12_RESOURCE_STATE_GENERIC_READ;
-                else if (heapType == D3D12_HEAP_TYPE_UPLOAD)
+                else if (heapType == D3D12_HEAP_TYPE_READBACK)
                     resState = D3D12_RESOURCE_STATE_COPY_DEST;
                 CHECK_DX(device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
                     &resourceDesc, resState, nullptr, IID_PPV_ARGS(&resource)));
@@ -241,7 +243,7 @@ namespace GameEngine
                 CHECK_DX(stagingResource->Map(0, &mapRange, &stagingBufferPtr));
                 memcpy(stagingBufferPtr, data, size);
                 ID3D12GraphicsCommandList* copyCmdList;
-                CHECK_DX(state.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, state.largeCopyCmdListAllocator, nullptr,
+                CHECK_DX(state.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.largeCopyCmdListAllocator, nullptr,
                     IID_PPV_ARGS(&copyCmdList)));
                 copyCmdList->CopyBufferRegion(resource, offset, stagingResource, 0, size);
                 CHECK_DX(copyCmdList->Close());
@@ -274,7 +276,7 @@ namespace GameEngine
                 std::lock_guard<std::mutex> lock(state.largeCopyCmdListMutex);
                 ID3D12Resource* stagingResource = state.CreateBufferResource(size, D3D12_HEAP_TYPE_READBACK, D3D12_CPU_PAGE_PROPERTY_UNKNOWN,  false);
                 ID3D12GraphicsCommandList* copyCmdList;
-                CHECK_DX(state.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, state.largeCopyCmdListAllocator, nullptr,
+                CHECK_DX(state.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.largeCopyCmdListAllocator, nullptr,
                     IID_PPV_ARGS(&copyCmdList)));
                 copyCmdList->CopyBufferRegion(stagingResource, 0, resource, offset, size);
                 CHECK_DX(copyCmdList->Close());
@@ -339,72 +341,522 @@ namespace GameEngine
             }
         };
 
-        class Texture : public GameEngine::Texture
+        DXGI_FORMAT TranslateStorageFormat(StorageFormat format)
+        {
+            switch (format)
+            {
+            case StorageFormat::R_F16: return DXGI_FORMAT_R16_FLOAT;
+            case StorageFormat::R_F32: return DXGI_FORMAT_R32_FLOAT;
+            case StorageFormat::R_I8: return DXGI_FORMAT_R8_UINT;
+            case StorageFormat::R_I16: return DXGI_FORMAT_R16_UINT;
+            case StorageFormat::R_8: return DXGI_FORMAT_R8_UNORM;
+            case StorageFormat::R_16: return DXGI_FORMAT_R16_UNORM;
+            case StorageFormat::Int32_Raw: return DXGI_FORMAT_R32_UINT;
+            case StorageFormat::RG_F16: return DXGI_FORMAT_R16G16_FLOAT;
+            case StorageFormat::RG_F32: return DXGI_FORMAT_R32G32_FLOAT;
+            case StorageFormat::RG_I8: return DXGI_FORMAT_R8G8_UINT;
+            case StorageFormat::RG_8: return DXGI_FORMAT_R8G8_UNORM;
+            case StorageFormat::RG_16: return DXGI_FORMAT_R16G16_UNORM;
+            case StorageFormat::RG_I16: return DXGI_FORMAT_R16G16_UINT;
+            case StorageFormat::RG_I32_Raw: return DXGI_FORMAT_R32G32_UINT;
+            case StorageFormat::RGBA_F16: return DXGI_FORMAT_R16G16B16A16_FLOAT;
+            case StorageFormat::RGBA_F32: return DXGI_FORMAT_R32G32B32A32_FLOAT;
+            case StorageFormat::RGBA_8: return DXGI_FORMAT_R8G8B8A8_UNORM;
+            case StorageFormat::RGBA_8_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+            case StorageFormat::RGBA_16: return DXGI_FORMAT_R16G16B16A16_UNORM;
+            case StorageFormat::RGBA_I8: return DXGI_FORMAT_R8G8B8A8_UINT;
+            case StorageFormat::RGBA_I16: return DXGI_FORMAT_R16G16B16A16_UINT;
+            case StorageFormat::RGBA_I32_Raw: return DXGI_FORMAT_R32G32B32A32_UINT;
+            case StorageFormat::BC1: return DXGI_FORMAT_BC1_UNORM;
+            case StorageFormat::BC1_SRGB: return DXGI_FORMAT_B8G8R8X8_UNORM_SRGB;
+            case StorageFormat::BC5: return DXGI_FORMAT_BC5_UNORM;
+            case StorageFormat::BC3: return DXGI_FORMAT_BC3_UNORM;
+            case StorageFormat::BC6H: return DXGI_FORMAT_BC6H_UF16;
+            case StorageFormat::RGBA_Compressed: return DXGI_FORMAT_BC7_UNORM;
+            case StorageFormat::R11F_G11F_B10F: return DXGI_FORMAT_R11G11B10_FLOAT;
+            case StorageFormat::RGB10_A2: return DXGI_FORMAT_R10G10B10A2_UNORM;
+            case StorageFormat::Depth24: return DXGI_FORMAT_D24_UNORM_S8_UINT;
+            case StorageFormat::Depth32: return DXGI_FORMAT_D32_FLOAT;
+            case StorageFormat::Depth24Stencil8: return DXGI_FORMAT_D24_UNORM_S8_UINT;
+            default: CORELIB_NOT_IMPLEMENTED("TranslateStorageFormat");
+            }
+        }
+
+        int GetResourceSize(StorageFormat format, int width, int height)
+        {
+            switch (format)
+            {
+            case StorageFormat::R_I16:
+            case StorageFormat::R_F16:
+            case StorageFormat::R_16:
+            case StorageFormat::RG_8: return DXGI_FORMAT_R8G8_UNORM;
+            case StorageFormat::RG_I8:
+                return width * height * 2;
+            case StorageFormat::R_F32:
+            case StorageFormat::RG_F16:
+            case StorageFormat::RG_16:
+            case StorageFormat::Int32_Raw:
+            case StorageFormat::RGBA_8:
+            case StorageFormat::RGBA_I8:
+            case StorageFormat::RGBA_8_SRGB:
+            case StorageFormat::RG_I16:
+            case StorageFormat::R11F_G11F_B10F:
+            case StorageFormat::RGB10_A2:
+            case StorageFormat::Depth24:
+            case StorageFormat::Depth32:
+            case StorageFormat::Depth24Stencil8:
+                return width * height * 4;
+            case StorageFormat::R_I8:
+            case StorageFormat::R_8:
+                return width * height;
+            case StorageFormat::RG_F32:
+            case StorageFormat::RG_I32_Raw:
+            case StorageFormat::RGBA_F16:
+            case StorageFormat::RGBA_16:
+            case StorageFormat::RGBA_I16:
+                return width * height * 8;
+            case StorageFormat::RGBA_F32:
+            case StorageFormat::RGBA_I32_Raw:
+                return width * height * 16;
+            case StorageFormat::BC1:
+            case StorageFormat::BC1_SRGB:
+                return ((width + 3) / 4) * ((height + 3) / 4) * 8;
+            case StorageFormat::BC5: return DXGI_FORMAT_BC5_UNORM;
+            case StorageFormat::BC3: return DXGI_FORMAT_BC3_UNORM;
+            case StorageFormat::BC6H: return DXGI_FORMAT_BC6H_UF16;
+            case StorageFormat::RGBA_Compressed:
+                return ((width + 3) / 4) * ((height + 3) / 4) * 16;
+            default: CORELIB_NOT_IMPLEMENTED("GetResourceSize");
+            }
+        }
+
+        class ResourceBarrier
         {
         public:
-            Texture() {}
+            static D3D12_RESOURCE_BARRIER Transition(ID3D12Resource* resource, unsigned subresourceID,
+                D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
+            {
+                D3D12_RESOURCE_BARRIER barrier = {};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Transition.pResource = resource;
+                barrier.Transition.Subresource = subresourceID;
+                barrier.Transition.StateBefore = before;
+                barrier.Transition.StateAfter = after;
+                return barrier;
+            }
+        };
+
+        class D3DTexture
+        {
         public:
-            virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
-            virtual bool IsDepthStencilFormat() override { return false; }
+            struct TextureProperties
+            {
+                StorageFormat format;
+                TextureUsage usage;
+                DXGI_FORMAT d3dformat;
+                D3D12_RESOURCE_DIMENSION dimension;
+                int width = 0;
+                int height = 0;
+                int depth = 0;
+                int mipLevels = 0;
+                int arraySize = 0;
+            };
+            List<D3D12_RESOURCE_STATES> subresourceStates;
+            TextureProperties properties;
+            ID3D12Resource* resource = nullptr;
+            D3DTexture() {}
+            ~D3DTexture()
+            {
+                if (resource)
+                    resource->Release();
+            }
+            void BuildMipmaps()
+            {
+            }
+        public:
+            static ID3D12Resource* CreateTextureResource(D3D12_HEAP_TYPE heapType, int width, int height, int arraySize, int mipLevel,
+                DXGI_FORMAT format, D3D12_RESOURCE_DIMENSION resourceDimension, D3D12_RESOURCE_STATES resState)
+            {
+                auto& state = RendererState::Get();
+                D3D12_HEAP_PROPERTIES heapProperties = {};
+                heapProperties.Type = heapType;
+                heapProperties.CreationNodeMask = heapProperties.VisibleNodeMask = 1;
+                D3D12_RESOURCE_DESC resourceDesc = {};
+                resourceDesc.Dimension = resourceDimension;
+                resourceDesc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+                resourceDesc.Width = width;
+                resourceDesc.Height = height;
+                resourceDesc.DepthOrArraySize = (UINT16)arraySize;
+                resourceDesc.MipLevels = (UINT16)mipLevel;
+                resourceDesc.Format = format;
+                resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+                resourceDesc.SampleDesc.Count = 1;
+                resourceDesc.SampleDesc.Quality = 0;
+                ID3D12Resource* resultResource;
+                CHECK_DX(state.device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
+                    &resourceDesc, resState, nullptr, IID_PPV_ARGS(&resultResource)));
+                return resultResource;
+            }
+            static D3D12_RESOURCE_STATES TextureUsageToInitialState(TextureUsage usage)
+            {
+                switch (usage)
+                {
+                case TextureUsage::ColorAttachment:
+                case TextureUsage::DepthAttachment:
+                case TextureUsage::DepthStencilAttachment:
+                case TextureUsage::StencilAttachment:
+                    return D3D12_RESOURCE_STATE_RENDER_TARGET;
+                    break;
+                default:
+                    return D3D12_RESOURCE_STATE_GENERIC_READ;
+                    break;
+                }
+            }
+            void SetData(int mipLevel, int layer, int xOffset, int yOffset, int zOffset, int width, int height, int depth,
+                DataType inputType, void* data, D3D12_RESOURCE_STATES newState)
+            {
+                CORELIB_ASSERT((properties.dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D && layer == 0) || 
+                               (properties.dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D && zOffset == 0));
+
+                auto packedResourceSize = GetResourceSize(properties.format, width, height);
+                // Half float translation
+                int dataTypeSize = DataTypeSize(inputType);
+                CoreLib::List<unsigned short> translatedBuffer;
+                if ((properties.format == StorageFormat::R_F16 || properties.format == StorageFormat::RG_F16 || properties.format == StorageFormat::RGBA_F16)
+                    && (GetDataTypeElementType(inputType) != DataType::Half))
+                {
+                    // transcode f32 to f16
+                    int channelCount = 1;
+                    switch (properties.format)
+                    {
+                    case StorageFormat::RG_F16:
+                        channelCount = 2;
+                        break;
+                    case StorageFormat::RGBA_F16:
+                        channelCount = 4;
+                        break;
+                    default:
+                        channelCount = 1;
+                        break;
+                    }
+                    translatedBuffer.SetSize(width * height * depth * channelCount);
+                    float* src = (float*)data;
+                    for (int i = 0; i < translatedBuffer.Count(); i++)
+                        translatedBuffer[i] = CoreLib::FloatToHalf(src[i]);
+                    dataTypeSize >>= 1;
+                    data = (void*)translatedBuffer.Buffer();
+                }
+
+                // Copy data
+                int slices = 1;
+                if (properties.dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+                    slices = depth;
+                auto& state = RendererState::Get();
+                D3D12_RESOURCE_DESC desc = resource->GetDesc();
+                uint32_t numRows;
+                uint64_t rowSize, totalSize;
+                D3D12_PLACED_SUBRESOURCE_FOOTPRINT footPrint;
+                state.device->GetCopyableFootprints(&desc, mipLevel, 1, 0, &footPrint, &numRows, &rowSize, &totalSize);
+                auto stagingResource = state.CreateBufferResource(totalSize, D3D12_HEAP_TYPE_UPLOAD,
+                    D3D12_CPU_PAGE_PROPERTY_UNKNOWN, false);
+                std::lock_guard<std::mutex> lock(state.largeCopyCmdListMutex);
+                ID3D12GraphicsCommandList* copyCmdList;
+                CHECK_DX(state.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.largeCopyCmdListAllocator, nullptr,
+                    IID_PPV_ARGS(&copyCmdList)));
+                for (int i = 0; i < slices; i++)
+                {
+                    unsigned subresourceId = (layer + i) * properties.mipLevels + mipLevel;
+
+                    D3D12_RANGE mapRange;
+                    mapRange.Begin = 0;
+                    mapRange.End = totalSize;
+                    void* stagingBufferPtr;
+                    CHECK_DX(stagingResource->Map(0, &mapRange, &stagingBufferPtr));
+                    if (totalSize == packedResourceSize)
+                        memcpy(stagingBufferPtr, data, totalSize);
+                    else
+                    {
+                        for (unsigned row = 0; row < numRows; row++)
+                        {
+                            memcpy((char*)stagingBufferPtr + footPrint.Footprint.RowPitch * row, (char*)data + rowSize * row, rowSize);
+                        }
+                    }
+                    stagingResource->Unmap(0, &mapRange);
+                    if (subresourceStates[subresourceId] != D3D12_RESOURCE_STATE_COPY_DEST)
+                    {
+                        D3D12_RESOURCE_BARRIER preCopyBarrier = ResourceBarrier::Transition(resource, subresourceId,
+                            subresourceStates[subresourceId], D3D12_RESOURCE_STATE_COPY_DEST);
+                        copyCmdList->ResourceBarrier(1, &preCopyBarrier);
+                    }
+                    D3D12_TEXTURE_COPY_LOCATION dstLoc = {};
+                    D3D12_TEXTURE_COPY_LOCATION srcLoc = {};
+                    dstLoc.pResource = resource;
+                    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                    dstLoc.SubresourceIndex = subresourceId;
+                    srcLoc.pResource = stagingResource;
+                    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                    srcLoc.PlacedFootprint = footPrint;
+                    copyCmdList->CopyTextureRegion(&dstLoc, xOffset, yOffset, zOffset, &srcLoc, nullptr);
+                    if (newState != D3D12_RESOURCE_STATE_COPY_DEST)
+                    {
+                        D3D12_RESOURCE_BARRIER postCopyBarrier = ResourceBarrier::Transition(resource, subresourceId,
+                            D3D12_RESOURCE_STATE_COPY_DEST, newState);
+                        copyCmdList->ResourceBarrier(1, &postCopyBarrier);
+                        subresourceStates[subresourceId] = newState;
+                    }
+                    CHECK_DX(copyCmdList->Close());
+                    ID3D12CommandList* cmdList = copyCmdList;
+                    state.queue->ExecuteCommandLists(1, &cmdList);
+                    state.Wait();
+                    copyCmdList->Reset(state.commandAllocators[state.version], nullptr);
+                }
+                copyCmdList->Release();
+                stagingResource->Release();
+                state.largeCopyCmdListAllocator->Reset();
+            }
+            void GetData(int mipLevel, int layer, int xOffset, int yOffset, int width, int height, int depth,
+                void* data, int bufferSize)
+            {
+                auto& state = RendererState::Get();
+                unsigned subresourceId = layer * properties.mipLevels + mipLevel;
+                int rowSize = width * StorageFormatSize(properties.format);
+                int rowPitch = Align(rowSize, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+                auto resourceSize = height * rowPitch;
+                auto stagingResource = state.CreateBufferResource(resourceSize, D3D12_HEAP_TYPE_READBACK,
+                    D3D12_CPU_PAGE_PROPERTY_UNKNOWN, false);
+                
+                CORELIB_ASSERT(rowSize * height == bufferSize && "Buffer size must match resource size.");
+
+                ID3D12GraphicsCommandList* copyCmdList;
+                CHECK_DX(state.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.largeCopyCmdListAllocator, nullptr,
+                    IID_PPV_ARGS(&copyCmdList)));
+                if (subresourceStates[subresourceId] != D3D12_RESOURCE_STATE_COPY_SOURCE)
+                {
+                    D3D12_RESOURCE_BARRIER preCopyBarrier = ResourceBarrier::Transition(resource, subresourceId,
+                        subresourceStates[subresourceId], D3D12_RESOURCE_STATE_COPY_SOURCE);
+                    copyCmdList->ResourceBarrier(1, &preCopyBarrier);
+                    subresourceStates[subresourceId] = D3D12_RESOURCE_STATE_COPY_SOURCE;
+                }
+                D3D12_TEXTURE_COPY_LOCATION dstLoc = {};
+                D3D12_TEXTURE_COPY_LOCATION srcLoc = {};
+                dstLoc.pResource = stagingResource;
+                dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                dstLoc.PlacedFootprint.Footprint.Depth = depth;
+                dstLoc.PlacedFootprint.Footprint.Width = width;
+                dstLoc.PlacedFootprint.Footprint.Height = height;
+                dstLoc.PlacedFootprint.Footprint.Format = properties.d3dformat;
+                dstLoc.PlacedFootprint.Footprint.RowPitch = rowPitch;
+                srcLoc.pResource = resource;
+                srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                srcLoc.SubresourceIndex = subresourceId;
+                D3D12_BOX copyBox = {};
+                copyBox.left = xOffset;
+                copyBox.top = yOffset;
+                copyBox.front = layer;
+                copyBox.right = xOffset + width;
+                copyBox.bottom = yOffset + height;
+                copyBox.back = layer + depth;
+                copyCmdList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, &copyBox);
+                CHECK_DX(copyCmdList->Close());
+                ID3D12CommandList* cmdList = copyCmdList;
+                state.queue->ExecuteCommandLists(1, &cmdList);
+                state.Wait();
+                std::lock_guard<std::mutex> lock(state.largeCopyCmdListMutex);
+                D3D12_RANGE mapRange;
+                mapRange.Begin = 0;
+                mapRange.End = resourceSize;
+                void* stagingBufferPtr;
+                CHECK_DX(stagingResource->Map(0, &mapRange, &stagingBufferPtr));
+                if (rowSize != rowPitch)
+                {
+                    for (int i = 0; i < height; i++)
+                        memcpy((char*)data + i * rowSize, (char*)stagingBufferPtr + rowPitch * i, rowSize);
+                }
+                else
+                {
+                    memcpy(data, stagingBufferPtr, resourceSize);
+                }
+                stagingResource->Unmap(0, &mapRange);
+                copyCmdList->Release();
+                stagingResource->Release();
+                state.largeCopyCmdListAllocator->Reset();
+            }
+
+            void InitTexture(int width, int height, int layers, int depth, int mipLevels, StorageFormat format,
+                TextureUsage usage,
+                D3D12_RESOURCE_DIMENSION dimension,
+                D3D12_RESOURCE_STATES initialState)
+            {
+                properties.width = width;
+                properties.height = height;
+                properties.depth = depth;
+                properties.format = format;
+                properties.arraySize = layers;
+                properties.mipLevels = mipLevels;
+                properties.dimension = dimension;
+                properties.usage = usage;
+                properties.d3dformat = TranslateStorageFormat(format);
+                int arraySizeOrDepth = dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ? layers : depth;
+                resource = CreateTextureResource(D3D12_HEAP_TYPE_DEFAULT, width, height, arraySizeOrDepth,
+                    properties.mipLevels, properties.d3dformat, dimension, initialState);
+                subresourceStates.SetSize(properties.mipLevels * properties.arraySize);
+                for (auto& s : subresourceStates)
+                    s = initialState;
+            }
+            void InitTexture2DFromData(int width, int height, TextureUsage usage, StorageFormat format, DataType inputType, void* data)
+            {
+                auto mipLevels = CoreLib::Math::Log2Ceil(CoreLib::Math::Max(width, height)) + 1;
+                InitTexture(width, height, 1, 1, mipLevels, format, usage, D3D12_RESOURCE_DIMENSION_TEXTURE2D, D3D12_RESOURCE_STATE_COPY_DEST);
+               
+                // Copy data
+                SetData(0, 0, 0, 0, 0, width, height, 1, inputType, data, TextureUsageToInitialState(usage));
+
+                // Build mipmaps
+                BuildMipmaps();
+            }
+            
         };
 
         class Texture2D : public virtual GameEngine::Texture2D
         {
         public:
-            Texture2D() {}
+            D3DTexture texture;
         public:
-            virtual void GetSize(int&/*width*/, int&/*height*/) override {}
-            virtual void SetData(int /*level*/, int /*width*/, int /*height*/, int /*samples*/, DataType /*inputType*/, void* /*data*/) override {}
-            virtual void SetData(int /*width*/, int /*height*/, int /*samples*/, DataType /*inputType*/, void* /*data*/) override {}
-            virtual void GetData(int /*mipLevel*/, void* /*data*/, int /*bufSize*/) override {}
-            virtual void BuildMipmaps() override {}
-            virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
-            virtual bool IsDepthStencilFormat() override { return false; }
+            virtual void GetSize(int& width, int& height) override
+            {
+                width = texture.properties.width;
+                height = texture.properties.height;
+            }
+            virtual void SetData(int level, int width, int height, int /*samples*/, DataType inputType, void* data) override
+            {
+                CORELIB_ASSERT(width == CoreLib::Math::Max(1, (texture.properties.width >> level)));
+                CORELIB_ASSERT(height == CoreLib::Math::Max(1, (texture.properties.height >> level)));
+                texture.SetData(level, 0, 0, 0, 0, width, height, 0, inputType, data, D3D12_RESOURCE_STATE_GENERIC_READ);
+            }
+            virtual void SetData(int width, int height, int /*samples*/, DataType inputType, void* data) override
+            {
+                CORELIB_ASSERT(width == texture.properties.width);
+                CORELIB_ASSERT(height == texture.properties.height);
+                texture.SetData(0, 0, 0, 0, 0, width, height, 0, inputType, data, D3D12_RESOURCE_STATE_GENERIC_READ);
+            }
+            virtual void GetData(int mipLevel, void* data, int bufSize) override
+            {
+                texture.GetData(mipLevel, 0, 0, 0, texture.properties.width, texture.properties.height, 0,
+                    data, bufSize);
+            }
+            virtual void BuildMipmaps() override
+            {
+                texture.BuildMipmaps();
+            }
+            virtual bool IsDepthStencilFormat() override
+            {
+                auto format = texture.properties.format;
+                return format == StorageFormat::Depth24 || format == StorageFormat::Depth24Stencil8 || format == StorageFormat::Depth32;
+            }
         };
 
         class Texture2DArray : public virtual GameEngine::Texture2DArray
         {
         public:
+            D3DTexture texture;
             Texture2DArray() {}
         public:
-            virtual void GetSize(int&/*width*/, int&/*height*/, int&/*layers*/) override {}
-            virtual void SetData(int /*mipLevel*/, int /*xOffset*/, int /*yOffset*/, int /*layerOffset*/, int /*width*/, int /*height*/, int /*layerCount*/, DataType /*inputType*/, void* /*data*/) override {}
-            virtual void BuildMipmaps() override {}
-            virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
-            virtual bool IsDepthStencilFormat() override { return false; }
+            virtual void GetSize(int& width, int& height, int& layers) override
+            {
+                width = texture.properties.width;
+                height = texture.properties.height;
+                layers = texture.properties.arraySize;
+            }
+            virtual void SetData(int mipLevel, int xOffset, int yOffset, int layerOffset, int width, int height, int layerCount, DataType inputType, void* data) override
+            {
+                CORELIB_ASSERT(CoreLib::Math::Max(1, texture.properties.width >> mipLevel) == width);
+                CORELIB_ASSERT(CoreLib::Math::Max(1, texture.properties.height >> mipLevel) == height);
+
+                texture.SetData(mipLevel, layerOffset, xOffset, yOffset, 0, width, height, layerCount, inputType, data, D3D12_RESOURCE_STATE_GENERIC_READ);
+            }
+            virtual void BuildMipmaps() override
+            {
+                texture.BuildMipmaps();
+            }
+            virtual bool IsDepthStencilFormat() override
+            {
+                auto format = texture.properties.format;
+                return format == StorageFormat::Depth24 || format == StorageFormat::Depth24Stencil8 || format == StorageFormat::Depth32;
+            }
         };
 
         class Texture3D : public virtual GameEngine::Texture3D
         {
         public:
+            D3DTexture texture;
             Texture3D() {}
 
         public:
-            virtual void GetSize(int&/*width*/, int&/*height*/, int&/*depth*/) override {}
-            virtual void SetData(int /*mipLevel*/, int /*xOffset*/, int /*yOffset*/, int /*zOffset*/, int /*width*/, int /*height*/, int /*depth*/, DataType /*inputType*/, void* /*data*/) override {}
-            virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
-            virtual bool IsDepthStencilFormat() override { return false; }
+            virtual void GetSize(int& width, int& height, int& depth) override
+            {
+                width = texture.properties.width;
+                height = texture.properties.height;
+                depth = texture.properties.depth;
+            }
+            virtual void SetData(int mipLevel, int xOffset, int yOffset, int zOffset, int width, int height, int depth, DataType inputType, void* data) override
+            {
+                texture.SetData(mipLevel, 0, xOffset, yOffset, zOffset, width, height, depth, inputType, data, D3D12_RESOURCE_STATE_GENERIC_READ);
+            }
+            virtual bool IsDepthStencilFormat() override
+            {
+                auto format = texture.properties.format;
+                return format == StorageFormat::Depth24 || format == StorageFormat::Depth24Stencil8 || format == StorageFormat::Depth32;
+            }
         };
 
         class TextureCube : public virtual GameEngine::TextureCube
         {
         public:
+            D3DTexture texture;
             TextureCube() {}
 
         public:
-            virtual void GetSize(int&/*size*/) override {}
-            virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
-            virtual bool IsDepthStencilFormat() override { return false; }
+            virtual void GetSize(int& size) override
+            {
+                size = texture.properties.width;
+            }
+            virtual void SetData(int mipLevel, int xOffset, int yOffset, int layerOffset, int width, int height, int layerCount, DataType inputType, void* data) override
+            {
+                CORELIB_ASSERT(CoreLib::Math::Max(1, texture.properties.width >> mipLevel) == width);
+                CORELIB_ASSERT(CoreLib::Math::Max(1, texture.properties.height >> mipLevel) == height);
+
+                texture.SetData(mipLevel, layerOffset, xOffset, yOffset, 0, width, height, layerCount, inputType, data, D3D12_RESOURCE_STATE_GENERIC_READ);
+            }
+            virtual bool IsDepthStencilFormat() override
+            {
+                auto format = texture.properties.format;
+                return format == StorageFormat::Depth24 || format == StorageFormat::Depth24Stencil8 || format == StorageFormat::Depth32;
+            }
         };
 
         class TextureCubeArray : public virtual GameEngine::TextureCubeArray
         {
         public:
+            D3DTexture texture;
             TextureCubeArray() {}
         public:
-            virtual void GetSize(int&/*size*/, int&/*layerCount*/) override {}
-            virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
-            virtual bool IsDepthStencilFormat() override { return false; }
+            virtual void GetSize(int& size, int& layerCount) override
+            {
+                size = texture.properties.width;
+                layerCount = texture.properties.arraySize / 6;
+            }
+            virtual void SetData(int mipLevel, int xOffset, int yOffset, int layerOffset, int width, int height, int layerCount, DataType inputType, void* data) override
+            {
+                CORELIB_ASSERT(CoreLib::Math::Max(1, texture.properties.width >> mipLevel) == width);
+                CORELIB_ASSERT(CoreLib::Math::Max(1, texture.properties.height >> mipLevel) == height);
+
+                texture.SetData(mipLevel, layerOffset, xOffset, yOffset, 0, width, height, layerCount, inputType, data, D3D12_RESOURCE_STATE_GENERIC_READ);
+            }
+            virtual bool IsDepthStencilFormat() override
+            {
+                auto format = texture.properties.format;
+                return format == StorageFormat::Depth24 || format == StorageFormat::Depth24Stencil8 || format == StorageFormat::Depth32;
+            }
         };
 
         class TextureSampler : public virtual GameEngine::TextureSampler
@@ -491,7 +943,7 @@ namespace GameEngine
         public:
             virtual void BeginUpdate() override {}
             virtual void Update(int /*location*/, GameEngine::Texture* /*texture*/, TextureAspect /*aspect*/) override {}
-            virtual void Update(int /*location*/, CoreLib::ArrayView<GameEngine::Texture*> /*texture*/, TextureAspect /*aspect*/, TextureLayout /*layout*/) override {}
+            virtual void Update(int /*location*/, CoreLib::ArrayView<GameEngine::Texture*> /*texture*/, TextureAspect /*aspect*/) override {}
             virtual void UpdateStorageImage(int /*location*/, CoreLib::ArrayView<GameEngine::Texture*> /*texture*/, TextureAspect /*aspect*/) override {}
             virtual void Update(int /*location*/, GameEngine::TextureSampler* /*sampler*/) override {}
             virtual void Update(int /*location*/, GameEngine::Buffer* /*buffer*/, int /*offset*/, int /*length*/) override {}
@@ -548,10 +1000,7 @@ namespace GameEngine
             virtual void DrawIndexed(int /*firstIndex*/, int /*indexCount*/) override {}
             virtual void DrawIndexedInstanced(int /*numInstances*/, int /*firstIndex*/, int /*indexCount*/) override {}
             virtual void DispatchCompute(int /*groupCountX*/, int /*groupCountY*/, int /*groupCountZ*/) override {}
-            virtual void TransferLayout(CoreLib::ArrayView<GameEngine::Texture*> /*attachments*/, TextureLayoutTransfer /*transferDirection*/) override {}
-            virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, TextureLayout /*srcLayout*/, VectorMath::Vec2i /*destOffset*/, bool /*flipSrc*/) override {}
             virtual void ClearAttachments(GameEngine::FrameBuffer* /*frameBuffer*/) override {}
-            virtual void MemoryAccessBarrier(MemoryBarrierType /*barrierType*/) override {}
         };
 
         class WindowSurface : public GameEngine::WindowSurface
@@ -660,7 +1109,7 @@ namespace GameEngine
                     CHECK_DX(state.device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&state.queue)));
 
                     // Create Copy command list allocator
-                    CHECK_DX(state.device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY,
+                    CHECK_DX(state.device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
                         IID_PPV_ARGS(&state.largeCopyCmdListAllocator)));
                 }
                 state.rendererCount++;
@@ -681,19 +1130,12 @@ namespace GameEngine
             }
             virtual void ClearTexture(GameEngine::Texture2D* /*texture*/) override {}
             virtual void BeginJobSubmission() override {}
-            virtual void QueueRenderPass(GameEngine::FrameBuffer* /*frameBuffer*/, CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/) override
+            virtual void QueueRenderPass(GameEngine::FrameBuffer* /*frameBuffer*/, CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/,
+                PipelineBarriers /*barriers*/) override
             {
             }
-            virtual void QueueNonRenderCommandBuffers(CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/) override
-            {
-            }
-            virtual void QueueComputeTask(GameEngine::Pipeline* /*computePipeline*/, GameEngine::DescriptorSet* /*descriptorSet*/, int /*x*/, int /*y*/, int /*z*/) override
-            {
-            }
-            virtual void QueuePipelineBarrier(ResourceUsage /*usageBefore*/, ResourceUsage /*usageAfter*/, CoreLib::ArrayView<ImagePipelineBarrier> /*barriers*/) override
-            {
-            }
-            virtual void QueuePipelineBarrier(ResourceUsage /*usageBefore*/, ResourceUsage /*usageAfter*/, CoreLib::ArrayView<GameEngine::Buffer*> /*buffers*/) override
+            virtual void QueueComputeTask(GameEngine::Pipeline* /*computePipeline*/, GameEngine::DescriptorSet* /*descriptorSet*/,
+                int /*x*/, int /*y*/, int /*z*/, PipelineBarriers /*barriers*/) override
             {
             }
             virtual void EndJobSubmission(GameEngine::Fence* fence) override
@@ -711,7 +1153,10 @@ namespace GameEngine
             virtual void Present(GameEngine::WindowSurface* /*surface*/, GameEngine::Texture2D* /*srcImage*/) override
             {
             }
-            virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, VectorMath::Vec2i /*destOffset*/) override {}
+            virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/,
+                VectorMath::Vec2i /*destOffset*/, bool /*flipSrc*/) override
+            {
+            }
             virtual void Wait() override
             {
                 RendererState::Get().Wait();
@@ -755,33 +1200,57 @@ namespace GameEngine
             {
                 return new Buffer(usage, sizeInBytes, true);
             }
-            virtual GameEngine::Texture2D* CreateTexture2D(int /*width*/, int /*height*/, StorageFormat /*format*/, DataType /*type*/, void* /*data*/) override
+            virtual GameEngine::Texture2D* CreateTexture2D(String name, int width, int height, StorageFormat format, DataType type, void* data) override
             {
-                return new Texture2D();
+                auto result = new Texture2D();
+                result->texture.InitTexture2DFromData(width, height, TextureUsage::Sampled, format, type, data);
+                return result;
             }
-            virtual GameEngine::Texture2D* CreateTexture2D(TextureUsage /*usage*/, int /*width*/, int /*height*/, int /*mipLevelCount*/, StorageFormat /*format*/) override
+            virtual GameEngine::Texture2D* CreateTexture2D(String name, TextureUsage usage, int width, int height, int mipLevelCount, StorageFormat format) override
             {
-                return new Texture2D();
+                auto result = new Texture2D();
+                result->texture.InitTexture(width, height, 1, 1, mipLevelCount, format, usage, D3D12_RESOURCE_DIMENSION_TEXTURE2D, 
+                    D3DTexture::TextureUsageToInitialState(usage));
+                return result;
             }
-            virtual GameEngine::Texture2D* CreateTexture2D(TextureUsage /*usage*/, int /*width*/, int /*height*/, int /*mipLevelCount*/, StorageFormat /*format*/, DataType /*type*/, CoreLib::ArrayView<void*> /*mipLevelData*/) override
+            virtual GameEngine::Texture2D* CreateTexture2D(String name, TextureUsage usage, int width, int height, int mipLevelCount, StorageFormat format, DataType type, CoreLib::ArrayView<void*> mipLevelData) override
             {
-                return new Texture2D();
+                auto result = new Texture2D();
+                result->texture.InitTexture(width, height, 1, 1, mipLevelCount, format, usage, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                    D3D12_RESOURCE_STATE_COPY_DEST);
+                for (int i = 0; i < mipLevelCount; i++)
+                {
+                    result->texture.SetData(i, 0, 0, 0, 0, CoreLib::Math::Max(1, (width >> i)), CoreLib::Math::Max(1, (height >> i)), 1, type, mipLevelData[i], D3DTexture::TextureUsageToInitialState(usage));
+                }
+                return result;
             }
-            virtual GameEngine::Texture2DArray* CreateTexture2DArray(TextureUsage /*usage*/, int /*width*/, int /*height*/, int /*layers*/, int /*mipLevelCount*/, StorageFormat /*format*/) override
+            virtual GameEngine::Texture2DArray* CreateTexture2DArray(String name, TextureUsage usage, int width, int height, int layers, int mipLevelCount, StorageFormat format) override
             {
-                return new Texture2DArray();
+                auto result = new Texture2DArray();
+                result->texture.InitTexture(width, height, layers, 1, mipLevelCount, format, usage, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                    D3DTexture::TextureUsageToInitialState(usage));
+                return result;
             }
-            virtual GameEngine::TextureCube* CreateTextureCube(TextureUsage /*usage*/, int /*size*/, int /*mipLevelCount*/, StorageFormat /*format*/) override
+            virtual GameEngine::TextureCube* CreateTextureCube(String name, TextureUsage usage, int size, int mipLevelCount, StorageFormat format) override
             {
-                return new TextureCube();
+                auto result = new TextureCube();
+                result->texture.InitTexture(size, size, 6, 1, mipLevelCount, format, usage, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                    D3DTexture::TextureUsageToInitialState(usage));
+                return result;
             }
-            virtual GameEngine::TextureCubeArray* CreateTextureCubeArray(TextureUsage /*usage*/, int /*size*/, int /*mipLevelCount*/, int /*cubemapCount*/, StorageFormat /*format*/) override
+            virtual GameEngine::TextureCubeArray* CreateTextureCubeArray(String name, TextureUsage usage, int size, int mipLevelCount, int cubemapCount, StorageFormat format) override
             {
-                return new TextureCubeArray();
+                auto result = new TextureCubeArray();
+                result->texture.InitTexture(size, size, 6 * cubemapCount, 1, mipLevelCount, format, usage, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                    D3DTexture::TextureUsageToInitialState(usage));
+                return result;
             }
-            virtual GameEngine::Texture3D* CreateTexture3D(TextureUsage /*usage*/, int /*width*/, int /*height*/, int /*depth*/, int /*mipLevelCount*/, StorageFormat /*format*/) override
+            virtual GameEngine::Texture3D* CreateTexture3D(String name, TextureUsage usage, int width, int height, int depth, int mipLevelCount, StorageFormat format) override
             {
-                return new Texture3D();
+                auto result = new Texture3D();
+                result->texture.InitTexture(width, height, 1, depth, mipLevelCount, format, usage, D3D12_RESOURCE_DIMENSION_TEXTURE3D,
+                    D3DTexture::TextureUsageToInitialState(usage));
+                return result;
             }
             virtual GameEngine::TextureSampler* CreateTextureSampler() override
             {
@@ -826,7 +1295,6 @@ namespace GameEngine
             {
                 return RendererState::Get().deviceName;
             }
-            virtual void TransferBarrier(int /*barrierId*/) override {}
         };
     }
 }

@@ -258,7 +258,7 @@ namespace DummyRenderer
 		virtual void ClearTexture(GameEngine::Texture2D* /*texture*/) override {}
         virtual void BeginJobSubmission() override {}
 		virtual void QueueRenderPass(GameEngine::FrameBuffer* /*frameBuffer*/, CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/,
-            PipelineBarriers barriers) override
+            PipelineBarriers /*barriers*/) override
         {
             writer->Write("Execute RenderPass\n");
         }
