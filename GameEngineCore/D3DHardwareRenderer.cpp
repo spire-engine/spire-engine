@@ -1,8 +1,12 @@
-#if __has_include(<d3d12.h>)
 #include "HardwareRenderer.h"
+
+#if __has_include(<d3d12.h>)
+
 #include "CoreLib/Stream.h"
 #include "CoreLib/TextIO.h"
 
+#include <mutex>
+#include <thread>
 #include <d3d12.h>
 #include <dxgi1_4.h>
 
@@ -16,11 +20,35 @@ namespace GameEngine
 
         thread_local int renderThreadId = 0;
         static constexpr int MaxRenderThreads = 8;
+        static constexpr int D3DConstantBufferAlignment = 256;
+        static constexpr int D3DStorageBufferAlignment = 256;
+        // 64MB staging buffer per frame version
+        static constexpr int StagingBufferSize = 1 << 26;
+        // Max data size allowed to use the shared staging buffer for CPU-GPU upload.
+        static constexpr int SharedStagingBufferDataSizeThreshold = 1 << 20;
+
+        int AlignBufferSize(int size, int alignment)
+        {
+            return (size + alignment - 1) / alignment * alignment;
+        }
+
         class RendererState
         {
         public:
             ID3D12Device* device = nullptr;
             ID3D12CommandQueue* queue = nullptr;
+            ID3D12Heap* heap = nullptr;
+            int version = 0;
+            CoreLib::List<ID3D12Resource*> stagingBuffers;
+            CoreLib::List<long> stagingBufferAllocPtr;
+            std::mutex stagingBufferMutex;
+            CoreLib::List<CoreLib::List<ID3D12GraphicsCommandList*>> tempCommandLists;
+            CoreLib::List<long> tempCommandListAllocPtr;
+            CoreLib::List<ID3D12CommandAllocator*> commandAllocators;
+            std::mutex tempCommandListMutex;
+            ID3D12CommandAllocator* largeCopyCmdListAllocator;
+            std::mutex largeCopyCmdListMutex;
+
             CoreLib::String deviceName;
             CoreLib::String cacheLocation;
             int rendererCount = 0;
@@ -28,6 +56,62 @@ namespace GameEngine
             uint64_t waitFenceValue = 1;
             ID3D12Fence* waitFences[MaxRenderThreads] = {};
             HANDLE waitEvents[MaxRenderThreads] = {};
+            ID3D12GraphicsCommandList* GetTempCommandList()
+            {
+                long cmdListId = 0;
+                {
+                    std::lock_guard<std::mutex> lock(tempCommandListMutex);
+                    auto& allocPtr = tempCommandListAllocPtr[version];
+                    if (allocPtr == tempCommandLists[version].Count())
+                    {
+                        ID3D12GraphicsCommandList* commandList;
+                        CHECK_DX(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocators[version],
+                            nullptr, IID_PPV_ARGS(&commandList)));
+                        commandList->Close();
+                        tempCommandLists[version].Add(commandList);
+                    }
+                    cmdListId = allocPtr;
+                    allocPtr++;
+                }
+                auto cmdList = tempCommandLists[version][cmdListId];
+                cmdList->Reset(commandAllocators[version], nullptr);
+                return cmdList;
+            }
+            ID3D12Resource* CreateBufferResource(size_t sizeInBytes, D3D12_HEAP_TYPE heapType, D3D12_CPU_PAGE_PROPERTY cpuPageProperty, bool allowUnorderedAccess)
+            {
+                D3D12_HEAP_PROPERTIES heapProperties = {};
+                heapProperties.Type = heapType;
+                heapProperties.CreationNodeMask = heapProperties.VisibleNodeMask = 1;
+                if (heapType == D3D12_HEAP_TYPE_CUSTOM)
+                {
+                    heapProperties.CPUPageProperty = cpuPageProperty;
+                    heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+                }
+                D3D12_RESOURCE_DESC resourceDesc = {};
+                resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+                resourceDesc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+                resourceDesc.Width = CoreLib::Math::Max((size_t)1, sizeInBytes);
+                resourceDesc.Height = 1;
+                resourceDesc.DepthOrArraySize = 1;
+                resourceDesc.MipLevels = 1;
+                resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+                resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                resourceDesc.SampleDesc.Count = 1;
+                resourceDesc.SampleDesc.Quality = 0;
+                if (allowUnorderedAccess)
+                {
+                    resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+                }
+                ID3D12Resource* resource;
+                D3D12_RESOURCE_STATES resState = D3D12_RESOURCE_STATE_COMMON;
+                if (heapType == D3D12_HEAP_TYPE_UPLOAD)
+                    resState = D3D12_RESOURCE_STATE_GENERIC_READ;
+                else if (heapType == D3D12_HEAP_TYPE_UPLOAD)
+                    resState = D3D12_RESOURCE_STATE_COPY_DEST;
+                CHECK_DX(device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
+                    &resourceDesc, resState, nullptr, IID_PPV_ARGS(&resource)));
+                return resource;
+            }
             void Wait()
             {
                 auto value = InterlockedIncrement(&waitFenceValue);
@@ -51,11 +135,25 @@ namespace GameEngine
                         CloseHandle(state.waitEvents[i]);
                     }
                 }
+                for (auto& cmdLists : state.tempCommandLists)
+                    for (auto cmdList : cmdLists)
+                        cmdList->Release();
+                for (auto cmdAllocator : state.commandAllocators)
+                    cmdAllocator->Release();
+                state.largeCopyCmdListAllocator->Release();
+                for (auto stagingBuffer : state.stagingBuffers)
+                    stagingBuffer->Release();
                 if (state.queue)
                     state.queue->Release();
                 if (state.device)
                     state.device->Release();
-                Get() = RendererState();
+                state.tempCommandListAllocPtr = decltype(state.tempCommandListAllocPtr)();
+                state.commandAllocators = decltype(state.commandAllocators)();
+                state.stagingBuffers = decltype(state.stagingBuffers)();
+                state.stagingBufferAllocPtr = decltype(state.stagingBufferAllocPtr)();
+                state.tempCommandLists = decltype(state.tempCommandLists)();
+                state.cacheLocation = CoreLib::String();
+                state.deviceName = CoreLib::String();
             }
             static RendererState& Get()
             {
@@ -66,19 +164,103 @@ namespace GameEngine
 
         class Buffer : public GameEngine::Buffer
         {
-            CoreLib::List<unsigned char> bufferContent;
+        private:
+            int bufferSize;
+            ID3D12Resource* resource;
+            bool isMappable = false;
+            int mappedStart = -1;
+            int mappedEnd = -1;
         public:
-            Buffer(int sizeInBytes)
+            Buffer(BufferUsage usage, int sizeInBytes, bool mappable)
             {
-                bufferContent.SetSize(sizeInBytes);
+                auto& state = RendererState::Get();
+                this->isMappable = mappable;
+                resource = state.CreateBufferResource(sizeInBytes,
+                    mappable ? D3D12_HEAP_TYPE_CUSTOM : D3D12_HEAP_TYPE_DEFAULT,
+                    mappable ? D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE : D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+                    usage == BufferUsage::StorageBuffer);
+                bufferSize = sizeInBytes;
+            }
+            ~Buffer()
+            {
+                resource->Release();
+            }
+
+            // SetDataImpl: returns true if succeeded without GPU synchronization.
+            bool SetDataImpl(int offset, void* data, int size)
+            {
+                auto& state = RendererState::Get();
+                if (size == 0)
+                    return true;
+                if (isMappable)
+                {
+                    D3D12_RANGE range;
+                    range.Begin = (SIZE_T)offset;
+                    range.End = (SIZE_T)size;
+                    void* mappedPtr = nullptr;
+                    CHECK_DX(resource->Map(0, &range, &mappedPtr));
+                    memcpy(mappedPtr, data, size);
+                    resource->Unmap(0, &range);
+                    return true;
+                }
+
+                if (size < SharedStagingBufferDataSizeThreshold)
+                {
+                    // Use shared staging buffer for async upload
+                    std::lock_guard<std::mutex> lockGuard(state.stagingBufferMutex);
+                    auto stagingOffset = InterlockedAdd(&(state.stagingBufferAllocPtr[state.version]), size);
+                    if (stagingOffset + size <= StagingBufferSize)
+                    {
+                        // Map and copy to staging buffer.
+                        D3D12_RANGE range;
+                        range.Begin = (SIZE_T)stagingOffset;
+                        range.End = (SIZE_T)size;
+                        void* mappedStagingPtr = nullptr;
+                        CHECK_DX(state.stagingBuffers[state.version]->Map(0, &range, &mappedStagingPtr));
+                        memcpy(mappedStagingPtr, data, size);
+                        state.stagingBuffers[state.version]->Unmap(0, &range);
+                        // Submit a copy command to GPU.
+                        auto copyCommandList = state.GetTempCommandList();
+                        copyCommandList->CopyBufferRegion(resource, offset, state.stagingBuffers[state.version], stagingOffset, size);
+                        CHECK_DX(copyCommandList->Close());
+                        ID3D12CommandList* cmdList = copyCommandList;
+                        state.queue->ExecuteCommandLists(1, &cmdList);
+                        return true;
+                    }
+                }
+
+                // Data is too large to use the shared staging buffer, or the staging buffer
+                // is already full.
+                // Create a dedicated staging buffer and perform uploading right here.
+                std::lock_guard<std::mutex> lock(state.largeCopyCmdListMutex);
+                ID3D12Resource* stagingResource = state.CreateBufferResource(size, D3D12_HEAP_TYPE_UPLOAD, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, false);
+                D3D12_RANGE mapRange;
+                mapRange.Begin = 0;
+                mapRange.End = size;
+                void* stagingBufferPtr;
+                CHECK_DX(stagingResource->Map(0, &mapRange, &stagingBufferPtr));
+                memcpy(stagingBufferPtr, data, size);
+                ID3D12GraphicsCommandList* copyCmdList;
+                CHECK_DX(state.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, state.largeCopyCmdListAllocator, nullptr,
+                    IID_PPV_ARGS(&copyCmdList)));
+                copyCmdList->CopyBufferRegion(resource, offset, stagingResource, 0, size);
+                CHECK_DX(copyCmdList->Close());
+                ID3D12CommandList* cmdList = copyCmdList;
+                state.queue->ExecuteCommandLists(1, &cmdList);
+                state.Wait();
+                copyCmdList->Release();
+                stagingResource->Release();
+                state.largeCopyCmdListAllocator->Reset();
+                return false;
             }
             virtual void SetDataAsync(int offset, void* data, int size) override
             {
-                SetData(offset, data, size);
+                SetDataImpl(offset, data, size);
             }
             virtual void SetData(int offset, void* data, int size) override
             {
-                memcpy(bufferContent.Buffer() + offset, data, size);
+                if (!SetDataImpl(offset, data, size))
+                    RendererState::Get().Wait();
             }
             virtual void SetData(void* data, int size) override
             {
@@ -86,14 +268,75 @@ namespace GameEngine
             }
             virtual void GetData(void* buffer, int offset, int size) override
             {
-                memcpy(buffer, bufferContent.Buffer() + offset, size);
+                auto& state = RendererState::Get();
+                if (size == 0)
+                    return;
+                std::lock_guard<std::mutex> lock(state.largeCopyCmdListMutex);
+                ID3D12Resource* stagingResource = state.CreateBufferResource(size, D3D12_HEAP_TYPE_READBACK, D3D12_CPU_PAGE_PROPERTY_UNKNOWN,  false);
+                ID3D12GraphicsCommandList* copyCmdList;
+                CHECK_DX(state.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, state.largeCopyCmdListAllocator, nullptr,
+                    IID_PPV_ARGS(&copyCmdList)));
+                copyCmdList->CopyBufferRegion(stagingResource, 0, resource, offset, size);
+                CHECK_DX(copyCmdList->Close());
+                ID3D12CommandList* cmdList = copyCmdList;
+                state.queue->ExecuteCommandLists(1, &cmdList);
+                state.Wait();
+                copyCmdList->Release();
+                state.largeCopyCmdListAllocator->Reset();
+                D3D12_RANGE mapRange;
+                mapRange.Begin = 0;
+                mapRange.End = size;
+                void* stagingBufferPtr;
+                CHECK_DX(stagingResource->Map(0, &mapRange, &stagingBufferPtr));
+                memcpy(buffer, stagingBufferPtr, size);
+                mapRange.End = 0;
+                stagingResource->Unmap(0, &mapRange);
+                stagingResource->Release();
             }
-            virtual int GetSize() override { return bufferContent.Count(); }
-            virtual void* Map(int /*offset*/, int /*size*/) override { return bufferContent.Buffer(); }
-            virtual void* Map() override { return bufferContent.Buffer(); }
-            virtual void Flush(int /*offset*/, int /*size*/) override {}
-            virtual void Flush() override {}
-            virtual void Unmap() override {}
+            virtual int GetSize() override
+            {
+                return bufferSize;
+            }
+            virtual void* Map(int offset, int size) override
+            {
+                CORELIB_ASSERT(isMappable);
+                CORELIB_ASSERT(mappedStart == -1 && "Nested calls to Buffer::Map() not allowed.");
+                D3D12_RANGE range;
+                range.Begin = (SIZE_T)offset;
+                range.End = (SIZE_T)size;
+                void* mappedPtr = nullptr;
+                CHECK_DX(resource->Map(0, &range, &mappedPtr));
+                mappedStart = offset;
+                mappedEnd = offset + size;
+                return mappedPtr;
+            }
+            virtual void* Map() override
+            {
+                return Map(0, bufferSize);
+            }
+            virtual void Flush(int offset, int size) override
+            {
+                CORELIB_ASSERT(isMappable);
+                CORELIB_ASSERT(mappedStart == -1);
+                D3D12_RANGE range;
+                range.Begin = (SIZE_T)offset;
+                range.End = (SIZE_T)size;
+                void* mappedPtr = nullptr;
+                CHECK_DX(resource->Map(0, &range, &mappedPtr));
+                resource->Unmap(0, &range);
+            }
+            virtual void Flush() override
+            {
+                Flush(0, bufferSize);
+            }
+            virtual void Unmap() override
+            {
+                CORELIB_ASSERT(mappedStart != -1);
+                D3D12_RANGE range;
+                range.Begin = (SIZE_T)mappedStart;
+                range.End = (SIZE_T)mappedEnd;
+                resource->Unmap(0, &range);
+            }
         };
 
         class Texture : public GameEngine::Texture
@@ -415,6 +658,10 @@ namespace GameEngine
                     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
                     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
                     CHECK_DX(state.device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&state.queue)));
+
+                    // Create Copy command list allocator
+                    CHECK_DX(state.device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY,
+                        IID_PPV_ARGS(&state.largeCopyCmdListAllocator)));
                 }
                 state.rendererCount++;
             }
@@ -469,19 +716,44 @@ namespace GameEngine
             {
                 RendererState::Get().Wait();
             }
-            virtual void SetMaxTempBufferVersions(int /*versionCount*/) override {}
-            virtual void ResetTempBufferVersion(int /*version*/) override {}
+            virtual void SetMaxTempBufferVersions(int versionCount) override
+            {
+                auto& state = RendererState::Get();
+                CORELIB_ASSERT(state.stagingBuffers.Count() == 0);
+                state.stagingBuffers.SetSize(versionCount);
+                state.stagingBufferAllocPtr.SetSize(versionCount);
+                state.commandAllocators.SetSize(versionCount);
+                for (int i = 0; i < versionCount; i++)
+                {
+                    state.stagingBuffers[i] = state.CreateBufferResource(StagingBufferSize, D3D12_HEAP_TYPE_UPLOAD, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, false);
+                    CHECK_DX(state.device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&state.commandAllocators[i])));
+                }
+                state.tempCommandLists.SetSize(versionCount);
+                state.tempCommandListAllocPtr.SetSize(versionCount);
+                for (int i = 0; i < versionCount; i++)
+                {
+                    state.tempCommandListAllocPtr[i] = 0;
+                    state.stagingBufferAllocPtr[i] = 0;
+                }
+            }
+            virtual void ResetTempBufferVersion(int version) override
+            {
+                auto& state = RendererState::Get();
+                state.version = version;
+                state.stagingBufferAllocPtr[state.version] = 0;
+                state.tempCommandListAllocPtr[state.version] = 0;
+            }
             virtual GameEngine::Fence* CreateFence() override
             {
                 return new Fence();
             }
-            virtual GameEngine::Buffer* CreateBuffer(BufferUsage /*usage*/, int sizeInBytes) override
+            virtual GameEngine::Buffer* CreateBuffer(BufferUsage usage, int sizeInBytes) override
             {
-                return new Buffer(sizeInBytes);
+                return new Buffer(usage, sizeInBytes, false);
             }
-            virtual GameEngine::Buffer* CreateMappedBuffer(BufferUsage /*usage*/, int sizeInBytes) override
+            virtual GameEngine::Buffer* CreateMappedBuffer(BufferUsage usage, int sizeInBytes) override
             {
-                return new Buffer(sizeInBytes);
+                return new Buffer(usage, sizeInBytes, true);
             }
             virtual GameEngine::Texture2D* CreateTexture2D(int /*width*/, int /*height*/, StorageFormat /*format*/, DataType /*type*/, void* /*data*/) override
             {
@@ -544,8 +816,8 @@ namespace GameEngine
                 return new CommandBuffer();
             }
             virtual TargetShadingLanguage GetShadingLanguage() override { return TargetShadingLanguage::HLSL; }
-            virtual int UniformBufferAlignment() override { return 16; }
-            virtual int StorageBufferAlignment() override { return 16; }
+            virtual int UniformBufferAlignment() override { return D3DConstantBufferAlignment; }
+            virtual int StorageBufferAlignment() override { return D3DStorageBufferAlignment; }
             virtual GameEngine::WindowSurface* CreateSurface(WindowHandle /*windowHandle*/, int /*width*/, int /*height*/) override
             {
                 return new WindowSurface();
@@ -564,6 +836,16 @@ namespace GameEngine
     HardwareRenderer* CreateD3DHardwareRenderer(int gpuId, bool useSoftwareRenderer, CoreLib::String cachePath)
     {
         return new D3DRenderer::HardwareRenderer(gpuId, useSoftwareRenderer, cachePath);
+    }
+}
+
+#else
+
+namespace GameEngine
+{
+    HardwareRenderer* CreateD3DHardwareRenderer(int /*gpuId*/, bool /*useSoftwareRenderer*/, CoreLib::String /*cachePath*/)
+    {
+        throw HardwareRendererException("Direct3D 12 is not available on this platform.");
     }
 }
 
