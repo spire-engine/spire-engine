@@ -45,7 +45,7 @@ namespace GameEngine
             switch (resources[i].type)
             {
             case ResourceBinding::BindingType::Texture:
-                descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.textureBinding, TextureAspect::Color, resources[i].textureLayout);
+                descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.textureBinding, TextureAspect::Color);
                 break;
             case ResourceBinding::BindingType::StorageImage:
                 descriptorSet->UpdateStorageImage(bindingOffset + i, resources[i].resourceHandles.textureBinding, TextureAspect::Color);
@@ -63,19 +63,11 @@ namespace GameEngine
                 break;
             }
             case ResourceBinding::BindingType::TextureArray:
-                descriptorSet->Update(bindingOffset + i, resources[i].textureArrayBinding, TextureAspect::Color, resources[i].textureLayout);
+                descriptorSet->Update(bindingOffset + i, resources[i].textureArrayBinding, TextureAspect::Color);
                 break;
             }
         }
         descriptorSet->EndUpdate();
-    }
-
-    void ComputeTaskInstance::Dispatch(CommandBuffer * cmdBuffer, int x, int y, int z)
-    {
-        auto kernelImpl = (ComputeKernelImpl*)kernel;
-        cmdBuffer->BindPipeline(kernelImpl->pipeline.Ptr());
-        cmdBuffer->BindDescriptorSet(0, descriptorSets[version].Ptr());
-        cmdBuffer->DispatchCompute(x, y, z);
     }
 
     void ComputeTaskInstance::Queue(int x, int y, int z)
@@ -84,13 +76,10 @@ namespace GameEngine
         manager->hardwareRenderer->QueueComputeTask(kernelImpl->pipeline.Ptr(), descriptorSets[version].Ptr(), x, y, z);
     }
 
-    void ComputeTaskInstance::Run(CommandBuffer * cmdBuffer, int x, int y, int z, Fence * fence)
+    void ComputeTaskInstance::Run(int x, int y, int z, Fence * fence)
     {
-        cmdBuffer->BeginRecording();
-        Dispatch(cmdBuffer, x, y, z);
-        cmdBuffer->EndRecording();
         manager->hardwareRenderer->BeginJobSubmission();
-        manager->hardwareRenderer->QueueNonRenderCommandBuffers(MakeArrayView(cmdBuffer));
+        Queue(x, y, z);
         manager->hardwareRenderer->EndJobSubmission(fence);
     }
 

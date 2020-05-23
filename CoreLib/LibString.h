@@ -121,6 +121,12 @@ namespace CoreLib
 				length = IntToAscii(buffer.Ptr(), val, radix);
 				ReverseInternalAscii(buffer.Ptr(), length);
 			}
+			String(unsigned long long val, int radix = 10)
+			{
+				buffer = new char[65];
+				length = IntToAscii(buffer.Ptr(), val, radix);
+				ReverseInternalAscii(buffer.Ptr(), length);
+			}
 			String(float val, const char * format = "%g")
 			{
 				buffer = new char[128];

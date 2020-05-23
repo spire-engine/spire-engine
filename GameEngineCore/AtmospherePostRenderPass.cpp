@@ -46,7 +46,7 @@ namespace GameEngine
 					List<float> irradianceData;
 					irradianceData.SetSize(16 * 64 * 3);
 					reader.Read(irradianceData.Buffer(), irradianceData.Count());
-					irradianceTex = hwRenderer->CreateTexture2D(TextureUsage::Sampled, 64, 16, 1, StorageFormat::RGBA_F16);
+					irradianceTex = hwRenderer->CreateTexture2D("AtmospherePostRenderPass::irradianceTex", TextureUsage::Sampled, 64, 16, 1, StorageFormat::RGBA_F16);
 					List<char> irradianceData4 = Graphics::TranslateThreeChannelTextureFormat((char*)irradianceData.Buffer(), 16 * 64, sizeof(float));
 					irradianceTex->SetData(64, 16, 1, DataType::Float4, irradianceData4.Buffer());
 				}
@@ -60,7 +60,7 @@ namespace GameEngine
 					const int na = 8;
 					inscatterData.SetSize(nr * nv * nb * na * 4);
 					reader.Read(inscatterData.Buffer(), inscatterData.Count());
-					inscatterTex = hwRenderer->CreateTexture3D(TextureUsage::Sampled, na*nb, nv, nr, 1, StorageFormat::RGBA_F16);
+					inscatterTex = hwRenderer->CreateTexture3D("AtmospherePostRenderPass::inscatterTex", TextureUsage::Sampled, na*nb, nv, nr, 1, StorageFormat::RGBA_F16);
 					inscatterTex->SetData(0, 0, 0, 0, na*nb, nv, nr, DataType::Float4, inscatterData.Buffer());
 				}
 				{
@@ -68,7 +68,7 @@ namespace GameEngine
 					List<float> transmittanceData;
 					transmittanceData.SetSize(256 * 64 * 3);
 					reader.Read(transmittanceData.Buffer(), transmittanceData.Count());
-					transmittanceTex = hwRenderer->CreateTexture2D(TextureUsage::Sampled, 256, 64, 1, StorageFormat::RGBA_F16);
+					transmittanceTex = hwRenderer->CreateTexture2D("AtmospherePostRenderPass::transmittanceTex", TextureUsage::Sampled, 256, 64, 1, StorageFormat::RGBA_F16);
 					List<char> irradianceData4 = Graphics::TranslateThreeChannelTextureFormat((char*)transmittanceData.Buffer(), 256 * 64, sizeof(float));
 					transmittanceTex->SetData(0, 256, 64, 1, DataType::Float4, irradianceData4.Buffer());
 				}

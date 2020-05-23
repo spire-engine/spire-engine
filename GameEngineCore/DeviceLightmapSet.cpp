@@ -42,7 +42,8 @@ namespace GameEngine
             int size = 1 << i;
             if (imageCounts[i] != 0)
             {
-                textureArrays[i] = hwRenderer->CreateTexture2DArray(TextureUsage::Sampled, size, size, imageCounts[i], 1, format);
+                textureArrays[i] = hwRenderer->CreateTexture2DArray("DeviceLightmap::lightmapImage_" + String(i),
+                    TextureUsage::Sampled, size, size, imageCounts[i], 1, format);
             }
             else
                 textureArrays[i] = nullptr;

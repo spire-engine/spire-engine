@@ -94,7 +94,7 @@ namespace GameEngine
         CoreLib::RefPtr<OsTimer> tmrHover, tmrTick;
         CoreLib::Array<CoreLib::RefPtr<DescriptorSet>, DynamicBufferLengthMultiplier> descSets;
         VectorMath::Matrix4 orthoMatrix;
-        CoreLib::RefPtr<AsyncCommandBuffer> cmdBuffer, blitCmdBuffer;
+        CoreLib::RefPtr<AsyncCommandBuffer> cmdBuffer;
         void SetSize(int w, int h);
         UIWindowContext();
         ~UIWindowContext();
@@ -132,8 +132,8 @@ namespace GameEngine
             return textBufferObj.Ptr();
         }
         GraphicsUI::IImage * CreateImageObject(const CoreLib::Imaging::Bitmap & bmp);
-        void TransferDrawCommands(UIWindowContext * ctx, Texture2D* baseTexture, WindowBounds viewport, CoreLib::List<GraphicsUI::DrawCommand> & commands);
-        void QueueDrawCommands(UIWindowContext * ctx, Fence* fence);
+        void TransferDrawCommands(UIWindowContext * ctx, bool hasBackground, CoreLib::List<GraphicsUI::DrawCommand> & commands);
+        void QueueDrawCommands(Texture2D* baseTexture, UIWindowContext* ctx, WindowBounds viewport, Fence* frameFence);
         FrameBuffer * CreateFrameBuffer(Texture2D * texture);
         CoreLib::RefPtr<UIWindowContext> CreateWindowContext(SystemWindow* handle, int w, int h, int log2BufferSize);
         void UnregisterWindowContext(UIWindowContext * ctx);

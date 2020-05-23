@@ -113,10 +113,10 @@ namespace GameEngine
                 auto map = maps.Buffer() + *mapId;
                 int width = map->diffuseMap.Width * SuperSampleFactor;
                 int height = map->diffuseMap.Height * SuperSampleFactor;
-                RefPtr<Texture2D> texDiffuse = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, width, height, 1, StorageFormat::RGBA_8);
-                RefPtr<Texture2D> texPosition = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, width, height, 1, StorageFormat::RGBA_F32);
-                RefPtr<Texture2D> texNormal = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, width, height, 1, StorageFormat::RGBA_F32);
-                RefPtr<Texture2D> texDepth = hwRenderer->CreateTexture2D(TextureUsage::SampledDepthAttachment, width, height, 1, StorageFormat::Depth32);
+                RefPtr<Texture2D> texDiffuse = hwRenderer->CreateTexture2D("LightmapBaker::texDiffuse", TextureUsage::SampledColorAttachment, width, height, 1, StorageFormat::RGBA_8);
+                RefPtr<Texture2D> texPosition = hwRenderer->CreateTexture2D("LightmapBaker::texPosition", TextureUsage::SampledColorAttachment, width, height, 1, StorageFormat::RGBA_F32);
+                RefPtr<Texture2D> texNormal = hwRenderer->CreateTexture2D("LightmapBaker::texNormal", TextureUsage::SampledColorAttachment, width, height, 1, StorageFormat::RGBA_F32);
+                RefPtr<Texture2D> texDepth = hwRenderer->CreateTexture2D("LightmapBaker::texDepth", TextureUsage::SampledDepthAttachment, width, height, 1, StorageFormat::Depth32);
                 Array<Texture2D*, 4> dest;
                 Array<StorageFormat, 4> formats;
                 dest.SetSize(4);
@@ -787,7 +787,6 @@ namespace GameEngine
             auto computeTaskManager = Engine::GetComputeTaskManager();
             auto hw = Engine::Instance()->GetRenderer()->GetHardwareRenderer();
             RefPtr<Fence> fence = hw->CreateFence();
-            RefPtr<CommandBuffer> cmdBuffer = hw->CreateCommandBuffer();
             fence->Reset();
             for (auto & lm : lightmaps.Lightmaps)
             {
@@ -803,7 +802,7 @@ namespace GameEngine
                 auto instance = computeTaskManager->CreateComputeTaskInstance(lightmapComrpessionKernel, sizeof(uniformData), false);
                 instance->SetBinding(resBindings.GetArrayView());
                 instance->SetUniformData(&uniformData, sizeof(uniformData));
-                instance->Run(cmdBuffer.Ptr(), lm.Width >> 2, lm.Height >> 2, 1, fence.Ptr());
+                instance->Run(lm.Width >> 2, lm.Height >> 2, 1, fence.Ptr());
                 fence->Wait();
                 fence->Reset();
                 lm.Init(RawObjectSpaceMap::DataType::BC6H, lm.Width, lm.Height);

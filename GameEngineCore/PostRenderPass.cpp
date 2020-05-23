@@ -46,8 +46,6 @@ namespace GameEngine
 		pipeline = pipelineBuilder->ToPipeline(renderTargetLayout.Ptr());
 		
 		commandBuffer = new AsyncCommandBuffer(hwRenderer);
-		transferInCommandBuffer = new AsyncCommandBuffer(hwRenderer);
-		transferOutCommandBuffer = new AsyncCommandBuffer(hwRenderer);
 	}
 
 	PostRenderPass::PostRenderPass(ViewResource * view)
@@ -61,12 +59,9 @@ namespace GameEngine
 		viewRes->Resized.Unbind(this, &PostRenderPass::Resized);
 	}
 
-	void PostRenderPass::Execute(SharedModuleInstances sharedModules)
+	void PostRenderPass::Execute(SharedModuleInstances sharedModules, PipelineBarriers barriers)
 	{
-		auto cmdBufIn = transferInCommandBuffer->BeginRecording();
 		frameBuffer->GetRenderAttachments().GetTextures(textures);
-		cmdBufIn->TransferLayout(textures.GetArrayView(), TextureLayoutTransfer::UndefinedToRenderAttachment);
-		cmdBufIn->EndRecording();
 
 		auto cmdBuf = commandBuffer->BeginRecording(frameBuffer.Ptr());
 		if (clearFrameBuffer)
@@ -84,18 +79,7 @@ namespace GameEngine
 		
 		cmdBuf->EndRecording();
 
-		auto cmdBufOut = transferOutCommandBuffer->BeginRecording();
-		cmdBufOut->TransferLayout(textures.GetArrayView(), TextureLayoutTransfer::RenderAttachmentToSample);
-		cmdBufOut->EndRecording();
-
-		Array<CommandBuffer*, 3> buffers;
-		//buffers.Add(cmdBufIn);
-		buffers.Add(cmdBuf);
-		//buffers.Add(cmdBufOut);
-		hwRenderer->QueueNonRenderCommandBuffers(MakeArrayView(cmdBufIn));
-		hwRenderer->QueueRenderPass(frameBuffer.Ptr(), buffers.GetArrayView());
-		hwRenderer->QueueNonRenderCommandBuffers(MakeArrayView(cmdBufOut));
-
+		hwRenderer->QueueRenderPass(frameBuffer.Ptr(), MakeArrayView(cmdBuf), barriers);
 	}
 
 	RefPtr<RenderTask> PostRenderPass::CreateInstance(SharedModuleInstances sharedModules)

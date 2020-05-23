@@ -39,11 +39,12 @@ namespace GameEngine
 		ViewResource * viewRes = nullptr;
 		CoreLib::List<PostPassSource> sources;
 		CoreLib::Array<Texture*, 8> textures;
+
 	protected:
 		bool clearFrameBuffer = false;
 		CoreLib::RefPtr<RenderOutput> renderOutput;
 		CoreLib::RefPtr<FrameBuffer> frameBuffer;
-		CoreLib::RefPtr<AsyncCommandBuffer> commandBuffer, transferInCommandBuffer, transferOutCommandBuffer;
+		CoreLib::RefPtr<AsyncCommandBuffer> commandBuffer;
 		CoreLib::RefPtr<Pipeline> pipeline;
 		CoreLib::List<CoreLib::RefPtr<Shader>> shaders;
 		CoreLib::List<CoreLib::RefPtr<DescriptorSetLayout>> descLayouts;
@@ -57,7 +58,7 @@ namespace GameEngine
 	public:
 		PostRenderPass(ViewResource * view);
 		~PostRenderPass();
-		void Execute(SharedModuleInstances sharedModules);
+		void Execute(SharedModuleInstances sharedModules, PipelineBarriers barriers);
 		CoreLib::RefPtr<RenderTask> CreateInstance(SharedModuleInstances sharedModules);
 		virtual void SetParameters(void * data, int count) = 0;
 		void SetSource(CoreLib::ArrayView<PostPassSource> sourceTextures);

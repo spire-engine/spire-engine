@@ -82,20 +82,23 @@ namespace GameEngine
         virtual void RenderObjectSpaceMap(ArrayView<Texture2D*> dest, ArrayView<StorageFormat> attachmentFormats, Actor * actor, int width, int height) override
         {
             List<AttachmentLayout> attachments;
+
             RenderAttachments renderAttachments;
             for (int i = 0; i < attachmentFormats.Count(); i++)
             {
                 AttachmentLayout layout;
                 layout.ImageFormat = attachmentFormats[i];
                 if (attachmentFormats[i] == StorageFormat::Depth32)
+                {
                     layout.Usage = TextureUsage::DepthAttachment;
+                }
                 else
+                {
                     layout.Usage = TextureUsage::ColorAttachment;
+                }
                 attachments.Add(layout);
                 renderAttachments.SetAttachment(i, dest[i]);
             }
-
-            auto destTextures = From(dest).Select([](auto x) {return (Texture*)x; }).ToList();
             RefPtr<RenderTargetLayout> renderTargetLayout = hwRenderer->CreateRenderTargetLayout(attachments.GetArrayView(), true);
             RefPtr<FrameBuffer> frameBuffer = renderTargetLayout->CreateFrameBuffer(renderAttachments);
             
@@ -108,14 +111,8 @@ namespace GameEngine
             param.CameraPos = actor->GetPosition();
             param.UseSkeleton = false;
             actor->GetDrawables(param);
-            
-            layoutTransferCmdBuffer1->BeginRecording();
-            layoutTransferCmdBuffer1->TransferLayout(destTextures.GetArrayView(),
-                TextureLayoutTransfer::UndefinedToRenderAttachment);
-            layoutTransferCmdBuffer1->EndRecording();
+
             hwRenderer->BeginJobSubmission();
-            hwRenderer->QueueNonRenderCommandBuffers(layoutTransferCmdBuffer1.Ptr());
-            
             cmdBuffer->BeginRecording(frameBuffer.Ptr());
             cmdBuffer->SetViewport(0, 0, width, height);
             cmdBuffer->ClearAttachments(frameBuffer.Ptr());
@@ -170,15 +167,9 @@ namespace GameEngine
                     processDrawable(drawable);
                 }
             }
-
             cmdBuffer->EndRecording();
-            hwRenderer->QueueRenderPass(frameBuffer.Ptr(), MakeArrayView(cmdBuffer.Ptr()));
-            layoutTransferCmdBuffer2->BeginRecording();
-            layoutTransferCmdBuffer2->TransferLayout(destTextures.GetArrayView(),
-                TextureLayoutTransfer::RenderAttachmentToSample);
-            layoutTransferCmdBuffer2->EndRecording();
 
-            hwRenderer->QueueNonRenderCommandBuffers(layoutTransferCmdBuffer2.Ptr());
+            hwRenderer->QueueRenderPass(frameBuffer.Ptr(), MakeArrayView(cmdBuffer.Ptr()));
             hwRenderer->EndJobSubmission(fence.Ptr());
             fence->Wait();
             fence->Reset();

@@ -126,7 +126,7 @@ namespace GameEngine
         hwRenderer->Wait();
         surface->Resize(w, h);
         uiEntry->Posit(0, 0, w, h);
-        uiOverlayTexture = hwRenderer->CreateTexture2D(TextureUsage::SampledColorAttachment, w, h, 1, StorageFormat::RGBA_8);
+        uiOverlayTexture = hwRenderer->CreateTexture2D("uiOverlayTexture", TextureUsage::SampledColorAttachment, w, h, 1, StorageFormat::RGBA_8);
         frameBuffer = sysInterface->CreateFrameBuffer(uiOverlayTexture.Ptr());
         screenWidth = w;
         screenHeight = h;
@@ -257,7 +257,7 @@ namespace GameEngine
             indexStream.Clear();
             primCounter = 0;
         }
-        void EndUIDrawing(UIWindowContext * wndCtx, Texture2D * baseTexture, WindowBounds viewport)
+        void EndUIDrawing(UIWindowContext * wndCtx, bool hasBackground)
         {
             frameId = frameId % DynamicBufferLengthMultiplier;
             int indexCount = indexStream.Count();
@@ -270,17 +270,8 @@ namespace GameEngine
             wndCtx->primitiveBuffer->SetDataAsync(frameId * wndCtx->primitiveBufferSize, uniformFields.Buffer(),
                 Math::Min((int)sizeof(UniformField) * uniformFields.Count(), wndCtx->primitiveBufferSize));
 
-            auto cmdBuf = wndCtx->blitCmdBuffer->BeginRecording();
-            if (baseTexture)
-                cmdBuf->Blit(wndCtx->uiOverlayTexture.Ptr(), baseTexture, TextureLayout::Sample,
-                    VectorMath::Vec2i::Create(viewport.x, viewport.y), true);
-            else
-                cmdBuf->TransferLayout(MakeArrayView(dynamic_cast<Texture*>(wndCtx->uiOverlayTexture.Ptr())), TextureLayoutTransfer::UndefinedToRenderAttachment);
-            wndCtx->uiOverlayTexture->SetCurrentLayout(TextureLayout::ColorAttachment);
-            cmdBuf->EndRecording();
-
-            cmdBuf = wndCtx->cmdBuffer->BeginRecording(wndCtx->frameBuffer.Ptr());
-            if (!baseTexture)
+            auto cmdBuf = wndCtx->cmdBuffer->BeginRecording(wndCtx->frameBuffer.Ptr());
+            if (!hasBackground)
                 cmdBuf->ClearAttachments(wndCtx->frameBuffer.Ptr());
             cmdBuf->BindPipeline(pipeline.Ptr());
             cmdBuf->BindVertexBuffer(wndCtx->vertexBuffer.Ptr(), frameId * wndCtx->vertexBufferSize);
@@ -290,10 +281,16 @@ namespace GameEngine
             cmdBuf->DrawIndexed(0, indexCount);
             cmdBuf->EndRecording();
         }
-        void SubmitCommands(UIWindowContext * wndCtx)
+        void SubmitCommands(Texture2D* baseTexture, WindowBounds viewport, UIWindowContext * wndCtx)
         {
             frameId++;
-            rendererApi->QueueRenderPass(wndCtx->frameBuffer.Ptr(), MakeArray(wndCtx->blitCmdBuffer->GetBuffer(), wndCtx->cmdBuffer->GetBuffer()).GetArrayView());
+
+            if (baseTexture)
+            {
+                rendererApi->Blit(wndCtx->uiOverlayTexture.Ptr(), baseTexture, VectorMath::Vec2i::Create(viewport.x, viewport.y), true);
+            }
+
+            rendererApi->QueueRenderPass(wndCtx->frameBuffer.Ptr(), MakeArrayView(wndCtx->cmdBuffer->GetBuffer()));
         }
         bool IsBufferFull()
         {
@@ -586,7 +583,7 @@ namespace GameEngine
         UIImage(UISystemBase* ctx, const CoreLib::Imaging::Bitmap & bmp)
         {
             context = ctx;
-            texture = context->rendererApi->CreateTexture2D(TextureUsage::Sampled, bmp.GetWidth(), bmp.GetHeight(), 1, StorageFormat::RGBA_8);
+            texture = context->rendererApi->CreateTexture2D("uiImage", TextureUsage::Sampled, bmp.GetWidth(), bmp.GetHeight(), 1, StorageFormat::RGBA_8);
             texture->SetData(bmp.GetWidth(), bmp.GetHeight(), 1, DataType::Byte4, bmp.GetPixels());
             w = bmp.GetWidth();
             h = bmp.GetHeight();
@@ -650,7 +647,7 @@ namespace GameEngine
         return textBufferPool.Alloc(size);
     }
 
-    void UISystemBase::TransferDrawCommands(UIWindowContext * ctx, Texture2D* baseTexture, WindowBounds viewport, CoreLib::List<GraphicsUI::DrawCommand>& commands)
+    void UISystemBase::TransferDrawCommands(UIWindowContext * ctx, bool hasBackground, CoreLib::List<GraphicsUI::DrawCommand>& commands)
     {
         const int MaxEllipseEdges = 32;
         uiRenderer->BeginUIDrawing();
@@ -758,13 +755,13 @@ namespace GameEngine
             }
             ptr++;
         }
-        uiRenderer->EndUIDrawing(ctx, baseTexture, viewport);
+        uiRenderer->EndUIDrawing(ctx, hasBackground);
     }
 
-    void UISystemBase::QueueDrawCommands(UIWindowContext * ctx, Fence* frameFence)
+    void UISystemBase::QueueDrawCommands(Texture2D* baseTexture, UIWindowContext* ctx, WindowBounds viewport, Fence* frameFence)
     {
         textBufferFence = frameFence;
-        uiRenderer->SubmitCommands(ctx);
+        uiRenderer->SubmitCommands(baseTexture, viewport, ctx);
     }
 
     GameEngine::FrameBuffer * UISystemBase::CreateFrameBuffer(GameEngine::Texture2D * texture)
@@ -789,7 +786,6 @@ namespace GameEngine
         rs->uiEntry = new GraphicsUI::UIEntry(w, h, rs.Ptr(), this);
         rs->uniformBuffer = rendererApi->CreateMappedBuffer(BufferUsage::UniformBuffer, sizeof(VectorMath::Matrix4));
         rs->cmdBuffer = new AsyncCommandBuffer(rendererApi);
-        rs->blitCmdBuffer = new AsyncCommandBuffer(rendererApi);
         rs->primitiveBufferSize = 1 << log2BufferSize;
         rs->vertexBufferSize = rs->primitiveBufferSize / sizeof(UniformField) * sizeof(UberVertex) * 16;
         rs->indexBufferSize = rs->vertexBufferSize >> 2;

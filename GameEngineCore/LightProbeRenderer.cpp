@@ -15,7 +15,7 @@ namespace GameEngine
 		renderService = prenderService;
 		renderProc = pRenderProc;
 		viewRes = pViewRes;
-		tempEnv = prenderer->GetHardwareRenderer()->CreateTextureCube(TextureUsage::SampledColorAttachment, EnvMapSize, Math::Log2Floor(EnvMapSize) + 1, StorageFormat::RGBA_F16);
+		tempEnv = prenderer->GetHardwareRenderer()->CreateTextureCube("LightProbeRenderer::tempEnv", TextureUsage::SampledColorAttachment, EnvMapSize, Math::Log2Floor(EnvMapSize) + 1, StorageFormat::RGBA_F16);
         {
             ShaderCompilationResult crs;
             copyShaderSet = CompileGraphicsShader(crs, prenderer->GetHardwareRenderer(), "CopyPixel.slang");
@@ -73,10 +73,6 @@ namespace GameEngine
 		RefPtr<DescriptorSet> copyDescSet = hw->CreateDescriptorSet(copyPassLayout.Ptr());
 		List<RefPtr<CommandBuffer>> commandBuffers;
 		List<RefPtr<FrameBuffer>> frameBuffers;
-        hw->BeginJobSubmission();
-        hw->QueuePipelineBarrier(ResourceUsage::All, ResourceUsage::RenderAttachmentOutput,
-            MakeArrayView(ImagePipelineBarrier(tempEnv.Ptr(), TextureLayout::Undefined, TextureLayout::ColorAttachment)));
-        hw->EndJobSubmission(nullptr);
         for (int f = 0; f < 6; f++)
 		{
 			Matrix4 viewMatrix;
@@ -144,7 +140,6 @@ namespace GameEngine
 			copyDescSet->Update(0, renderProc->GetOutput()->Texture.Ptr(), TextureAspect::Color);
 			copyDescSet->Update(1, sharedRes->nearestSampler.Ptr());
 			copyDescSet->EndUpdate();
-			hw->TransferBarrier(DynamicBufferLengthMultiplier);
             hw->BeginJobSubmission();
 
 			RefPtr<FrameBuffer> fb0, fb1;
@@ -187,10 +182,6 @@ namespace GameEngine
             fence->Wait();
             fence->Reset();
 		}
-        hw->BeginJobSubmission();
-        hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderRead, 
-            MakeArrayView(ImagePipelineBarrier(tempEnv.Ptr(), TextureLayout::ColorAttachment, TextureLayout::Sample)));
-        hw->EndJobSubmission(nullptr);
 		// prefilter
 		RefPtr<PipelineBuilder> pb2 = hw->CreatePipelineBuilder();
 		pb2->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
@@ -261,7 +252,6 @@ namespace GameEngine
 				prefilterParams.roughness = (l / (float)(numLevels - 1));
 
 				uniformBuffer->SetData(&prefilterParams, sizeof(prefilterParams));
-				hw->TransferBarrier(DynamicBufferLengthMultiplier);
 
 				RenderAttachments attachments;
 				attachments.SetAttachment(0, dest, id, (TextureCubeFace)f, l);
@@ -283,12 +273,5 @@ namespace GameEngine
                 fence->Reset();
 			}
 		}
-        hw->BeginJobSubmission();
-        ImagePipelineBarrier probeTexBarrier(dynamic_cast<GameEngine::Texture*>(dest), TextureLayout::ColorAttachment, TextureLayout::Sample, id * 6, 6);
-        hw->QueuePipelineBarrier(ResourceUsage::RenderAttachmentOutput, ResourceUsage::FragmentShaderRead,
-            MakeArrayView(probeTexBarrier));
-        hw->EndJobSubmission(fence.Ptr());
-        fence->Wait();
-        fence->Reset();
 	}
 }
