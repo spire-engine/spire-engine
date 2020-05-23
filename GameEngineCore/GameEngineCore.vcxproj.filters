@@ -443,9 +443,6 @@
     <ClInclude Include="AnimationSynthesizer.h">
       <Filter>Animation</Filter>
     </ClInclude>
-    <ClInclude Include="ImageBarrierHelper.h">
-      <Filter>Renderer</Filter>
-    </ClInclude>
     <ClInclude Include="RenderProcedure.h">
       <Filter>Renderer\RenderProcedure</Filter>
     </ClInclude>

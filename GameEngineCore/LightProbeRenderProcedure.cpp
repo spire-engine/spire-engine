@@ -9,7 +9,6 @@
 #include "RenderProcedure.h"
 #include "StandardViewUniforms.h"
 #include "LightingData.h"
-#include "ImageBarrierHelper.h"
 
 using namespace VectorMath;
 
@@ -59,8 +58,6 @@ namespace GameEngine
         LightingEnvironment lighting;
         AtmosphereParameters lastAtmosphereParams;
         bool useAtmosphere = false;
-
-        ImageBarrierHelper barrierHelper;
     public:
         ~LightProbeRenderProcedure()
         {
@@ -263,10 +260,7 @@ namespace GameEngine
                     }
                 }
             }
-            // collect light data and render shadow maps
-
-            barrierHelper.QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), ImageBarrierHelper::UndefinedToRenderTarget);
-
+            // collect light data and render shadow map
             lighting.GatherInfo(hardwareRenderer, &sink, params, w, h, viewUniform, shadowRenderPass.Ptr());
 
             viewParams.SetUniformData(&viewUniform, (int)sizeof(viewUniform));
@@ -286,9 +280,8 @@ namespace GameEngine
             sharedRes->pipelineManager.PushModuleInstance(&viewParams);
             preZPassTransparentInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Transparent, cameraCullFrustum, false));
             sharedRes->pipelineManager.PopModuleInstance();
-            preZPassInstance->Execute(hardwareRenderer, *params.renderStats);
-            preZPassTransparentInstance->Execute(hardwareRenderer, *params.renderStats);
-            barrierHelper.QueueImageBarrier(hardwareRenderer, prezTextures.GetArrayView(), ImageBarrierHelper::RenderTargetToCompute);
+            preZPassInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
+            preZPassTransparentInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
 
             // build tiled light list
             BuildTiledLightListUniforms buildLightListUniforms;
@@ -306,22 +299,16 @@ namespace GameEngine
             buildLightListBindings.Add(ResourceBinding(lighting.tiledLightListBufffer.Ptr(), 0, lighting.tiledLightListBufferSize));
             lightListBuildingComputeTaskInstance->UpdateVersionedParameters(&buildLightListUniforms, sizeof(buildLightListUniforms), buildLightListBindings.GetArrayView());
             lightListBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
-            hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::FragmentShaderRead, lighting.tiledLightListBufffer.Ptr());
 
             // execute forward lighting pass
-            barrierHelper.QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), ImageBarrierHelper::RenderTargetToGraphics);
-
             forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-            barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::SampledToRenderTarget);
             forwardRenderPass->Bind();
             sharedRes->pipelineManager.PushModuleInstance(&viewParams);
             sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
             forwardBaseInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
             sharedRes->pipelineManager.PopModuleInstance();
             sharedRes->pipelineManager.PopModuleInstance();
-            forwardBaseInstance->Execute(hardwareRenderer, *params.renderStats);
-
-            barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::RenderTargetToGraphics);
+            forwardBaseInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
 
             if (useAtmosphere)
             {
@@ -354,9 +341,7 @@ namespace GameEngine
                 transparentPassInstance->SetFixedOrderDrawContent(sharedRes->pipelineManager, reorderBuffer.GetArrayView());
                 sharedRes->pipelineManager.PopModuleInstance();
                 sharedRes->pipelineManager.PopModuleInstance();
-                barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::SampledToRenderTarget);
-                transparentPassInstance->Execute(hardwareRenderer, *params.renderStats);
-                barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::RenderTargetToGraphics);
+                transparentPassInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
             }
             hardwareRenderer->EndJobSubmission(nullptr);
         }

@@ -398,17 +398,11 @@ namespace GameEngine
 		Color, Depth, Stencil
 	};
 
-	enum class TextureLayout
-	{
-		Undefined, General, Sample, ColorAttachment, TransferDst, TransferSrc, DepthStencilAttachment, Present
-	};
-
 	class Texture : public CoreLib::RefObject
 	{
 	protected:
 		Texture() {};
     public:
-        virtual void SetCurrentLayout(TextureLayout layout) = 0;
         virtual bool IsDepthStencilFormat() = 0;
 	};
 
@@ -449,6 +443,7 @@ namespace GameEngine
 		TextureCube() {};
 	public:
 		virtual void GetSize(int & size) = 0;
+		virtual void SetData(int mipLevel, int xOffset, int yOffset, int layerOffset, int width, int height, int layerCount, DataType inputType, void* data) = 0;
 	};
 
 	class TextureCubeArray : public Texture
@@ -457,6 +452,7 @@ namespace GameEngine
 		TextureCubeArray() {}
 	public:
 		virtual void GetSize(int & size, int & layerCount) = 0;
+		virtual void SetData(int mipLevel, int xOffset, int yOffset, int layerOffset, int width, int height, int layerCount, DataType inputType, void* data) = 0;
 	};
 
 	class TextureSampler : public CoreLib::RefObject
@@ -725,7 +721,7 @@ namespace GameEngine
 	public:
 		virtual void BeginUpdate() = 0;
 		virtual void Update(int location, Texture* texture, TextureAspect aspect) = 0;
-        virtual void Update(int location, CoreLib::ArrayView<Texture*> texture, TextureAspect aspect, TextureLayout layout = TextureLayout::Sample) = 0;
+        virtual void Update(int location, CoreLib::ArrayView<Texture*> texture, TextureAspect aspect) = 0;
         virtual void UpdateStorageImage(int location, CoreLib::ArrayView<Texture*> texture, TextureAspect aspect) = 0;
 		virtual void Update(int location, TextureSampler* sampler) = 0;
 		virtual void Update(int location, Buffer* buffer, int offset = 0, int length = -1) = 0;
@@ -782,19 +778,6 @@ namespace GameEngine
 		virtual Pipeline* CreateComputePipeline(CoreLib::ArrayView<DescriptorSetLayout*> descriptorSets, Shader* shader) = 0;
 	};
 
-	enum class TextureLayoutTransfer
-	{
-		RenderAttachmentToSample,
-		SampleToRenderAttachment,
-		UndefinedToRenderAttachment,
-	};
-
-	enum class MemoryBarrierType
-	{
-		ShaderWriteToShaderRead,
-		ShaderWriteToHostRead
-	};
-
 	class CommandBuffer : public CoreLib::RefObject
 	{
 	protected:
@@ -817,10 +800,7 @@ namespace GameEngine
 		virtual void DrawIndexed(int firstIndex, int indexCount) = 0;
 		virtual void DrawIndexedInstanced(int numInstances, int firstIndex, int indexCount) = 0;
 		virtual void DispatchCompute(int groupCountX, int groupCountY, int groupCountZ) = 0;
-		virtual void TransferLayout(CoreLib::ArrayView<Texture*> attachments, TextureLayoutTransfer transferDirection) = 0;
-		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, TextureLayout srcLayout, VectorMath::Vec2i destOffset, bool flipSrc) = 0;
 		virtual void ClearAttachments(FrameBuffer * frameBuffer) = 0;
-		virtual void MemoryAccessBarrier(MemoryBarrierType barrierType) = 0;
 	};
 
     class WindowSurface : public CoreLib::RefObject
@@ -842,29 +822,13 @@ namespace GameEngine
         SPIRV, HLSL
     };
 
-    enum class ResourceUsage
-    {
-        FragmentShaderRead = 1, FragmentShaderWrite = 2, GraphicsShaderRead = 3, GraphicsShaderWrite = 4,
-        ComputeRead = 5, ComputeWrite = 6, ComputeReadWrite = 7,
-        RenderAttachmentOutput = 8, RenderAttachmentInput = 16, HostRead = 32, HostWrite = 64,
-        All = 0xFFFF
-    };
-    struct ImagePipelineBarrier
-    {
-        Texture* Image;
-        TextureLayout LayoutBefore, LayoutAfter;
-        int ArrayIndex = 0;
-        int ArrayCount = -1;
-        ImagePipelineBarrier() {}
-        ImagePipelineBarrier(Texture* image, TextureLayout before, TextureLayout after, int arrayIdx = 0, int arrayCount = -1)
-        {
-            Image = image;
-            LayoutBefore = before;
-            LayoutAfter = after;
-            ArrayIndex = arrayIdx;
-            ArrayCount = arrayCount;
-        }
-    };
+	enum class PipelineBarriers
+	{
+		None,
+		ExecutionOnly,
+		Memory,
+		MemoryAndImage
+	};
 
 	class HardwareRenderer : public CoreLib::RefObject
 	{
@@ -872,14 +836,11 @@ namespace GameEngine
         virtual void ThreadInit(int threadId) = 0;
 		virtual void ClearTexture(GameEngine::Texture2D* texture) = 0;
         virtual void BeginJobSubmission() = 0;
-		virtual void QueueRenderPass(FrameBuffer* frameBuffer, CoreLib::ArrayView<CommandBuffer*> commands) = 0;
-		virtual void QueueNonRenderCommandBuffers(CoreLib::ArrayView<CommandBuffer*> commands) = 0;
-        virtual void QueueComputeTask(Pipeline* computePipeline, DescriptorSet* descriptorSet, int x, int y, int z) = 0;
-        virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter, CoreLib::ArrayView<ImagePipelineBarrier> barriers) = 0;
-        virtual void QueuePipelineBarrier(ResourceUsage usageBefore, ResourceUsage usageAfter, CoreLib::ArrayView<Buffer*> buffers) = 0;
+		virtual void QueueRenderPass(FrameBuffer* frameBuffer, CoreLib::ArrayView<CommandBuffer*> commands, PipelineBarriers barriers = PipelineBarriers::MemoryAndImage) = 0;
+        virtual void QueueComputeTask(Pipeline* computePipeline, DescriptorSet* descriptorSet, int x, int y, int z, PipelineBarriers barriers = PipelineBarriers::MemoryAndImage) = 0;
         virtual void EndJobSubmission(GameEngine::Fence* fence) = 0;
 		virtual void Present(WindowSurface * surface, Texture2D* srcImage) = 0;
-		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, VectorMath::Vec2i destOffset) = 0;
+		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, VectorMath::Vec2i destOffset, bool flipSrc) = 0;
 		virtual void Wait() = 0;
 		virtual void SetMaxTempBufferVersions(int versionCount) = 0;
 		virtual void ResetTempBufferVersion(int version) = 0;
@@ -887,15 +848,15 @@ namespace GameEngine
 		virtual Buffer* CreateBuffer(BufferUsage usage, int sizeInBytes) = 0;
 		virtual Buffer* CreateMappedBuffer(BufferUsage usage, int sizeInBytes) = 0;
 		// Automatically builds mipmaps with supplied data
-		virtual Texture2D* CreateTexture2D(int width, int height, StorageFormat format, DataType type, void* data) = 0;
+		virtual Texture2D* CreateTexture2D(CoreLib::String name, int width, int height, StorageFormat format, DataType type, void* data) = 0;
 		// Allocates resources for a texture with supplied parameters
-		virtual Texture2D* CreateTexture2D(TextureUsage usage, int width, int height, int mipLevelCount, StorageFormat format) = 0;
+		virtual Texture2D* CreateTexture2D(CoreLib::String name, TextureUsage usage, int width, int height, int mipLevelCount, StorageFormat format) = 0;
 		// Populates the created texture with the data supplied for each mipLevel
-		virtual Texture2D* CreateTexture2D(TextureUsage usage, int width, int height, int mipLevelCount, StorageFormat format, DataType type, CoreLib::ArrayView<void*> mipLevelData) = 0;
-		virtual Texture2DArray* CreateTexture2DArray(TextureUsage usage, int width, int height, int layers, int mipLevelCount, StorageFormat format) = 0;
-		virtual TextureCube* CreateTextureCube(TextureUsage usage, int size, int mipLevelCount, StorageFormat format) = 0;
-		virtual TextureCubeArray* CreateTextureCubeArray(TextureUsage usage, int size, int mipLevelCount, int cubemapCount, StorageFormat format) = 0;
-		virtual Texture3D* CreateTexture3D(TextureUsage usage, int width, int height, int depth, int mipLevelCount, StorageFormat format) = 0;
+		virtual Texture2D* CreateTexture2D(CoreLib::String name, TextureUsage usage, int width, int height, int mipLevelCount, StorageFormat format, DataType type, CoreLib::ArrayView<void*> mipLevelData) = 0;
+		virtual Texture2DArray* CreateTexture2DArray(CoreLib::String name, TextureUsage usage, int width, int height, int layers, int mipLevelCount, StorageFormat format) = 0;
+		virtual TextureCube* CreateTextureCube(CoreLib::String name, TextureUsage usage, int size, int mipLevelCount, StorageFormat format) = 0;
+		virtual TextureCubeArray* CreateTextureCubeArray(CoreLib::String name, TextureUsage usage, int size, int mipLevelCount, int cubemapCount, StorageFormat format) = 0;
+		virtual Texture3D* CreateTexture3D(CoreLib::String name, TextureUsage usage, int width, int height, int depth, int mipLevelCount, StorageFormat format) = 0;
 		virtual TextureSampler* CreateTextureSampler() = 0;
 		virtual Shader* CreateShader(ShaderType stage, const char* data, int size) = 0;
 		virtual RenderTargetLayout* CreateRenderTargetLayout(CoreLib::ArrayView<AttachmentLayout> bindings, bool ignoreInitialContent) = 0;
@@ -909,7 +870,6 @@ namespace GameEngine
 		virtual int StorageBufferAlignment() = 0;
         virtual WindowSurface * CreateSurface(WindowHandle windowHandle, int width, int height) = 0;
 		virtual CoreLib::String GetRendererName() = 0;
-		virtual void TransferBarrier(int barrierId) = 0;
 	};
 
 	// HardwareRenderer instance constructors

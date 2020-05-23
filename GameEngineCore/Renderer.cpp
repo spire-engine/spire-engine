@@ -303,7 +303,6 @@ namespace GameEngine
             }
 			UpdateLightProbes();
 			RunRenderProcedure();
-			hardwareRenderer->TransferBarrier(DynamicBufferLengthMultiplier);
 			RenderFrame();
 			Wait();
 			sharedRes.renderStats.Clear();

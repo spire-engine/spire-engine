@@ -224,7 +224,6 @@ powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive "$(SolutionDir
     <ClInclude Include="Gizmo.h" />
     <ClInclude Include="GizmoActor.h" />
     <ClInclude Include="ComputeTaskManager.h" />
-    <ClInclude Include="ImageBarrierHelper.h" />
     <ClInclude Include="LevelEditor.h" />
     <ClInclude Include="Drawable.h" />
     <ClInclude Include="EngineLimits.h" />

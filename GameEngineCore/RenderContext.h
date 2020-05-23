@@ -93,7 +93,7 @@ namespace GameEngine
 	class RenderTask : public CoreLib::RefObject
 	{
 	public:
-		virtual void Execute(HardwareRenderer * hw, RenderStat & stats) = 0;
+		virtual void Execute(HardwareRenderer * hw, RenderStat & stats, PipelineBarriers barriers = PipelineBarriers::MemoryAndImage) = 0;
 	};
 
 	class WorldPassRenderTask : public RenderTask
@@ -111,7 +111,7 @@ namespace GameEngine
 		FixedFunctionPipelineStates * fixedFunctionStates = nullptr;
 		Viewport viewport; 
 		bool clearOutput = false;
-		virtual void Execute(HardwareRenderer * hw, RenderStat & stats) override;
+		virtual void Execute(HardwareRenderer * hw, RenderStat & stats, PipelineBarriers barriers) override;
 		void SetFixedOrderDrawContent(PipelineContext & pipelineManager, CoreLib::ArrayView<Drawable*> drawables);
 		void SetDrawContent(PipelineContext & pipelineManager, CoreLib::List<Drawable*>& reorderBuffer, CoreLib::ArrayView<Drawable*> drawables);
 	};
@@ -121,17 +121,7 @@ namespace GameEngine
 	public:
 		PostRenderPass * postPass = nullptr;
 		SharedModuleInstances sharedModules;
-		virtual void Execute(HardwareRenderer * hw, RenderStat & stats) override;
-	};
-
-	class GeneralRenderTask : public RenderTask
-	{
-	private:
-		GeneralRenderTask() = default;
-		AsyncCommandBuffer * commandBuffer = nullptr;
-	public:
-		GeneralRenderTask(AsyncCommandBuffer * cmdBuffer);
-		virtual void Execute(HardwareRenderer * hw, RenderStat & stats) override;
+		virtual void Execute(HardwareRenderer * hw, RenderStat & stats, PipelineBarriers barriers) override;
 	};
 
 	struct SpireModuleStruct

@@ -43,7 +43,6 @@ namespace DummyRenderer
     public:
         Texture() {}
     public:
-        virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
         virtual bool IsDepthStencilFormat() override { return false; }
     };
 
@@ -57,7 +56,6 @@ namespace DummyRenderer
         virtual void SetData(int /*width*/, int /*height*/, int /*samples*/, DataType /*inputType*/, void * /*data*/) override {}
         virtual void GetData(int /*mipLevel*/, void * /*data*/, int /*bufSize*/) override {}
         virtual void BuildMipmaps() override {}
-        virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
         virtual bool IsDepthStencilFormat() override { return false;  }
     };
 
@@ -69,7 +67,6 @@ namespace DummyRenderer
         virtual void GetSize(int &/*width*/, int &/*height*/, int &/*layers*/) override {}
         virtual void SetData(int /*mipLevel*/, int /*xOffset*/, int /*yOffset*/, int /*layerOffset*/, int /*width*/, int /*height*/, int /*layerCount*/, DataType /*inputType*/, void * /*data*/) override {}
         virtual void BuildMipmaps() override {}
-        virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
         virtual bool IsDepthStencilFormat() override { return false;  }
     };
 
@@ -81,7 +78,6 @@ namespace DummyRenderer
     public:
         virtual void GetSize(int &/*width*/, int &/*height*/, int &/*depth*/) override {}
         virtual void SetData(int /*mipLevel*/, int /*xOffset*/, int /*yOffset*/, int /*zOffset*/, int /*width*/, int /*height*/, int /*depth*/, DataType /*inputType*/, void * /*data*/) override {}
-        virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
         virtual bool IsDepthStencilFormat() override { return false;  }
     };
 
@@ -92,7 +88,7 @@ namespace DummyRenderer
 
     public:
         virtual void GetSize(int &/*size*/) override {}
-        virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
+        virtual void SetData(int /*mipLevel*/, int /*xOffset*/, int /*yOffset*/, int /*layerOffset*/, int /*width*/, int /*height*/, int /*layerCount*/, DataType /*inputType*/, void* /*data*/) override {}
         virtual bool IsDepthStencilFormat() override { return false; }
     };
 
@@ -102,7 +98,7 @@ namespace DummyRenderer
         TextureCubeArray() {}
     public:
         virtual void GetSize(int &/*size*/, int &/*layerCount*/) override {}
-        virtual void SetCurrentLayout(TextureLayout /*layout*/) override {}
+        virtual void SetData(int /*mipLevel*/, int /*xOffset*/, int /*yOffset*/, int /*layerOffset*/, int /*width*/, int /*height*/, int /*layerCount*/, DataType /*inputType*/, void* /*data*/) override {}
         virtual bool IsDepthStencilFormat() override { return false; }
     };
 
@@ -173,7 +169,7 @@ namespace DummyRenderer
     public:
         virtual void BeginUpdate() override {}
         virtual void Update(int /*location*/, GameEngine::Texture * /*texture*/, TextureAspect /*aspect*/) override {}
-        virtual void Update(int /*location*/, CoreLib::ArrayView<GameEngine::Texture *> /*texture*/, TextureAspect /*aspect*/, TextureLayout /*layout*/) override {}
+        virtual void Update(int /*location*/, CoreLib::ArrayView<GameEngine::Texture *> /*texture*/, TextureAspect /*aspect*/) override {}
         virtual void UpdateStorageImage(int /*location*/, CoreLib::ArrayView<GameEngine::Texture *> /*texture*/, TextureAspect /*aspect*/) override {}
         virtual void Update(int /*location*/, GameEngine::TextureSampler * /*sampler*/) override {}
         virtual void Update(int /*location*/, GameEngine::Buffer * /*buffer*/, int /*offset*/, int /*length*/) override {}
@@ -237,10 +233,7 @@ namespace DummyRenderer
 		virtual void DrawIndexed(int /*firstIndex*/, int /*indexCount*/) override {}
 		virtual void DrawIndexedInstanced(int /*numInstances*/, int /*firstIndex*/, int /*indexCount*/) override {}
 		virtual void DispatchCompute(int /*groupCountX*/, int /*groupCountY*/, int /*groupCountZ*/) override {}
-		virtual void TransferLayout(CoreLib::ArrayView<GameEngine::Texture*> /*attachments*/, TextureLayoutTransfer /*transferDirection*/) override {}
-		virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, TextureLayout /*srcLayout*/, VectorMath::Vec2i /*destOffset*/, bool /*flipSrc*/) override {}
 		virtual void ClearAttachments(GameEngine::FrameBuffer * /*frameBuffer*/) override {}
-		virtual void MemoryAccessBarrier(MemoryBarrierType /*barrierType*/) override {}
 	};
 
     class WindowSurface : public GameEngine::WindowSurface
@@ -264,32 +257,22 @@ namespace DummyRenderer
         virtual void ThreadInit(int /*threadId*/) override {}
 		virtual void ClearTexture(GameEngine::Texture2D* /*texture*/) override {}
         virtual void BeginJobSubmission() override {}
-		virtual void QueueRenderPass(GameEngine::FrameBuffer* /*frameBuffer*/, CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/) override
+		virtual void QueueRenderPass(GameEngine::FrameBuffer* /*frameBuffer*/, CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/,
+            PipelineBarriers barriers) override
         {
             writer->Write("Execute RenderPass\n");
         }
-		virtual void QueueNonRenderCommandBuffers(CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/) override
-        {
-            writer->Write("Execute CommandBuffer\n");
-        }
-        virtual void QueueComputeTask(GameEngine::Pipeline* /*computePipeline*/, GameEngine::DescriptorSet* /*descriptorSet*/, int /*x*/, int /*y*/, int /*z*/) override
+        virtual void QueueComputeTask(GameEngine::Pipeline* /*computePipeline*/, GameEngine::DescriptorSet* /*descriptorSet*/, 
+            int /*x*/, int /*y*/, int /*z*/, PipelineBarriers /*barriers*/) override
         {
             writer->Write("Execute ComputeTask\n");
-        }
-        virtual void QueuePipelineBarrier(ResourceUsage /*usageBefore*/, ResourceUsage /*usageAfter*/, CoreLib::ArrayView<ImagePipelineBarrier> /*barriers*/) override
-        {
-            writer->Write("PipelineBarrier\n");
-        }
-        virtual void QueuePipelineBarrier(ResourceUsage /*usageBefore*/, ResourceUsage /*usageAfter*/, CoreLib::ArrayView<GameEngine::Buffer*> /*buffers*/) override
-        {
-            writer->Write("PipelineBarrier\n");
         }
         virtual void EndJobSubmission(GameEngine::Fence* /*fence*/) override {}
 		virtual void Present(GameEngine::WindowSurface * /*surface*/, GameEngine::Texture2D* /*srcImage*/) override
         {
             writer->Write("Present\n");
         }
-        virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, VectorMath::Vec2i /*destOffset*/) override {}
+        virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, VectorMath::Vec2i /*destOffset*/, bool /*flipSrc*/) override {}
 		virtual void Wait() override {}
 		virtual void SetMaxTempBufferVersions(int /*versionCount*/) override {}
 		virtual void ResetTempBufferVersion(int /*version*/) override {}
@@ -311,7 +294,7 @@ namespace DummyRenderer
             writer->Write(" bytes)\n");
             return new Buffer(sizeInBytes);
         }
-		virtual GameEngine::Texture2D* CreateTexture2D(int width, int height, StorageFormat /*format*/, DataType /*type*/, void* /*data*/) override
+		virtual GameEngine::Texture2D* CreateTexture2D(CoreLib::String /*name*/, int width, int height, StorageFormat /*format*/, DataType /*type*/, void* /*data*/) override
         {
             writer->Write("Create Texture2D (");
             writer->Write(CoreLib::String(width));
@@ -320,7 +303,7 @@ namespace DummyRenderer
             writer->Write(")\n");
             return new Texture2D();
         }
-		virtual GameEngine::Texture2D* CreateTexture2D(TextureUsage /*usage*/, int width, int height, int /*mipLevelCount*/, StorageFormat /*format*/) override
+		virtual GameEngine::Texture2D* CreateTexture2D(CoreLib::String /*name*/, TextureUsage /*usage*/, int width, int height, int /*mipLevelCount*/, StorageFormat /*format*/) override
         {
             writer->Write("Create Texture2D (");
             writer->Write(CoreLib::String(width));
@@ -329,7 +312,7 @@ namespace DummyRenderer
             writer->Write(")\n");
             return new Texture2D();
         }
-		virtual GameEngine::Texture2D* CreateTexture2D(TextureUsage /*usage*/, int width, int height, int /*mipLevelCount*/, StorageFormat /*format*/, DataType /*type*/, CoreLib::ArrayView<void*> /*mipLevelData*/) override
+		virtual GameEngine::Texture2D* CreateTexture2D(CoreLib::String /*name*/, TextureUsage /*usage*/, int width, int height, int /*mipLevelCount*/, StorageFormat /*format*/, DataType /*type*/, CoreLib::ArrayView<void*> /*mipLevelData*/) override
         {
             writer->Write("Create Texture2D (");
             writer->Write(CoreLib::String(width));
@@ -338,7 +321,7 @@ namespace DummyRenderer
             writer->Write(")\n");
             return new Texture2D();
         }
-		virtual GameEngine::Texture2DArray* CreateTexture2DArray(TextureUsage /*usage*/, int width, int height, int layers, int /*mipLevelCount*/, StorageFormat /*format*/) override
+		virtual GameEngine::Texture2DArray* CreateTexture2DArray(CoreLib::String /*name*/, TextureUsage /*usage*/, int width, int height, int layers, int /*mipLevelCount*/, StorageFormat /*format*/) override
         {
             writer->Write("Create Texture2DArray (");
             writer->Write(CoreLib::String(width));
@@ -349,14 +332,14 @@ namespace DummyRenderer
             writer->Write(")\n");
             return new Texture2DArray();
         }
-		virtual GameEngine::TextureCube* CreateTextureCube(TextureUsage /*usage*/, int size, int /*mipLevelCount*/, StorageFormat /*format*/) override
+		virtual GameEngine::TextureCube* CreateTextureCube(CoreLib::String /*name*/, TextureUsage /*usage*/, int size, int /*mipLevelCount*/, StorageFormat /*format*/) override
         {
             writer->Write("Create TextureCube (");
             writer->Write(CoreLib::String(size));
             writer->Write(")\n");
             return new TextureCube();
         }
-		virtual GameEngine::TextureCubeArray* CreateTextureCubeArray(TextureUsage /*usage*/, int size, int /*mipLevelCount*/, int cubemapCount, StorageFormat /*format*/) override
+		virtual GameEngine::TextureCubeArray* CreateTextureCubeArray(CoreLib::String /*name*/, TextureUsage /*usage*/, int size, int /*mipLevelCount*/, int cubemapCount, StorageFormat /*format*/) override
         {
             writer->Write("Create TextureCubeArray (");
             writer->Write(CoreLib::String(size));
@@ -365,7 +348,7 @@ namespace DummyRenderer
             writer->Write(")\n");
             return new TextureCubeArray();
         }
-		virtual GameEngine::Texture3D* CreateTexture3D(TextureUsage /*usage*/, int width, int height, int depth, int /*mipLevelCount*/, StorageFormat /*format*/) override
+		virtual GameEngine::Texture3D* CreateTexture3D(CoreLib::String /*name*/, TextureUsage /*usage*/, int width, int height, int depth, int /*mipLevelCount*/, StorageFormat /*format*/) override
         {
             writer->Write("Create Texture3D (");
             writer->Write(CoreLib::String(width));
@@ -426,7 +409,6 @@ namespace DummyRenderer
         {
             return "Dummy Renderer";
         }
-		virtual void TransferBarrier(int /*barrierId*/) override {}
 	};
 }
 }

@@ -145,6 +145,7 @@
     <ClInclude Include="Regex\RegexNFA.h" />
     <ClInclude Include="Regex\RegexTree.h" />
     <ClInclude Include="SecureCRT.h" />
+    <ClInclude Include="ShortList.h" />
     <ClInclude Include="SmartPointer.h" />
     <ClInclude Include="Stream.h" />
     <ClInclude Include="TextIO.h" />

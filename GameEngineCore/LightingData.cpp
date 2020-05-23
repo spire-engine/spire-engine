@@ -75,7 +75,7 @@ namespace GameEngine
 		pass->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, drawableBuffer.GetArrayView());
 		sharedRes->pipelineManager.PopModuleInstance();
         RenderStat stat;
-		pass->Execute(hw, stat);
+		pass->Execute(hw, stat, PipelineBarriers::MemoryAndImage);
 	}
 
 	void LightingEnvironment::GatherInfo(HardwareRenderer* hw, DrawableSink * sink, const RenderProcedureParameters & params, int w, int h, StandardViewUniforms & viewUniform, WorldRenderPass * shadowRenderPass)
@@ -336,8 +336,13 @@ namespace GameEngine
 		this->sharedRes = &pSharedRes;
 		this->useEnvMap = pUseEnvMap;
 		if (!useEnvMap)
-			emptyEnvMapArray = pSharedRes.hardwareRenderer->CreateTextureCubeArray(TextureUsage::Sampled, 2, 2, MaxEnvMapCount, StorageFormat::RGBA_F16);
-        emptyLightmapArray = pSharedRes.hardwareRenderer->CreateTexture2DArray(TextureUsage::Sampled, 2, 2, 2, 1, StorageFormat::RGBA_F16);
+		{
+			emptyEnvMapArray = pSharedRes.hardwareRenderer->CreateTextureCubeArray("emptyEnvMapArray", TextureUsage::Sampled, 2, 1, MaxEnvMapCount, StorageFormat::RGBA_F16);
+			emptyEnvMapArray->SetData(0, 0, 0, 0, 2, 2, MaxEnvMapCount * 6, DataType::Half4, nullptr);
+		}
+		emptyLightmapArray = pSharedRes.hardwareRenderer->CreateTexture2DArray("emptyLightmapArray", TextureUsage::Sampled, 2, 2, 2, 1, StorageFormat::RGBA_F16);
+		emptyLightmapArray->SetData(0, 0, 0, 0, 2, 2, 2, DataType::Half4, nullptr);
+
 		sharedRes->CreateModuleInstance(moduleInstance, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("LightingEnvironment"), uniformMemory, sizeof(LightingUniform));
 		lightBufferSize = Math::RoundUpToAlignment((int)sizeof(GpuLightData) * MaxLights, sharedRes->hardwareRenderer->UniformBufferAlignment());
 		lightBuffer = sharedRes->hardwareRenderer->CreateMappedBuffer(GameEngine::BufferUsage::StorageBuffer, lightBufferSize * DynamicBufferLengthMultiplier);

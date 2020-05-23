@@ -218,10 +218,10 @@ namespace GameEngine
 			Array<void*, 32> mipData;
 			for(int level = 0; level < data.GetMipLevels(); level++)
 				mipData.Add(data.GetBuffer(level).Buffer());
-			rs = hw->CreateTexture2D(TextureUsage::Sampled, data.GetWidth(), data.GetHeight(), data.GetMipLevels(), format, dataType, mipData.GetArrayView());
+			rs = hw->CreateTexture2D(name, TextureUsage::Sampled, data.GetWidth(), data.GetHeight(), data.GetMipLevels(), format, dataType, mipData.GetArrayView());
 		}
 		else
-			rs = hw->CreateTexture2D(data.GetWidth(), data.GetHeight(), format, dataType, textureData);
+			rs = hw->CreateTexture2D(name, data.GetWidth(), data.GetHeight(), format, dataType, textureData);
 		textures[name] = rs;
 		return rs;
 	}
@@ -416,7 +416,7 @@ namespace GameEngine
 	{
 		auto & graphicsSettings = Engine::Instance()->GetGraphicsSettings();
 
-		shadowMapArray = hwRenderer->CreateTexture2DArray(TextureUsage::SampledDepthAttachment, graphicsSettings.ShadowMapResolution, graphicsSettings.ShadowMapResolution,
+		shadowMapArray = hwRenderer->CreateTexture2DArray("shadowmapArray", TextureUsage::SampledDepthAttachment, graphicsSettings.ShadowMapResolution, graphicsSettings.ShadowMapResolution,
 			graphicsSettings.ShadowMapArraySize, 1, StorageFormat::Depth32);
 		shadowMapArrayFreeBits.SetMax(graphicsSettings.ShadowMapArraySize);
 		shadowMapArrayFreeBits.Clear();
@@ -606,10 +606,10 @@ namespace GameEngine
 		indexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::IndexBuffer, false, 26, 256);
 		vertexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::ArrayBuffer, false, 28, 256);
 
-		envMapArray = hardwareRenderer->CreateTextureCubeArray(TextureUsage::SampledColorAttachment, EnvMapSize, Math::Log2Floor(EnvMapSize) + 1, MaxEnvMapCount, StorageFormat::RGBA_F16);
+		envMapArray = hardwareRenderer->CreateTextureCubeArray("envMapArray", TextureUsage::SampledColorAttachment, EnvMapSize, Math::Log2Floor(EnvMapSize) + 1, MaxEnvMapCount, StorageFormat::RGBA_F16);
 	
 		// create default color lookup texture
-		defaultColorLookupTexture = hardwareRenderer->CreateTexture3D(TextureUsage::Sampled, 16, 16, 16, 1, StorageFormat::RGBA_8);
+		defaultColorLookupTexture = hardwareRenderer->CreateTexture3D("defaultColorLookup", TextureUsage::Sampled, 16, 16, 16, 1, StorageFormat::RGBA_8);
 		struct color { unsigned char r, g, b, a; };
 		List<color> buffer;
 		buffer.SetSize(16 * 16 * 16);
@@ -815,26 +815,20 @@ namespace GameEngine
 		SetFixedOrderDrawContent(pipelineManager, reorderBuffer.GetArrayView());
 
 	}
-	void PostPassRenderTask::Execute(HardwareRenderer * /*hwRenderer*/, RenderStat & /*stats*/)
+	void PostPassRenderTask::Execute(HardwareRenderer * /*hwRenderer*/, RenderStat & /*stats*/, PipelineBarriers barriers)
 	{
-		postPass->Execute(sharedModules);
+		postPass->Execute(sharedModules, barriers);
 	}
-	void WorldPassRenderTask::Execute(HardwareRenderer * hwRenderer, RenderStat & stats)
+	void WorldPassRenderTask::Execute(HardwareRenderer * hwRenderer, RenderStat & stats, PipelineBarriers barriers)
 	{
 		stats.NumPasses++;
 		stats.NumDrawCalls += numDrawCalls;
 		stats.NumMaterials += numMaterials;
 		stats.NumShaders += numShaders;
 		
-		hwRenderer->QueueRenderPass(renderOutput->GetFrameBuffer(), MakeArrayView<CommandBuffer*>(apiCommandBuffers.Buffer(), apiCommandBuffers.Count()));
-	}
-	GeneralRenderTask::GeneralRenderTask(AsyncCommandBuffer * cmdBuffer)
-	{
-		commandBuffer = cmdBuffer;
-	}
-	void GeneralRenderTask::Execute(HardwareRenderer * hwRenderer, RenderStat & /*stats*/)
-	{
-		hwRenderer->QueueNonRenderCommandBuffers(MakeArrayView(commandBuffer->GetBuffer()));
+		hwRenderer->QueueRenderPass(renderOutput->GetFrameBuffer(),
+			MakeArrayView<CommandBuffer*>(apiCommandBuffers.Buffer(), apiCommandBuffers.Count()),
+			barriers);
 	}
 }
 

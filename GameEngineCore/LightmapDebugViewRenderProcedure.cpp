@@ -6,7 +6,6 @@
 #include "FrustumCulling.h"
 #include "RenderProcedure.h"
 #include "StandardViewUniforms.h"
-#include "ImageBarrierHelper.h"
 
 using namespace VectorMath;
 
@@ -42,8 +41,6 @@ namespace GameEngine
         List<Drawable*> reorderBuffer, drawableBuffer;
         RefPtr<Buffer> lightmapSizeBuffer, lightmapColorBuffer;
         DeviceLightmapSet* lightmapSet = nullptr;
-
-        ImageBarrierHelper barrierHelper;
     public:
         ~LightmapDebugViewRenderProcedure()
         {
@@ -265,24 +262,21 @@ namespace GameEngine
             sharedRes->pipelineManager.PushModuleInstance(&standardViewParams);
             customDepthPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, cameraCullFrustum, true));
             sharedRes->pipelineManager.PopModuleInstance();
-            customDepthPassInstance->Execute(hardwareRenderer, *params.renderStats);
-            barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::RenderTargetToGraphics);
+            customDepthPassInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
 
             // execute visualization pass
             forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-            barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::UndefinedToRenderTarget);
             forwardRenderPass->Bind();
             sharedRes->pipelineManager.PushModuleInstance(&lightmapViewParams);
             forwardBaseInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, cameraCullFrustum, false));
             sharedRes->pipelineManager.PopModuleInstance();
-            forwardBaseInstance->Execute(hardwareRenderer, *params.renderStats);
-
-            barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::RenderTargetToGraphics);
+            forwardBaseInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
 
             if (Engine::Instance()->GetEngineMode() == EngineMode::Editor)
             {
                 forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-                editorOutlinePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats);
+                editorOutlinePass->CreateInstance(sharedModules)->Execute(hardwareRenderer, *params.renderStats,
+                    PipelineBarriers::MemoryAndImage);
             }
             hardwareRenderer->EndJobSubmission(nullptr);
         }

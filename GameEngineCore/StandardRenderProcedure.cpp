@@ -13,7 +13,6 @@
 #include "BuildHistogram.h"
 #include "EyeAdaptation.h"
 #include "SSAOActor.h"
-#include "ImageBarrierHelper.h"
 
 using namespace VectorMath;
 
@@ -84,8 +83,6 @@ namespace GameEngine
         bool useAtmosphere = false;
         bool postProcess = false;
         bool useEnvMap = false;
-
-        ImageBarrierHelper barrierHelper;
     public:
         StandardRenderProcedure(bool pPostProcess, bool pUseEnvMap)
         {
@@ -420,9 +417,6 @@ namespace GameEngine
                 }
             }
             // collect light data and render shadow maps
-
-            barrierHelper.QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), ImageBarrierHelper::UndefinedToRenderTarget);
-
             lighting.GatherInfo(hardwareRenderer, &sink, params, w, h, viewUniform, shadowRenderPass.Ptr());
 
             viewParams.SetUniformData(&viewUniform, (int)sizeof(viewUniform));
@@ -435,8 +429,7 @@ namespace GameEngine
             sharedRes->pipelineManager.PushModuleInstance(&viewParams);
             customDepthPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::CustomDepth, cameraCullFrustum, false));
             sharedRes->pipelineManager.PopModuleInstance();
-            customDepthPassInstance->Execute(hardwareRenderer, *params.renderStats);
-            barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::RenderTargetToGraphics);
+            customDepthPassInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
 
             // pre-z pass
             Array<Texture*, 2> prezTextures;
@@ -451,17 +444,12 @@ namespace GameEngine
             sharedRes->pipelineManager.PushModuleInstance(&viewParams);
             preZPassTransparentInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Transparent, cameraCullFrustum, false));
             sharedRes->pipelineManager.PopModuleInstance();
-            preZPassInstance->Execute(hardwareRenderer, *params.renderStats);
-            preZPassTransparentInstance->Execute(hardwareRenderer, *params.renderStats);
-            barrierHelper.QueueImageBarrier(hardwareRenderer, prezTextures.GetArrayView(), ImageBarrierHelper::RenderTargetToCompute);
+            preZPassInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
+            preZPassTransparentInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
 
             if (ssaoEnabled)
             {
                 // ssao
-                Array<ImagePipelineBarrier, 2> aoImageBarriers;
-                aoImageBarriers.Add(ImagePipelineBarrier(aoRenderTarget->Texture.Ptr(), TextureLayout::Undefined, TextureLayout::General));
-                aoImageBarriers.Add(ImagePipelineBarrier(aoBlurTarget->Texture.Ptr(), TextureLayout::Undefined, TextureLayout::General));
-                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeRead, ResourceUsage::ComputeWrite, aoImageBarriers.GetArrayView());
                 Array<ResourceBinding, 3> ssaoBindings;
                 ssaoBindings.Add(ResourceBinding(prezTextures[0]));
                 ssaoBindings.Add(ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage));
@@ -474,25 +462,16 @@ namespace GameEngine
 
                 ssaoComputeTaskInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
                 ssaoComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
-                aoImageBarriers.Clear();
-                aoImageBarriers.Add(ImagePipelineBarrier(aoRenderTarget->Texture.Ptr(), TextureLayout::General, TextureLayout::General));
-                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, aoImageBarriers.GetArrayView());
 
-                ssaoBindings[0] = ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture, TextureLayout::General);
+                ssaoBindings[0] = ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture);
                 ssaoBindings[1] = ResourceBinding(aoBlurTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage);
                 ssaoBlurXInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
                 ssaoBlurXInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
-                aoImageBarriers.Clear();
-                aoImageBarriers.Add(ImagePipelineBarrier(aoBlurTarget->Texture.Ptr(), TextureLayout::General, TextureLayout::General));
-                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, aoImageBarriers.GetArrayView());
 
-                ssaoBindings[0] = ResourceBinding(aoBlurTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture, TextureLayout::General);
+                ssaoBindings[0] = ResourceBinding(aoBlurTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture);
                 ssaoBindings[1] = ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage);
                 ssaoBlurYInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
                 ssaoBlurYInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
-                aoImageBarriers.Clear();
-                aoImageBarriers.Add(ImagePipelineBarrier(aoRenderTarget->Texture.Ptr(), TextureLayout::General, TextureLayout::General));
-                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, aoImageBarriers.GetArrayView());
             }
 
             // build tiled light list
@@ -511,42 +490,33 @@ namespace GameEngine
             buildLightListBindings.Add(ResourceBinding(lighting.tiledLightListBufffer.Ptr(), 0, lighting.tiledLightListBufferSize));
             lightListBuildingComputeTaskInstance->UpdateVersionedParameters(&buildLightListUniforms, sizeof(buildLightListUniforms), buildLightListBindings.GetArrayView());
             lightListBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
-            hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::FragmentShaderRead, lighting.tiledLightListBufffer.Ptr());
 
             // execute forward lighting pass
-            barrierHelper.QueueImageBarrier(hardwareRenderer, ArrayView<Texture*>(sharedRes->shadowMapResources.shadowMapArray.Ptr()), ImageBarrierHelper::RenderTargetToGraphics);
-
             forwardBaseOutput->GetFrameBuffer()->GetRenderAttachments().GetTextures(textures);
-            barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::SampledToRenderTarget);
             forwardRenderPass->Bind();
             sharedRes->pipelineManager.PushModuleInstance(&viewParams);
             sharedRes->pipelineManager.PushModuleInstance(&lighting.moduleInstance);
             forwardBaseInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer, GetDrawable(&sink, PassType::Main, cameraCullFrustum, false));
             sharedRes->pipelineManager.PopModuleInstance();
             sharedRes->pipelineManager.PopModuleInstance();
-            forwardBaseInstance->Execute(hardwareRenderer, *params.renderStats);
+            forwardBaseInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
 
             debugGraphicsRenderPass->Bind();
             sharedRes->pipelineManager.PushModuleInstance(&viewParams);
             debugGraphicsPassInstance->SetDrawContent(sharedRes->pipelineManager, reorderBuffer,
                 Engine::GetDebugGraphics()->GetDrawables(Engine::Instance()->GetRenderer()->GetRendererService()));
             sharedRes->pipelineManager.PopModuleInstance();
-            debugGraphicsPassInstance->Execute(hardwareRenderer, *params.renderStats);
+            debugGraphicsPassInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::None);
 
             if (ssaoEnabled)
             {
-                barrierHelper.QueueImageBarrier(hardwareRenderer, MakeArrayView(textures[0]), ImageBarrierHelper::RenderTargetToComputeStorage);
                 // composite AO with lit buffer
                 Array<ResourceBinding, 2> aoCompositeBindings;
-                aoCompositeBindings.Add(ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture, TextureLayout::General));
+                aoCompositeBindings.Add(ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture));
                 aoCompositeBindings.Add(ResourceBinding(textures[0],ResourceBinding::BindingType::StorageImage));
                 ssaoCompositeInstance->UpdateVersionedParameters(nullptr, 0, aoCompositeBindings.GetArrayView());
                 ssaoCompositeInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
-                barrierHelper.QueueImageBarrier(hardwareRenderer, MakeArrayView(textures[0]), ImageBarrierHelper::ComputeStorageToSample);
-                barrierHelper.QueueImageBarrier(hardwareRenderer, MakeArrayView(textures[1]), ImageBarrierHelper::RenderTargetToGraphics);
             }
-            else
-                barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::RenderTargetToGraphics);
 
             if (useAtmosphere)
             {
@@ -579,9 +549,7 @@ namespace GameEngine
                 transparentPassInstance->SetFixedOrderDrawContent(sharedRes->pipelineManager, reorderBuffer.GetArrayView());
                 sharedRes->pipelineManager.PopModuleInstance();
                 sharedRes->pipelineManager.PopModuleInstance();
-                barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::SampledToRenderTarget);
-                transparentPassInstance->Execute(hardwareRenderer, *params.renderStats);
-                barrierHelper.QueueImageBarrier(hardwareRenderer, textures.GetArrayView(), ImageBarrierHelper::RenderTargetToGraphics);
+                transparentPassInstance->Execute(hardwareRenderer, *params.renderStats, PipelineBarriers::MemoryAndImage);
             }
 
             if (postProcess)
@@ -593,7 +561,6 @@ namespace GameEngine
                 auto lightingOutput = textures[0];
                 // build histogram for eye adaptation
                 clearHistogramComputeTaskInstance->Queue(1, 1, 1);
-                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, sharedRes->histogramBuffer.Ptr());
                 BuildHistogramUniforms buildHistogramUniforms;
                 buildHistogramUniforms.width = w;
                 buildHistogramUniforms.height = h;
@@ -603,7 +570,6 @@ namespace GameEngine
                 buildHistogramBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, sizeof(int32_t)*128));
                 histogramBuildingComputeTaskInstance->UpdateVersionedParameters(&buildHistogramUniforms, sizeof(buildHistogramUniforms), buildHistogramBindings.GetArrayView());
                 histogramBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
-                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::ComputeRead, sharedRes->histogramBuffer.Ptr());
 
                 // compute adapted luminance
                 Array<ResourceBinding, 5> eyeAdaptationBindings;
@@ -611,7 +577,6 @@ namespace GameEngine
                 eyeAdaptationBindings.Add(ResourceBinding(sharedRes->adaptedLuminanceBuffer.Ptr(), 0, sizeof(float)));
                 eyeAdaptationComputeTaskInstance->UpdateVersionedParameters(&eyeAdaptationUniforms, sizeof(eyeAdaptationUniforms), eyeAdaptationBindings.GetArrayView());
                 eyeAdaptationComputeTaskInstance->Queue(1, 1, 1);
-                hardwareRenderer->QueuePipelineBarrier(ResourceUsage::ComputeWrite, ResourceUsage::FragmentShaderRead, sharedRes->adaptedLuminanceBuffer.Ptr());
 
                 // tone mapping with adapted luminance
                 if (useAtmosphere)

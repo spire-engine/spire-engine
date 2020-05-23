@@ -29,16 +29,14 @@ namespace GameEngine
             Texture, TextureArray, Sampler, StorageBuffer, StorageImage
         };
         BindingType type;
-        TextureLayout textureLayout;
         int bufferOffset;
         int bufferLength;
         CoreLib::ArrayView<Texture*> textureArrayBinding;
         ResourceBinding() {}
-        ResourceBinding(Texture* texture, BindingType bindingType = BindingType::Texture, TextureLayout layout = TextureLayout::Sample)
+        ResourceBinding(Texture* texture, BindingType bindingType = BindingType::Texture)
         {
             type = bindingType;
             resourceHandles.textureBinding = texture;
-            textureLayout = layout;
         }
         ResourceBinding(TextureSampler* sampler)
         {
@@ -52,11 +50,10 @@ namespace GameEngine
             bufferOffset = offset;
             bufferLength = size;
         }
-        ResourceBinding(CoreLib::ArrayView<Texture*> texArray, TextureLayout layout = TextureLayout::Sample)
+        ResourceBinding(CoreLib::ArrayView<Texture*> texArray)
         {
             type = BindingType::TextureArray;
             textureArrayBinding = texArray;
-            textureLayout = layout;
         }
     };
 
@@ -83,9 +80,8 @@ namespace GameEngine
         void SetUniformData(void * data, int size);
         void SetBinding(CoreLib::ArrayView<ResourceBinding> resources);
         void UpdateVersionedParameters(void * data, int size, CoreLib::ArrayView<ResourceBinding> resources);
-        void Dispatch(CommandBuffer* cmdBuffer, int x, int y, int z);
         void Queue(int x, int y, int z);
-        void Run(CommandBuffer * cmdBuffer, int x, int y, int z, Fence* fence = nullptr);
+        void Run(int x, int y, int z, Fence* fence = nullptr);
         ~ComputeTaskInstance();
     };
 

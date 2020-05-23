@@ -35,9 +35,9 @@ namespace GameEngine
             if (useAsStorage)
                 baseUsage = TextureUsage::Storage;
 			if (format == StorageFormat::Depth24Stencil8 || format == StorageFormat::Depth32 || format == StorageFormat::Depth24)
-				result->Texture = hwRenderer->CreateTexture2D(TextureUsage((int)baseUsage | (int)TextureUsage::SampledDepthAttachment), result->Width, result->Height, 1, format);
+				result->Texture = hwRenderer->CreateTexture2D(name, TextureUsage((int)baseUsage | (int)TextureUsage::SampledDepthAttachment), result->Width, result->Height, 1, format);
 			else
-				result->Texture = hwRenderer->CreateTexture2D(TextureUsage((int)baseUsage | (int)TextureUsage::SampledColorAttachment), result->Width, result->Height, 1, format);
+				result->Texture = hwRenderer->CreateTexture2D(name, TextureUsage((int)baseUsage | (int)TextureUsage::SampledColorAttachment), result->Width, result->Height, 1, format);
 			
 		}
 		result->FixedWidth = w;
@@ -60,9 +60,9 @@ namespace GameEngine
                 if (r.Value->EnableUseAsStorageImage)
                     baseUsage = TextureUsage::Storage;
                 if (r.Value->Format == StorageFormat::Depth24Stencil8 || r.Value->Format == StorageFormat::Depth32 || r.Value->Format == StorageFormat::Depth24)
-                    r.Value->Texture = hwRenderer->CreateTexture2D(TextureUsage((int)baseUsage | (int)TextureUsage::SampledDepthAttachment), r.Value->Width, r.Value->Height, 1, r.Value->Format);
+                    r.Value->Texture = hwRenderer->CreateTexture2D(r.Key, TextureUsage((int)baseUsage | (int)TextureUsage::SampledDepthAttachment), r.Value->Width, r.Value->Height, 1, r.Value->Format);
                 else
-                    r.Value->Texture = hwRenderer->CreateTexture2D(TextureUsage((int)baseUsage | (int)TextureUsage::SampledColorAttachment), r.Value->Width, r.Value->Height, 1, r.Value->Format);
+                    r.Value->Texture = hwRenderer->CreateTexture2D(r.Key, TextureUsage((int)baseUsage | (int)TextureUsage::SampledColorAttachment), r.Value->Width, r.Value->Height, 1, r.Value->Format);
             }
 		}
 		for (auto & output : renderOutputs)

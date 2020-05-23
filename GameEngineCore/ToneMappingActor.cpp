@@ -39,7 +39,7 @@ namespace GameEngine
 			reader.Read(buffer.Buffer(), buffer.Count());
 			auto hw = Engine::Instance()->GetRenderer()->GetHardwareRenderer();
             hw->Wait();
-			lookupTexture = hw->CreateTexture3D(TextureUsage::Sampled, size, size, size, 1, StorageFormat::RGBA_8);
+			lookupTexture = hw->CreateTexture3D(fileName, TextureUsage::Sampled, size, size, size, 1, StorageFormat::RGBA_8);
 			lookupTexture->SetData(0, 0, 0, 0, size, size, size, DataType::Byte4, buffer.Buffer());
             return true;
 		}
