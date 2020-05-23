@@ -280,14 +280,14 @@ namespace VK
 			bool hasValidationLayer = false;
 			auto supportedLayers = vk::enumerateInstanceLayerProperties();
 			for (auto & l : supportedLayers)
-				if (strcmp(l.layerName, "VK_LAYER_LUNARG_standard_validation") == 0)
+				if (strcmp(l.layerName, "VK_LAYER_KHRONOS_validation") == 0)
 				{
 					hasValidationLayer = true;
 					break;
 				}
 #if USE_VALIDATION_LAYER
 			if (hasValidationLayer)
-				enabledInstanceLayers.Add("VK_LAYER_LUNARG_standard_validation");
+				enabledInstanceLayers.Add("VK_LAYER_KHRONOS_validation");
 #endif
 #endif
 			// Enabled Extensions
@@ -4168,7 +4168,7 @@ namespace VK
 				{
 					return (value & bits) != GameEngine::TextureUsage::Unused;
 				};
-				if (testUsageBit(usage, GameEngine::TextureUsage::ColorAttachment | GameEngine::TextureUsage::SampledColorAttachment))
+				if (testUsageBit(usage, GameEngine::TextureUsage::ColorAttachment))
 				{
 					attachments.Add(
 						vk::ClearAttachment()
@@ -4177,7 +4177,7 @@ namespace VK
 						.setClearValue(vk::ClearColorValue())
 					);
 				}
-				if (testUsageBit(usage, GameEngine::TextureUsage::DepthAttachment | GameEngine::TextureUsage::SampledDepthAttachment))
+				if (testUsageBit(usage, GameEngine::TextureUsage::DepthAttachment))
 				{
 					attachments.Add(
 						vk::ClearAttachment()
@@ -4185,7 +4185,7 @@ namespace VK
 						.setColorAttachment(VK_ATTACHMENT_UNUSED)
 						.setClearValue(vk::ClearDepthStencilValue(1.0f, 0)));
 				}
-				if (testUsageBit(usage, GameEngine::TextureUsage::StencilAttachment | GameEngine::TextureUsage::SampledStencilAttachment))
+				if (testUsageBit(usage, GameEngine::TextureUsage::StencilAttachment))
 				{
 					attachments.Add(
 						vk::ClearAttachment()
@@ -4193,7 +4193,7 @@ namespace VK
 						.setColorAttachment(VK_ATTACHMENT_UNUSED)
 						.setClearValue(vk::ClearDepthStencilValue(1.0f, 0)));
 				}
-				if (testUsageBit(usage, GameEngine::TextureUsage::DepthStencilAttachment | GameEngine::TextureUsage::SampledDepthStencilAttachment))
+				if (testUsageBit(usage, GameEngine::TextureUsage::DepthStencilAttachment))
 				{
 					attachments.Add(
 						vk::ClearAttachment()
