@@ -151,6 +151,7 @@
     <ClInclude Include="TextIO.h" />
     <ClInclude Include="Threading.h" />
     <ClInclude Include="Tokenizer.h" />
+    <ClInclude Include="VariableSizeAllocator.h" />
     <ClInclude Include="VectorMath.h" />
     <ClInclude Include="WinForm\Debug.h" />
     <ClInclude Include="WinForm\WinAccel.h" />

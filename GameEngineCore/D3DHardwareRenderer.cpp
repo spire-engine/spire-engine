@@ -4,6 +4,7 @@
 
 #include "CoreLib/Stream.h"
 #include "CoreLib/TextIO.h"
+#include "CoreLib/VariableSizeAllocator.h"
 
 #include <mutex>
 #include <thread>
@@ -29,17 +30,88 @@ namespace GameEngine
         // Max data size allowed to use the shared staging buffer for CPU-GPU upload.
         static constexpr int SharedStagingBufferDataSizeThreshold = 1 << 20;
 
+        static constexpr int ResourceDescriptorHeapSize = 1000000;
+        static constexpr int SamplerDescriptorHeapSize = 512;
+
         int Align(int size, int alignment)
         {
             return (size + alignment - 1) / alignment * alignment;
         }
+
+        struct DescriptorAddress
+        {
+            D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;
+            D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
+        };
+
+        class DescriptorHeap
+        {
+        public:
+            D3D12_DESCRIPTOR_HEAP_DESC desc;
+            ID3D12DescriptorHeap* heap;
+            D3D12_CPU_DESCRIPTOR_HANDLE cpuHeapStart;
+            D3D12_GPU_DESCRIPTOR_HANDLE gpuHeapStart;
+            UINT handleIncrementSize;
+            VariableSizeAllocator allocator;
+            DescriptorAddress GetAddress(int offsetInDescSlots)
+            {
+                DescriptorAddress addr;
+                addr.cpuHandle = cpuHeapStart;
+                addr.gpuHandle = gpuHeapStart;
+                addr.cpuHandle.ptr += offsetInDescSlots * handleIncrementSize;
+                addr.gpuHandle.ptr += offsetInDescSlots * handleIncrementSize;
+                return addr;
+            }
+        public:
+            void Create(
+                ID3D12Device* pDevice,
+                D3D12_DESCRIPTOR_HEAP_TYPE Type,
+                UINT numDescriptors,
+                bool shaderVisible = false)
+            {
+                desc.Type = Type;
+                desc.NumDescriptors = numDescriptors;
+                desc.Flags = (shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+
+                CHECK_DX(pDevice->CreateDescriptorHeap(&desc,
+                    __uuidof(ID3D12DescriptorHeap),
+                    (void**)&heap));
+
+                cpuHeapStart = heap->GetCPUDescriptorHandleForHeapStart();
+                gpuHeapStart = heap->GetGPUDescriptorHandleForHeapStart();
+
+                handleIncrementSize = pDevice->GetDescriptorHandleIncrementSize(desc.Type);
+
+                allocator.InitPool(numDescriptors);
+            }
+
+            DescriptorAddress Alloc(int numDescs)
+            {
+                if (numDescs == 0)
+                    return GetAddress(0);
+
+                int offset = allocator.Alloc(numDescs);
+                CORELIB_ASSERT(offset != -1 && "Descriptor allocation failed.");
+                return GetAddress(offset);
+            }
+
+            void Free(DescriptorAddress addr, int numDescs)
+            {
+                if (numDescs == 0)
+                    return;
+                int offset = (int)(addr.cpuHandle.ptr = cpuHeapStart.ptr);
+                allocator.Free(offset, numDescs);
+            }
+        };
+
 
         class RendererState
         {
         public:
             ID3D12Device* device = nullptr;
             ID3D12CommandQueue* queue = nullptr;
-            ID3D12Heap* heap = nullptr;
+            DescriptorHeap resourceDescHeap, rtvDescHeap, samplerDescHeap;
+
             int version = 0;
             CoreLib::List<ID3D12Resource*> stagingBuffers;
             CoreLib::List<long> stagingBufferAllocPtr;
@@ -717,7 +789,7 @@ namespace GameEngine
             
         };
 
-        class Texture2D : public virtual GameEngine::Texture2D
+        class Texture2D : public GameEngine::Texture2D
         {
         public:
             D3DTexture texture;
@@ -755,7 +827,7 @@ namespace GameEngine
             }
         };
 
-        class Texture2DArray : public virtual GameEngine::Texture2DArray
+        class Texture2DArray : public GameEngine::Texture2DArray
         {
         public:
             D3DTexture texture;
@@ -785,7 +857,7 @@ namespace GameEngine
             }
         };
 
-        class Texture3D : public virtual GameEngine::Texture3D
+        class Texture3D : public GameEngine::Texture3D
         {
         public:
             D3DTexture texture;
@@ -809,7 +881,7 @@ namespace GameEngine
             }
         };
 
-        class TextureCube : public virtual GameEngine::TextureCube
+        class TextureCube : public GameEngine::TextureCube
         {
         public:
             D3DTexture texture;
@@ -834,7 +906,7 @@ namespace GameEngine
             }
         };
 
-        class TextureCubeArray : public virtual GameEngine::TextureCubeArray
+        class TextureCubeArray : public GameEngine::TextureCubeArray
         {
         public:
             D3DTexture texture;
@@ -859,7 +931,7 @@ namespace GameEngine
             }
         };
 
-        class TextureSampler : public virtual GameEngine::TextureSampler
+        class TextureSampler : public GameEngine::TextureSampler
         {
         public:
             TextureSampler() {}
@@ -873,13 +945,13 @@ namespace GameEngine
             virtual void SetDepthCompare(CompareFunc /*op*/) override {}
         };
 
-        class Shader : public virtual GameEngine::Shader
+        class Shader : public GameEngine::Shader
         {
         public:
             Shader() {};
         };
 
-        class FrameBuffer : public virtual GameEngine::FrameBuffer
+        class FrameBuffer : public GameEngine::FrameBuffer
         {
         public:
             RenderAttachments renderAttachments;
@@ -893,7 +965,7 @@ namespace GameEngine
             }
         };
 
-        class Fence : public virtual GameEngine::Fence
+        class Fence : public GameEngine::Fence
         {
         public:
             ID3D12Fence* fence = nullptr;
@@ -919,7 +991,7 @@ namespace GameEngine
             }
         };
 
-        class RenderTargetLayout : public virtual GameEngine::RenderTargetLayout
+        class RenderTargetLayout : public GameEngine::RenderTargetLayout
         {
         public:
             RenderTargetLayout() {}
@@ -930,33 +1002,118 @@ namespace GameEngine
             }
         };
 
-        class DescriptorSetLayout : public virtual GameEngine::DescriptorSetLayout
+        class DescriptorSetLayout : public GameEngine::DescriptorSetLayout
         {
         public:
-            DescriptorSetLayout() {}
+            CoreLib::List<DescriptorLayout> descriptors;
+            DescriptorSetLayout(CoreLib::ArrayView<DescriptorLayout> descs)
+            {
+                descriptors.AddRange(descs);
+            }
         };
 
-        class DescriptorSet : public virtual GameEngine::DescriptorSet
+        struct DescriptorNode
         {
+            DescriptorLayout layout;
+            DescriptorAddress address;
+        };
+
+        class DescriptorSet : public GameEngine::DescriptorSet
+        {
+        private:
+            DescriptorAddress resourceAddr, samplerAddr;
+            int resourceCount, samplerCount;
+            List<DescriptorNode> descriptors;
         public:
-            DescriptorSet() {}
+            DescriptorSet(DescriptorSetLayout* layout)
+            {
+                auto& state = RendererState::Get();
+                resourceCount = 0;
+                samplerCount = 0;
+                descriptors.Reserve(layout->descriptors.Count());
+                for (auto& desc : layout->descriptors)
+                {
+                    DescriptorNode node;
+                    node.layout = desc;
+                    node.address.cpuHandle.ptr = 0;
+                    switch (desc.Type)
+                    {
+                    case BindingType::Sampler:
+                        // temporarily store offset in cpuHandle.ptr
+                        node.address.cpuHandle.ptr = samplerCount;
+                        samplerCount++;
+                        break;
+                    case BindingType::StorageBuffer:
+                    case BindingType::StorageTexture:
+                    case BindingType::Texture:
+                    case BindingType::UniformBuffer:
+                        node.address.cpuHandle.ptr = resourceCount;
+                        resourceCount += desc.ArraySize;
+                        break;
+                    case BindingType::Unused:
+                        break;
+                    }
+                    descriptors.Add(node);
+                }
+                resourceAddr = state.resourceDescHeap.Alloc(resourceCount);
+                samplerAddr = state.samplerDescHeap.Alloc(samplerCount);
+                for (auto& node : descriptors)
+                {
+                    auto offset = node.address.cpuHandle.ptr;
+                    // Fill in true address
+                    if (node.layout.Type == BindingType::Sampler)
+                    {
+                        node.address.cpuHandle.ptr = samplerAddr.cpuHandle.ptr 
+                            + offset * state.samplerDescHeap.handleIncrementSize;
+                        node.address.gpuHandle.ptr = samplerAddr.gpuHandle.ptr
+                            + offset * state.samplerDescHeap.handleIncrementSize;
+                    }
+                    else
+                    {
+                        node.address.cpuHandle.ptr = resourceAddr.cpuHandle.ptr
+                            + offset * state.resourceDescHeap.handleIncrementSize;
+                        node.address.gpuHandle.ptr = resourceAddr.gpuHandle.ptr
+                            + offset * state.resourceDescHeap.handleIncrementSize;
+                    }
+                }
+            }
+            ~DescriptorSet()
+            {
+                auto& state = RendererState::Get();
+                state.resourceDescHeap.Free(resourceAddr, resourceCount);
+                state.samplerDescHeap.Free(samplerAddr, samplerCount);
+            }
         public:
             virtual void BeginUpdate() override {}
-            virtual void Update(int /*location*/, GameEngine::Texture* /*texture*/, TextureAspect /*aspect*/) override {}
-            virtual void Update(int /*location*/, CoreLib::ArrayView<GameEngine::Texture*> /*texture*/, TextureAspect /*aspect*/) override {}
-            virtual void UpdateStorageImage(int /*location*/, CoreLib::ArrayView<GameEngine::Texture*> /*texture*/, TextureAspect /*aspect*/) override {}
-            virtual void Update(int /*location*/, GameEngine::TextureSampler* /*sampler*/) override {}
-            virtual void Update(int /*location*/, GameEngine::Buffer* /*buffer*/, int /*offset*/, int /*length*/) override {}
-            virtual void EndUpdate() override {}
+            virtual void Update(int /*location*/, GameEngine::Texture* /*texture*/, TextureAspect /*aspect*/) override
+            {
+
+            }
+            virtual void Update(int /*location*/, CoreLib::ArrayView<GameEngine::Texture*> /*texture*/, TextureAspect /*aspect*/) override
+            {
+
+            }
+            virtual void UpdateStorageImage(int /*location*/, CoreLib::ArrayView<GameEngine::Texture*> /*texture*/, TextureAspect /*aspect*/) override
+            {
+            }
+            virtual void Update(int /*location*/, GameEngine::TextureSampler* /*sampler*/) override
+            {
+            }
+            virtual void Update(int /*location*/, GameEngine::Buffer* /*buffer*/, int /*offset*/, int /*length*/) override
+            {
+            }
+            virtual void EndUpdate() override
+            {
+            }
         };
 
-        class Pipeline : public virtual GameEngine::Pipeline
+        class Pipeline : public GameEngine::Pipeline
         {
         public:
             Pipeline() {}
         };
 
-        class PipelineBuilder : public virtual GameEngine::PipelineBuilder
+        class PipelineBuilder : public GameEngine::PipelineBuilder
         {
         private:
             CoreLib::String pipelineName;
@@ -981,7 +1138,7 @@ namespace GameEngine
             }
         };
 
-        class CommandBuffer : public virtual GameEngine::CommandBuffer
+        class CommandBuffer : public GameEngine::CommandBuffer
         {
         public:
             CommandBuffer() {}
@@ -1111,6 +1268,9 @@ namespace GameEngine
                     // Create Copy command list allocator
                     CHECK_DX(state.device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
                         IID_PPV_ARGS(&state.largeCopyCmdListAllocator)));
+
+                    state.resourceDescHeap.Create(state.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, ResourceDescriptorHeapSize, true);
+                    state.samplerDescHeap.Create(state.device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, SamplerDescriptorHeapSize, true);
                 }
                 state.rendererCount++;
             }
@@ -1128,8 +1288,12 @@ namespace GameEngine
                 CORELIB_ASSERT(threadId < MaxRenderThreads);
                 renderThreadId = threadId;
             }
-            virtual void ClearTexture(GameEngine::Texture2D* /*texture*/) override {}
-            virtual void BeginJobSubmission() override {}
+            virtual void ClearTexture(GameEngine::Texture2D* /*texture*/) override
+            {
+            }
+            virtual void BeginJobSubmission() override
+            {
+            }
             virtual void QueueRenderPass(GameEngine::FrameBuffer* /*frameBuffer*/, CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/,
                 PipelineBarriers /*barriers*/) override
             {
@@ -1268,13 +1432,13 @@ namespace GameEngine
             {
                 return new PipelineBuilder();
             }
-            virtual GameEngine::DescriptorSetLayout* CreateDescriptorSetLayout(CoreLib::ArrayView<DescriptorLayout> /*descriptors*/) override
+            virtual GameEngine::DescriptorSetLayout* CreateDescriptorSetLayout(CoreLib::ArrayView<DescriptorLayout> descriptors) override
             {
-                return new DescriptorSetLayout();
+                return new DescriptorSetLayout(descriptors);
             }
-            virtual GameEngine::DescriptorSet* CreateDescriptorSet(GameEngine::DescriptorSetLayout* /*layout*/) override
+            virtual GameEngine::DescriptorSet* CreateDescriptorSet(GameEngine::DescriptorSetLayout* layout) override
             {
-                return new DescriptorSet();
+                return new DescriptorSet(dynamic_cast<D3DRenderer::DescriptorSetLayout*>(layout));
             }
             virtual int GetDescriptorPoolCount() override
             {
