@@ -1054,31 +1054,108 @@ public:
 class TextureSampler : public GameEngine::TextureSampler
 {
 public:
+    TextureFilter textureFilter = TextureFilter::Linear;
+    WrapMode wrapMode = WrapMode::Clamp;
+    CompareFunc compareFunc = CompareFunc::LessEqual;
+    D3D12_SAMPLER_DESC desc = {};
     TextureSampler()
     {
+        desc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+        desc.AddressU = desc.AddressV = desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        desc.MipLODBias = 0.0f;
+        desc.MinLOD = 0;
+        desc.MaxLOD = 25;
+        desc.MaxAnisotropy = 16;
+        desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
     }
-
 public:
     virtual TextureFilter GetFilter() override
     {
-        return TextureFilter::Linear;
+        return textureFilter;
     }
-    virtual void SetFilter(TextureFilter /*filter*/) override
+    virtual void SetFilter(TextureFilter filter) override
     {
+        textureFilter = filter;
+        switch (filter)
+        {
+        case TextureFilter::Nearest:
+            desc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+            break;
+        case TextureFilter::Linear:
+            desc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+            break;
+        case TextureFilter::Trilinear:
+            desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+            break;
+        case TextureFilter::Anisotropic4x:
+            desc.Filter = D3D12_FILTER_ANISOTROPIC;
+            desc.MaxAnisotropy = 4;
+            break;
+        case TextureFilter::Anisotropic8x:
+            desc.Filter = D3D12_FILTER_ANISOTROPIC;
+            desc.MaxAnisotropy = 8;
+            break;
+        case TextureFilter::Anisotropic16x:
+            desc.Filter = D3D12_FILTER_ANISOTROPIC;
+            desc.MaxAnisotropy = 16;
+            break;
+        }
     }
     virtual WrapMode GetWrapMode() override
     {
-        return WrapMode::Clamp;
+        return wrapMode;
     }
-    virtual void SetWrapMode(WrapMode /*wrap*/) override
+    virtual void SetWrapMode(WrapMode mode) override
     {
+        wrapMode = mode;
+        switch (mode)
+        {
+        case WrapMode::Clamp:
+            desc.AddressU = desc.AddressV = desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+            break;
+        case WrapMode::Mirror:
+            desc.AddressU = desc.AddressV = desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+            break;
+        case WrapMode::Repeat:
+            desc.AddressU = desc.AddressV = desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+            break;
+        }
     }
     virtual CompareFunc GetCompareFunc() override
     {
-        return CompareFunc::Disabled;
+        return compareFunc;
     }
-    virtual void SetDepthCompare(CompareFunc /*op*/) override
+    virtual void SetDepthCompare(CompareFunc op) override
     {
+        compareFunc = op;
+        switch (compareFunc)
+        {
+        case CompareFunc::Always:
+        case CompareFunc::Disabled:
+            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+            break;
+        case CompareFunc::Equal:
+            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_EQUAL;
+            break;
+        case CompareFunc::Greater:
+            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_GREATER;
+            break;
+        case CompareFunc::GreaterEqual:
+            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+            break;
+        case CompareFunc::Less:
+            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS;
+            break;
+        case CompareFunc::LessEqual:
+            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+            break;
+        case CompareFunc::Never:
+            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+            break;
+        case CompareFunc::NotEqual:
+            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NOT_EQUAL;
+            break;
+        }
     }
 };
 
@@ -1316,8 +1393,11 @@ public:
             state.device->CreateUnorderedAccessView(d3dTexture->resource, nullptr, &desc, descAddr);
         }
     }
-    virtual void Update(int /*location*/, GameEngine::TextureSampler * /*sampler*/) override
+    virtual void Update(int location, GameEngine::TextureSampler * sampler) override
     {
+        auto &state = RendererState::Get();
+        state.device->CreateSampler(
+            &reinterpret_cast<TextureSampler *>(sampler)->desc, descriptors[location].address.cpuHandle);
     }
     virtual void Update(int location, GameEngine::Buffer *buffer, int offset, int length) override
     {
