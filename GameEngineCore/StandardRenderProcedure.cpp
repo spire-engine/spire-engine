@@ -141,7 +141,9 @@ namespace GameEngine
         RefPtr<Buffer> CreateRandomDirectionsBuffer()
         {
             size_t bufferSize = sizeof(VectorMath::Vec4) * 16 * 16 * 16;
-            RefPtr<Buffer> rs = sharedRes->hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, (int)bufferSize);
+            auto structInfo = BufferStructureInfo(sizeof(VectorMath::Vec4), 16 * 16 * 16);
+            RefPtr<Buffer> rs =
+                sharedRes->hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, (int)bufferSize, &structInfo);
             List<VectorMath::Vec4> dirs;
             dirs.SetSize(16 * 16 * 16);
             Random random(7291);
@@ -255,7 +257,7 @@ namespace GameEngine
                 randomDirectionBuffer = CreateRandomDirectionsBuffer();
             }
             // initialize forwardBasePassModule and lightingModule
-            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
+            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment(), nullptr);
             sharedRes->CreateModuleInstance(viewParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), &renderPassUniformMemory);
             lighting.Init(*sharedRes, &renderPassUniformMemory, useEnvMap);
             UpdateSharedResourceBinding();

@@ -50,9 +50,6 @@
     <ClCompile Include="DeviceMemory.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanAPI\VulkanHardwareRenderer.cpp">
-      <Filter>Renderer\RenderAPI\Vulkan API</Filter>
-    </ClCompile>
     <ClCompile Include="FrustumCulling.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
@@ -224,6 +221,9 @@
     <ClCompile Include="D3DHardwareRenderer.cpp">
       <Filter>Renderer\RenderAPI</Filter>
     </ClCompile>
+    <ClCompile Include="VulkanAPI\VulkanHardwareRenderer.cpp">
+      <Filter>Renderer\RenderAPI</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
@@ -275,14 +275,11 @@
     <ClInclude Include="AtmosphereActor.h">
       <Filter>Actors</Filter>
     </ClInclude>
-    <ClInclude Include="HardwareRenderer.h">
-      <Filter>Renderer</Filter>
-    </ClInclude>
     <ClInclude Include="DeviceMemory.h">
       <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="VulkanAPI\vulkan.hpp">
-      <Filter>Renderer\RenderAPI\Vulkan API</Filter>
+      <Filter>Renderer\RenderAPI\VulkanHeaders</Filter>
     </ClInclude>
     <ClInclude Include="FrustumCulling.h">
       <Filter>Renderer</Filter>
@@ -411,10 +408,10 @@
       <Filter>LightmapBaking</Filter>
     </ClInclude>
     <ClInclude Include="VulkanAPI\volk.h">
-      <Filter>Renderer\RenderAPI\Vulkan API</Filter>
+      <Filter>Renderer\RenderAPI\VulkanHeaders</Filter>
     </ClInclude>
     <ClInclude Include="VulkanAPI\vulkan.h">
-      <Filter>Renderer\RenderAPI\Vulkan API</Filter>
+      <Filter>Renderer\RenderAPI\VulkanHeaders</Filter>
     </ClInclude>
     <ClInclude Include="LightmapSet.h">
       <Filter>LightmapBaking</Filter>
@@ -455,6 +452,9 @@
     <ClInclude Include="Win32\UISystem-Win32.h">
       <Filter>OS\Win32</Filter>
     </ClInclude>
+    <ClInclude Include="HardwareRenderer.h">
+      <Filter>Renderer\RenderAPI</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Actors">
@@ -468,9 +468,6 @@
     </Filter>
     <Filter Include="Renderer\RenderAPI">
       <UniqueIdentifier>{dc5f3b14-2ee3-4ec3-90ef-775aa47bd1e3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\RenderAPI\Vulkan API">
-      <UniqueIdentifier>{f375156a-adb5-480f-a4fb-48b8eefc1bb7}</UniqueIdentifier>
     </Filter>
     <Filter Include="Renderer\PostProcess">
       <UniqueIdentifier>{22fb3ee2-66e4-40d0-a2cb-95d89972a04c}</UniqueIdentifier>
@@ -495,6 +492,9 @@
     </Filter>
     <Filter Include="Renderer\RenderProcedure">
       <UniqueIdentifier>{4f8eb815-cd2c-44e6-bb48-4e38a72dacc7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Renderer\RenderAPI\VulkanHeaders">
+      <UniqueIdentifier>{f375156a-adb5-480f-a4fb-48b8eefc1bb7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

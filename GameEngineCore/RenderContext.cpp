@@ -369,8 +369,8 @@ namespace GameEngine
 	{
 		auto hwRenderer = resource->hardwareRenderer.Ptr();
 		hardwareRenderer = hwRenderer;
-		instanceUniformMemory.Init(hwRenderer, BufferUsage::UniformBuffer, false, 24, hwRenderer->UniformBufferAlignment());
-		transformMemory.Init(hwRenderer, BufferUsage::UniformBuffer, false, 25, hwRenderer->UniformBufferAlignment());
+		instanceUniformMemory.Init(hwRenderer, BufferUsage::UniformBuffer, false, 24, hwRenderer->UniformBufferAlignment(), nullptr);
+		transformMemory.Init(hwRenderer, BufferUsage::UniformBuffer, false, 25, hwRenderer->UniformBufferAlignment(), nullptr);
 		Clear();
 	}
 	
@@ -603,8 +603,8 @@ namespace GameEngine
         		
 		pipelineManager.Init(hardwareRenderer.Ptr(), &renderStats);
 
-		indexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::IndexBuffer, false, 26, 256);
-		vertexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::ArrayBuffer, false, 28, 256);
+		indexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::IndexBuffer, false, 26, 256, nullptr);
+		vertexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::ArrayBuffer, false, 28, 256, nullptr);
 
 		envMapArray = hardwareRenderer->CreateTextureCubeArray("envMapArray", TextureUsage::SampledColorAttachment, EnvMapSize, Math::Log2Floor(EnvMapSize) + 1, MaxEnvMapCount, StorageFormat::RGBA_F16);
 	
@@ -626,8 +626,12 @@ namespace GameEngine
 				}
 		defaultColorLookupTexture->SetData(0, 0, 0, 0, 16, 16, 16, DataType::Byte4, buffer.Buffer());
 
-        histogramBuffer = hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, sizeof(int32_t) * 128);
-        adaptedLuminanceBuffer = hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, sizeof(float) * 1);
+		auto histogramBufferStructInfo = BufferStructureInfo(sizeof(int32_t), 128);
+        histogramBuffer = hardwareRenderer->CreateBuffer(
+            BufferUsage::StorageBuffer, sizeof(int32_t) * 128, &histogramBufferStructInfo);
+        auto adaptedLuminanceBufferStructInfo = BufferStructureInfo(sizeof(float), 1);
+        adaptedLuminanceBuffer = hardwareRenderer->CreateBuffer(
+            BufferUsage::StorageBuffer, sizeof(float) * 1, &adaptedLuminanceBufferStructInfo);
 	}
 	void RendererSharedResource::Destroy()
 	{

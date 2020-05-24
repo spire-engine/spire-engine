@@ -88,8 +88,12 @@ namespace GameEngine
                     else
                         sizes.Add(VectorMath::Vec2i::Create(1, 1));
                 }
-                lightmapSizeBuffer = sceneRes->hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, sizeof(uint32_t) * 2 * texArray.Count());
-                lightmapColorBuffer = sceneRes->hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, sizeof(float) * 4 * maxLayers);
+                auto lightmapSizeBufferStructInfo = BufferStructureInfo(sizeof(uint32_t) * 2, texArray.Count());
+                lightmapSizeBuffer = sceneRes->hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer,
+                    sizeof(uint32_t) * 2 * texArray.Count(), &lightmapSizeBufferStructInfo);
+                auto lightmapColorBufferStructInfo = BufferStructureInfo(sizeof(float) * 4, maxLayers);
+                lightmapColorBuffer = sceneRes->hardwareRenderer->CreateBuffer(
+                    BufferUsage::StorageBuffer, sizeof(float) * 4 * maxLayers, &lightmapColorBufferStructInfo);
                 lightmapSizeBuffer->SetData(sizes.Buffer(), (int)(sizes.Count() * sizeof(VectorMath::Vec2i)));
                 Random random;
                 List<VectorMath::Vec4> colors;
@@ -130,7 +134,7 @@ namespace GameEngine
                 customDepthRenderPass->GetRenderTargetLayout(),
                 viewRes->LoadSharedRenderTarget("customDepthBuffer", DepthBufferFormat));
 
-            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
+            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment(), nullptr);
             sharedRes->CreateModuleInstance(lightmapViewParams, Engine::GetShaderCompiler()->LoadTypeSymbol("LightmapVisualizationPass.slang", "LightmapVisualizationViewParams"), &renderPassUniformMemory);
             sharedRes->CreateModuleInstance(standardViewParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), &renderPassUniformMemory);
             UpdateSharedResourceBinding();
@@ -146,8 +150,9 @@ namespace GameEngine
                 ).GetArrayView());
                 editorOutlinePass->Init(renderer);
             }
-
-            lightmapSizeBuffer = sharedRes->hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, 16);
+            auto lightmapSizeBufferStructInfo = BufferStructureInfo(sizeof(uint32_t) * 2, 2);
+            lightmapSizeBuffer = sharedRes->hardwareRenderer->CreateBuffer(
+                BufferUsage::StorageBuffer, 16, &lightmapSizeBufferStructInfo);
             lightmapColorBuffer = lightmapSizeBuffer;
             for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
             {

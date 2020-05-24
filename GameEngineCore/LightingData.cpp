@@ -317,8 +317,9 @@ namespace GameEngine
         if (tiledLightListBufferSize < requiredLightListBufferSize)
         {
             hw->Wait();
-            tiledLightListBufffer = hw->CreateBuffer(BufferUsage::StorageBuffer, requiredLightListBufferSize);
             tiledLightListBufferSize = requiredLightListBufferSize;
+            auto structInfo = BufferStructureInfo(sizeof(uint32_t), tiledLightListBufferSize / sizeof(uint32_t));
+            tiledLightListBufffer = hw->CreateBuffer(BufferUsage::StorageBuffer, requiredLightListBufferSize, &structInfo);
             for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
             {
                 auto descSet = moduleInstance.GetDescriptorSet(i);
@@ -345,9 +346,17 @@ namespace GameEngine
 
 		sharedRes->CreateModuleInstance(moduleInstance, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("LightingEnvironment"), uniformMemory, sizeof(LightingUniform));
 		lightBufferSize = Math::RoundUpToAlignment((int)sizeof(GpuLightData) * MaxLights, sharedRes->hardwareRenderer->UniformBufferAlignment());
-		lightBuffer = sharedRes->hardwareRenderer->CreateMappedBuffer(GameEngine::BufferUsage::StorageBuffer, lightBufferSize * DynamicBufferLengthMultiplier);
+        auto lightBufferStructInfo = BufferStructureInfo(sizeof(GpuLightData), MaxLights);
+		lightBuffer = sharedRes->hardwareRenderer->CreateMappedBuffer(
+			GameEngine::BufferUsage::StorageBuffer,
+			lightBufferSize * DynamicBufferLengthMultiplier,
+			&lightBufferStructInfo);
 		lightProbeBufferSize = Math::RoundUpToAlignment((int)sizeof(GpuLightProbeData) * MaxEnvMapCount, sharedRes->hardwareRenderer->UniformBufferAlignment());
-		lightProbeBuffer = sharedRes->hardwareRenderer->CreateMappedBuffer(GameEngine::BufferUsage::StorageBuffer, lightProbeBufferSize * DynamicBufferLengthMultiplier);
+        auto lightProbeBufferStructInfo = BufferStructureInfo(sizeof(GpuLightProbeData), MaxEnvMapCount);
+		lightProbeBuffer = sharedRes->hardwareRenderer->CreateMappedBuffer(
+			GameEngine::BufferUsage::StorageBuffer,
+            lightProbeBufferSize * DynamicBufferLengthMultiplier,
+            &lightProbeBufferStructInfo);
 		for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
 		{
 			auto descSet = moduleInstance.GetDescriptorSet(i);

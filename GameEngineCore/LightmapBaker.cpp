@@ -792,8 +792,11 @@ namespace GameEngine
             {
                 int inputBufferSize = (int)lm.Width * lm.Height * sizeof(float) * 3;
                 int outputBufferSize = lm.Width * lm.Height;
-                RefPtr<Buffer> inputBuffer = hw->CreateBuffer(BufferUsage::StorageBuffer, inputBufferSize);
-                RefPtr<Buffer> outputBuffer = hw->CreateBuffer(BufferUsage::StorageBuffer, outputBufferSize);
+                auto inputBufferStructInfo = BufferStructureInfo(sizeof(float), inputBufferSize / sizeof(float));
+                RefPtr<Buffer> inputBuffer = hw->CreateBuffer(BufferUsage::StorageBuffer, inputBufferSize, &inputBufferStructInfo);
+                auto outputBufferStructInfo =
+                    BufferStructureInfo(sizeof(uint32_t) * 4, outputBufferSize / (sizeof(uint32_t) * 4));
+                RefPtr<Buffer> outputBuffer = hw->CreateBuffer(BufferUsage::StorageBuffer, outputBufferSize, &outputBufferStructInfo);
                 int uniformData[2] = { lm.Width >> 2, lm.Height >> 2 };
                 Array<ResourceBinding, 2> resBindings;
                 resBindings.Add(ResourceBinding(inputBuffer.Ptr(), 0, inputBufferSize));

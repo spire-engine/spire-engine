@@ -351,7 +351,9 @@ struct Light
     float3 position;
     uint direction;
     float3 color;
+    float padding;
     float4x4 lightMatrix;
+    float4 padding2;
 };
 
 struct LightProbe

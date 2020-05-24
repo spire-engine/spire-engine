@@ -16,7 +16,8 @@ namespace GameEngine
 	public:
 		DeviceMemory() {}
 		~DeviceMemory();
-		void Init(HardwareRenderer * hwRenderer, BufferUsage usage, bool isMapped, int log2BufferSize, int alignment);
+		void Init(HardwareRenderer * hwRenderer, BufferUsage usage, bool isMapped, int log2BufferSize, int alignment,
+			BufferStructureInfo* structInfo);
 		void * Alloc(int size);
 		void Free(void * ptr, int size);
 		void Sync(void * ptr, int size);

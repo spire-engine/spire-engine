@@ -38,14 +38,6 @@ namespace DummyRenderer
 		virtual void Unmap() override {}
 	};
 
-    class Texture : public GameEngine::Texture
-    {
-    public:
-        Texture() {}
-    public:
-        virtual bool IsDepthStencilFormat() override { return false; }
-    };
-
     class Texture2D : public virtual GameEngine::Texture2D
     {
     public:
@@ -57,6 +49,7 @@ namespace DummyRenderer
         virtual void GetData(int /*mipLevel*/, void * /*data*/, int /*bufSize*/) override {}
         virtual void BuildMipmaps() override {}
         virtual bool IsDepthStencilFormat() override { return false;  }
+        virtual void* GetInternalPtr() override { return this; }
     };
 
     class Texture2DArray : public virtual GameEngine::Texture2DArray
@@ -68,6 +61,7 @@ namespace DummyRenderer
         virtual void SetData(int /*mipLevel*/, int /*xOffset*/, int /*yOffset*/, int /*layerOffset*/, int /*width*/, int /*height*/, int /*layerCount*/, DataType /*inputType*/, void * /*data*/) override {}
         virtual void BuildMipmaps() override {}
         virtual bool IsDepthStencilFormat() override { return false;  }
+        virtual void* GetInternalPtr() override { return this; }
     };
 
     class Texture3D : public virtual GameEngine::Texture3D
@@ -79,6 +73,7 @@ namespace DummyRenderer
         virtual void GetSize(int &/*width*/, int &/*height*/, int &/*depth*/) override {}
         virtual void SetData(int /*mipLevel*/, int /*xOffset*/, int /*yOffset*/, int /*zOffset*/, int /*width*/, int /*height*/, int /*depth*/, DataType /*inputType*/, void * /*data*/) override {}
         virtual bool IsDepthStencilFormat() override { return false;  }
+        virtual void* GetInternalPtr() override { return this; }
     };
 
     class TextureCube : public virtual GameEngine::TextureCube
@@ -90,6 +85,7 @@ namespace DummyRenderer
         virtual void GetSize(int &/*size*/) override {}
         virtual void SetData(int /*mipLevel*/, int /*xOffset*/, int /*yOffset*/, int /*layerOffset*/, int /*width*/, int /*height*/, int /*layerCount*/, DataType /*inputType*/, void* /*data*/) override {}
         virtual bool IsDepthStencilFormat() override { return false; }
+        virtual void* GetInternalPtr() override { return this; }
     };
 
     class TextureCubeArray : public virtual GameEngine::TextureCubeArray
@@ -100,6 +96,7 @@ namespace DummyRenderer
         virtual void GetSize(int &/*size*/, int &/*layerCount*/) override {}
         virtual void SetData(int /*mipLevel*/, int /*xOffset*/, int /*yOffset*/, int /*layerOffset*/, int /*width*/, int /*height*/, int /*layerCount*/, DataType /*inputType*/, void* /*data*/) override {}
         virtual bool IsDepthStencilFormat() override { return false; }
+        virtual void* GetInternalPtr() override { return this; }
     };
 
     class TextureSampler : public virtual GameEngine::TextureSampler
@@ -280,14 +277,14 @@ namespace DummyRenderer
         {
             return new Fence();
         }
-		virtual GameEngine::Buffer* CreateBuffer(BufferUsage /*usage*/, int sizeInBytes) override
+		virtual GameEngine::Buffer* CreateBuffer(BufferUsage /*usage*/, int sizeInBytes, const BufferStructureInfo* /*structInfo*/) override
         {
             writer->Write("Create Buffer (");
             writer->Write(CoreLib::String(sizeInBytes));
             writer->Write(" bytes)\n");
             return new Buffer(sizeInBytes);
         }
-		virtual GameEngine::Buffer* CreateMappedBuffer(BufferUsage /*usage*/, int sizeInBytes) override
+		virtual GameEngine::Buffer* CreateMappedBuffer(BufferUsage /*usage*/, int sizeInBytes, const BufferStructureInfo* /*structInfo*/) override
         {
             writer->Write("Create Buffer (");
             writer->Write(CoreLib::String(sizeInBytes));

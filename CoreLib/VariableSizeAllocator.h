@@ -17,7 +17,7 @@ namespace CoreLib
         };
         FreeListNode* freeListHead = nullptr;
     public:
-        ~VariableSizeAllocator()
+        void Destroy()
         {
             auto list = freeListHead;
             while (list)
@@ -26,6 +26,11 @@ namespace CoreLib
                 delete list;
                 list = next;
             }
+            freeListHead = nullptr;
+        }
+        ~VariableSizeAllocator()
+        {
+            Destroy();
         }
         void InitPool(int numElements)
         {

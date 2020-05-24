@@ -622,8 +622,8 @@ namespace GameEngine
     UISystemBase::UISystemBase(GameEngine::HardwareRenderer * ctx)
     {
         rendererApi = ctx;
-
-        textBufferObj = ctx->CreateMappedBuffer(BufferUsage::StorageBuffer, TextBufferSize);
+        auto textBufferStructInfo = BufferStructureInfo(sizeof(uint32_t), TextBufferSize / sizeof(uint32_t));
+        textBufferObj = ctx->CreateMappedBuffer(BufferUsage::StorageBuffer, TextBufferSize, &textBufferStructInfo);
         textBuffer = (unsigned char*)textBufferObj->Map();
         textBufferPool.Init(textBuffer, Log2TextBufferBlockSize, TextBufferSize >> Log2TextBufferBlockSize);
         uiRenderer = new GLUIRenderer(this, ctx);
@@ -789,7 +789,10 @@ namespace GameEngine
         rs->primitiveBufferSize = 1 << log2BufferSize;
         rs->vertexBufferSize = rs->primitiveBufferSize / sizeof(UniformField) * sizeof(UberVertex) * 16;
         rs->indexBufferSize = rs->vertexBufferSize >> 2;
-        rs->primitiveBuffer = rendererApi->CreateMappedBuffer(BufferUsage::StorageBuffer, rs->primitiveBufferSize * DynamicBufferLengthMultiplier);
+        auto primitiveBufferStructInfo =
+            BufferStructureInfo(sizeof(uint32_t) * 4, rs->primitiveBufferSize / (sizeof(uint32_t) * 4));
+        rs->primitiveBuffer = rendererApi->CreateMappedBuffer(BufferUsage::StorageBuffer,
+            rs->primitiveBufferSize * DynamicBufferLengthMultiplier, &primitiveBufferStructInfo);
         rs->vertexBuffer = rendererApi->CreateMappedBuffer(BufferUsage::ArrayBuffer, rs->vertexBufferSize * DynamicBufferLengthMultiplier);
         rs->indexBuffer = rendererApi->CreateMappedBuffer(BufferUsage::IndexBuffer, rs->indexBufferSize * DynamicBufferLengthMultiplier);
 

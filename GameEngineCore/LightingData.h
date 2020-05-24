@@ -27,6 +27,7 @@ namespace GameEngine
 		VectorMath::Vec3 color;
         float padding;
 		VectorMath::Matrix4 lightMatrix;
+        float padding2[4];
 	};
 
 	struct GpuLightProbeData

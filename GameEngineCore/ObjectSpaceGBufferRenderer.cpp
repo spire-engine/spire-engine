@@ -57,7 +57,7 @@ namespace GameEngine
             viewUniform.Time = 0.0f;
 
             auto sharedRes = Engine::Instance()->GetRenderer()->GetSharedResource();
-            uniformMemory.Init(hw, BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
+            uniformMemory.Init(hw, BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment(), nullptr);
             sharedRes->CreateModuleInstance(viewParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), &uniformMemory);
             
             for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
@@ -69,7 +69,9 @@ namespace GameEngine
             }
             viewParams.SetUniformData(&viewUniform, sizeof(viewUniform));
 
-            globalMemory.Init(hw, BufferUsage::StorageBuffer, false, 26, sharedRes->hardwareRenderer->StorageBufferAlignment());
+            auto globalMemoryStructInfo = BufferStructureInfo(sizeof(float) * 3, (1 << 26) / (sizeof(float) * 3));
+            globalMemory.Init(hw, BufferUsage::StorageBuffer, false, 26, sharedRes->hardwareRenderer->StorageBufferAlignment(),
+                &globalMemoryStructInfo);
             sharedRes->CreateModuleInstance(globalMemoryParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("LightmapGBufferGlobalParams"), &uniformMemory);
             for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
             {

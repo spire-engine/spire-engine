@@ -133,7 +133,7 @@ namespace GameEngine
             atmospherePass->Init(renderer);
 
             // initialize forwardBasePassModule and lightingModule
-            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
+            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment(), nullptr);
             sharedRes->CreateModuleInstance(viewParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), &renderPassUniformMemory);
             lighting.Init(*sharedRes, &renderPassUniformMemory, false);
             UpdateSharedResourceBinding();

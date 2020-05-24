@@ -178,6 +178,18 @@ namespace GameEngine
 		return x == TextureUsage::Unused;
 	}
 
+	struct BufferStructureInfo
+	{
+		int StructureStride = 0;
+		int NumElements = 0;
+        BufferStructureInfo() = default;
+        BufferStructureInfo(int stride, int numElements)
+        {
+			StructureStride = stride;
+            NumElements = numElements;
+        }
+	};
+
 	struct AttachmentLayout
 	{
 		TextureUsage Usage;
@@ -409,6 +421,7 @@ namespace GameEngine
 		Texture() {};
     public:
         virtual bool IsDepthStencilFormat() = 0;
+		virtual void* GetInternalPtr() = 0;
 	};
 
 	class Texture2D : public Texture
@@ -850,8 +863,8 @@ namespace GameEngine
 		virtual void SetMaxTempBufferVersions(int versionCount) = 0;
 		virtual void ResetTempBufferVersion(int version) = 0;
 		virtual Fence* CreateFence() = 0;
-		virtual Buffer* CreateBuffer(BufferUsage usage, int sizeInBytes) = 0;
-		virtual Buffer* CreateMappedBuffer(BufferUsage usage, int sizeInBytes) = 0;
+		virtual Buffer* CreateBuffer(BufferUsage usage, int sizeInBytes, const BufferStructureInfo* structInfo = nullptr) = 0;
+		virtual Buffer* CreateMappedBuffer(BufferUsage usage, int sizeInBytes, const BufferStructureInfo* structInfo = nullptr) = 0;
 		// Automatically builds mipmaps with supplied data
 		virtual Texture2D* CreateTexture2D(CoreLib::String name, int width, int height, StorageFormat format, DataType type, void* data) = 0;
 		// Allocates resources for a texture with supplied parameters

@@ -140,7 +140,7 @@ namespace GameEngine
     {
         shaderCompiler = compiler;
         hardwareRenderer = hw;
-        memory.Init(hw, BufferUsage::UniformBuffer, true, 21, hardwareRenderer->UniformBufferAlignment());
+        memory.Init(hw, BufferUsage::UniformBuffer, true, 21, hardwareRenderer->UniformBufferAlignment(), nullptr);
     }
 
 }
