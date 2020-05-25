@@ -862,8 +862,8 @@ struct StandardBoneWeightSet : IBoneWeightSet
 {
 	struct PackedType
 	{
-		uint boneIds;
-		uint boneWeights;
+		uint boneIds : BONEIDS;
+		uint boneWeights : BONEWEIGHTS;
 	};
 	PackedType value;
 	PackedType getPackedRepresentation() { return value; }
@@ -913,7 +913,7 @@ struct NoTangentFrame : ITangentFrame
 
 struct StandardTangentFrame : ITangentFrame
 {
-	uint packedQuaternion;
+	uint packedQuaternion : TANGENT;
 	TangentFrame get()
 	{
 		TangentFrame rs;
@@ -927,7 +927,7 @@ struct StandardVertexFormat<TUVSet : IVertexUVSet, TTangentFrame : ITangentFrame
 	typedef TUVSet UVSet;
 	typedef TColorSet ColorSet;
 	typedef TBoneWeightSet BoneWeightSet;
-	float3 vertPos;
+	float3 vertPos:POSITION;
 	TUVSet uvSet;
 	TTangentFrame vertTangentFrame;
 	TColorSet colorSet;

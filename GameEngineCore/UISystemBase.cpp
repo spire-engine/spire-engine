@@ -212,9 +212,9 @@ namespace GameEngine
             RefPtr<PipelineBuilder> pipeBuilder = rendererApi->CreatePipelineBuilder();
             pipeBuilder->SetShaders(shaderList.GetArrayView());
             VertexFormat vformat;
-            vformat.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 0, 0));
-            vformat.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 8, 1));
-            vformat.Attributes.Add(VertexAttributeDesc(DataType::Int, 0, 16, 2));
+            vformat.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 0, 0, "POSITION"));
+            vformat.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 8, 1, "TEXCOORD0"));
+            vformat.Attributes.Add(VertexAttributeDesc(DataType::Int, 0, 16, 2, "PRIMID"));
             pipeBuilder->SetVertexLayout(vformat);
             descLayout = rendererApi->CreateDescriptorSetLayout(MakeArray(
                 DescriptorLayout(sfGraphics, 0, BindingType::UniformBuffer),

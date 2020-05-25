@@ -25,9 +25,9 @@ ParameterBlock<UberUIShaderParams> params;
 
 struct VertexIn
 {
-    float2 vertPos;
-    float2 vertUV;
-	int primId;
+    float2 vertPos : POSITION;
+    float2 vertUV : TEXCOORD0;
+	int primId : PRIMID;
 };
 
 struct VertexOut
@@ -48,7 +48,7 @@ VertexOut vs_main(VertexIn vin)
 	return rs;
 }
 
-float4 ps_main(VertexOut vin)
+float4 ps_main(VertexOut vin) : SV_Target
 {
 	float4 result = float4(0.0);
 	uint4 params0 = params.uniformInput[int(vin.primId) * 2];

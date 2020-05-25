@@ -188,7 +188,7 @@ namespace GameEngine
     class SlangShaderCompiler : public IShaderCompiler
     {
     public:
-        bool dumpGLSL = true;
+        bool dumpShaderSource = true;
         EnumerableDictionary<String, SlangCompileRequest*> reflectionCompileRequests;
         EnumerableDictionary<String, RefPtr<ShaderEntryPoint>> shaderEntryPoints;
         EnumerableDictionary<String, RefPtr<ShaderTypeSymbol>> shaderTypeSymbols;
@@ -198,7 +198,6 @@ namespace GameEngine
         SlangShaderCompiler()
         {
             cache.Load(Engine::Instance()->GetDirectory(false, ResourceType::ShaderCache), Engine::Instance()->GetTargetShadingLanguage());
-            dumpGLSL = dumpGLSL && Engine::Instance()->GetTargetShadingLanguage() == TargetShadingLanguage::SPIRV;
         }
         ~SlangShaderCompiler()
         {
@@ -349,7 +348,7 @@ namespace GameEngine
                     int size = (int)outBlob->getBufferSize();
                     src.ShaderCode[entryPointsToCompile[i]].SetSize(size);
                     memcpy(src.ShaderCode[entryPointsToCompile[i]].Buffer(), outBlob->getBufferPointer(), size);
-                    if (dumpGLSL)
+                    if (dumpShaderSource)
                     {
                         spGetEntryPointCodeBlob(req, i, 1, &outBlob);
                         glslOutput.Add((char*)outBlob->getBufferPointer());
@@ -413,7 +412,7 @@ namespace GameEngine
                 {
                     auto eid = entryPointsToCompile[i];
                     char* glsl = nullptr;
-                    if (dumpGLSL)
+                    if (dumpShaderSource)
                         glsl = glslOutput[i];
                     cache.UpdateEntry(keys[eid], src.ShaderCode[eid], glsl, src.BindingLayouts);
                 }
@@ -439,8 +438,13 @@ namespace GameEngine
 
             spAddCodeGenTarget(compileRequest, GetSlangTarget());
             spSetTargetProfile(compileRequest, 0, spFindProfile(session, "sm_5_1"));
-            if (dumpGLSL)
-                spAddCodeGenTarget(compileRequest, SLANG_GLSL);
+            if (dumpShaderSource)
+            {
+                if (GetSlangTarget() == SLANG_DXBC)
+                    spAddCodeGenTarget(compileRequest, SLANG_HLSL);
+                else
+                    spAddCodeGenTarget(compileRequest, SLANG_GLSL);
+            }
 
             #if 0
                 spSetDumpIntermediates(compileRequest, 1);

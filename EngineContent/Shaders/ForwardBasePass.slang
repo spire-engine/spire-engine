@@ -77,7 +77,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn)
     return rs;
 }
 
-float4 ps_main(VSOutput vsOut)
+float4 ps_main(VSOutput vsOut) : SV_Target
 {
     VertexPositionInfo vin;
     vin.vertPos = vsOut.worldPos_binormalSign.xyz;

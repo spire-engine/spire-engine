@@ -1,13 +1,13 @@
 struct VertexIn
 {
-    float2 vertPos;
-    float2 vertUV;
+    float2 vertPos : POSITION;
+    float2 vertUV : TEXCOORD0;
 };
 
 struct VertexOut
 {
     float4 vertPos : SV_POSITION;
-    float2 vertUV;
+    float2 vertUV : TEXCOORD0;
 };
 
 VertexOut vs_main(VertexIn vin)
@@ -57,7 +57,7 @@ float3 importanceSampleGGX(float2 xi, float roughness, float3 N)
 	return tangentX * H.x + tangentY * H.y + N * H.z;
 }
 
-float4 ps_main(VertexOut vin)
+float4 ps_main(VertexOut vin) : SV_Target
 {
     float3 coord = params.origin.xyz + params.s.xyz * vin.vertUV.x * 2.0 + params.t.xyz * vin.vertUV.y * 2.0;
 	float3 N = coord;

@@ -361,6 +361,7 @@ namespace GameEngine
 	class VertexAttributeDesc
 	{
 	public:
+        CoreLib::String Semantic;
 		DataType Type;
 		int Normalized : 1;
 		int StartOffset : 31;
@@ -369,12 +370,13 @@ namespace GameEngine
 		{
 			Location = -1;
 		}
-		VertexAttributeDesc(DataType type, int normalized, int offset, int location)
+		VertexAttributeDesc(DataType type, int normalized, int offset, int location, CoreLib::String semantic)
 		{
 			this->Type = type;
 			this->Normalized = normalized;
 			this->StartOffset = offset;
 			this->Location = location;
+            this->Semantic = semantic;
 		}
 	};
 	

@@ -5,6 +5,7 @@
 #include "CoreLib/Stream.h"
 #include "CoreLib/TextIO.h"
 #include "CoreLib/VariableSizeAllocator.h"
+#include "CoreLib/WinForm/Debug.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -105,6 +106,87 @@ public:
     }
 };
 
+D3D12_COMPARISON_FUNC TranslateCompareFunc(CompareFunc op)
+{
+    switch (op)
+    {
+    case CompareFunc::Always:
+    case CompareFunc::Disabled:
+        return D3D12_COMPARISON_FUNC_ALWAYS;
+    case CompareFunc::Equal:
+        return D3D12_COMPARISON_FUNC_EQUAL;
+    case CompareFunc::Greater:
+        return D3D12_COMPARISON_FUNC_GREATER;
+    case CompareFunc::GreaterEqual:
+        return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+    case CompareFunc::Less:
+        return D3D12_COMPARISON_FUNC_LESS;
+    case CompareFunc::LessEqual:
+        return D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    case CompareFunc::Never:
+        return D3D12_COMPARISON_FUNC_NEVER;
+    case CompareFunc::NotEqual:
+        return D3D12_COMPARISON_FUNC_NOT_EQUAL;
+    default:
+        return D3D12_COMPARISON_FUNC_ALWAYS;
+    }
+}
+
+D3D12_CULL_MODE TranslateCullMode(CullMode mode)
+{
+    switch (mode)
+    {
+    case CullMode::CullBackFace:
+        return D3D12_CULL_MODE_BACK;
+    case CullMode::CullFrontFace:
+        return D3D12_CULL_MODE_FRONT;
+    case CullMode::Disabled:
+        return D3D12_CULL_MODE_NONE;
+    default:
+        throw CoreLib::NotImplementedException("TranslateCullMode");
+    }
+}
+
+D3D12_FILL_MODE TranslateFillMode(PolygonMode mode)
+{
+    switch (mode)
+    {
+    case PolygonMode::Fill:
+        return D3D12_FILL_MODE_SOLID;
+    case PolygonMode::Line:
+        return D3D12_FILL_MODE_WIREFRAME;
+    case PolygonMode::Point:
+        return D3D12_FILL_MODE_WIREFRAME;
+    default:
+        return D3D12_FILL_MODE_SOLID;
+    }
+}
+
+D3D12_STENCIL_OP TranslateStencilOp(StencilOp op)
+{
+    switch (op)
+    {
+    case StencilOp::Keep:
+        return D3D12_STENCIL_OP_KEEP;
+    case StencilOp::Zero:
+        return D3D12_STENCIL_OP_ZERO;
+    case StencilOp::Replace:
+        return D3D12_STENCIL_OP_REPLACE;
+    case StencilOp::Increment:
+        return D3D12_STENCIL_OP_INCR_SAT;
+    case StencilOp::IncrementWrap:
+        return D3D12_STENCIL_OP_INCR;
+    case StencilOp::Decrement:
+        return D3D12_STENCIL_OP_DECR_SAT;
+    case StencilOp::DecrementWrap:
+        return D3D12_STENCIL_OP_DECR;
+    case StencilOp::Invert:
+        return D3D12_STENCIL_OP_INVERT;
+    default:
+        CORELIB_NOT_IMPLEMENTED("TranslateStencilOp");
+    }
+}
+
 class RendererState
 {
 public:
@@ -130,6 +212,8 @@ public:
     uint64_t waitFenceValue = 1;
     ID3D12Fence *waitFences[MaxRenderThreads] = {};
     HANDLE waitEvents[MaxRenderThreads] = {};
+    PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE serializeVersionedRootSignature = nullptr;
+
     ID3D12GraphicsCommandList *GetTempCommandList()
     {
         long cmdListId = 0;
@@ -1125,44 +1209,24 @@ public:
     {
         return compareFunc;
     }
+
     virtual void SetDepthCompare(CompareFunc op) override
     {
         compareFunc = op;
-        switch (compareFunc)
-        {
-        case CompareFunc::Always:
-        case CompareFunc::Disabled:
-            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-            break;
-        case CompareFunc::Equal:
-            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_EQUAL;
-            break;
-        case CompareFunc::Greater:
-            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_GREATER;
-            break;
-        case CompareFunc::GreaterEqual:
-            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
-            break;
-        case CompareFunc::Less:
-            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS;
-            break;
-        case CompareFunc::LessEqual:
-            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-            break;
-        case CompareFunc::Never:
-            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-            break;
-        case CompareFunc::NotEqual:
-            desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NOT_EQUAL;
-            break;
-        }
+        desc.ComparisonFunc = TranslateCompareFunc(op);
     }
 };
 
 class Shader : public GameEngine::Shader
 {
 public:
-    Shader(){};
+    List<char> shaderData;
+    ShaderType stage;
+    Shader(ShaderType stage, const char *data, int size)
+    {
+        this->stage = stage;
+        shaderData.AddRange(data, size);
+    };
 };
 
 class FrameBuffer : public GameEngine::FrameBuffer
@@ -1239,7 +1303,7 @@ struct DescriptorNode
 
 class DescriptorSet : public GameEngine::DescriptorSet
 {
-private:
+public:
     DescriptorAddress resourceAddr, samplerAddr;
     int resourceCount, samplerCount;
     List<DescriptorNode> descriptors;
@@ -1449,6 +1513,15 @@ class PipelineBuilder : public GameEngine::PipelineBuilder
 {
 private:
     CoreLib::String pipelineName;
+    List<Shader *> d3dShaders;
+    D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc = {};
+    List<D3D12_ROOT_PARAMETER> rootParams;
+    List<List<D3D12_DESCRIPTOR_RANGE>> descRanges;
+    D3D12_INPUT_LAYOUT_DESC inputDesc = {};
+    List<D3D12_INPUT_ELEMENT_DESC> inputElementDescs;
+
+    List<int> descSetBindingMapping; // DescriptorSet slot index -> D3D DescriptorTable Index.
+    ID3D12RootSignature *rootSignature = nullptr;
 
 public:
     PipelineBuilder()
@@ -1456,23 +1529,308 @@ public:
     }
 
 public:
-    virtual void SetShaders(CoreLib::ArrayView<GameEngine::Shader *> /*shaders*/) override
+    virtual void SetShaders(CoreLib::ArrayView<GameEngine::Shader *> shaders) override
     {
+        d3dShaders.Clear();
+        for (auto shader : shaders)
+            d3dShaders.Add(reinterpret_cast<Shader *>(shader));
     }
-    virtual void SetVertexLayout(VertexFormat /*vertexFormat*/) override
+    
+    virtual void SetVertexLayout(VertexFormat format) override
     {
+        inputElementDescs.SetSize(format.Attributes.Count());
+        inputDesc.NumElements = format.Attributes.Count();
+        for (int i = 0; i < format.Attributes.Count(); i++)
+        {
+            D3D12_INPUT_ELEMENT_DESC element = {};
+            element.SemanticIndex = 0;
+            element.SemanticName = format.Attributes[i].Semantic.Buffer();
+            element.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+            element.InputSlot = format.Attributes[i].Location;
+            element.InstanceDataStepRate = 0;
+            element.AlignedByteOffset = format.Attributes[i].StartOffset;
+            bool normalized = format.Attributes[i].Normalized;
+            switch (format.Attributes[i].Type)
+            {
+            case DataType::Byte:
+                element.Format = normalized ? DXGI_FORMAT_R8_UNORM : DXGI_FORMAT_R8_UINT;
+                break;
+            case DataType::Byte2:
+                element.Format = normalized ? DXGI_FORMAT_R8G8_UNORM : DXGI_FORMAT_R8G8_UINT;
+                break;
+            case DataType::Byte4:
+                element.Format = normalized ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R8G8B8A8_UINT;
+                break;
+            case DataType::Char:
+                element.Format = normalized ? DXGI_FORMAT_R8_SNORM : DXGI_FORMAT_R8_SINT;
+                break;
+            case DataType::Char2:
+                element.Format = normalized ? DXGI_FORMAT_R8G8_SNORM : DXGI_FORMAT_R8G8_SINT;
+                break;
+            case DataType::Char4:
+                element.Format = normalized ? DXGI_FORMAT_R8G8B8A8_SNORM : DXGI_FORMAT_R8G8B8A8_SNORM;
+                break;
+            case DataType::Float:
+                element.Format = DXGI_FORMAT_R32_FLOAT;
+                break;
+            case DataType::Float2:
+                element.Format = DXGI_FORMAT_R32G32_FLOAT;
+                break;
+            case DataType::Float3:
+                element.Format = DXGI_FORMAT_R32G32B32_FLOAT;
+                break;
+            case DataType::Float4:
+                element.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                break;
+            case DataType::Half:
+                element.Format = DXGI_FORMAT_R16_FLOAT;
+                break;
+            case DataType::Half2:
+                element.Format = DXGI_FORMAT_R16G16_FLOAT;
+                break;
+            case DataType::Half4:
+                element.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+                break;
+            case DataType::Int:
+                element.Format = DXGI_FORMAT_R32_SINT;
+                break;
+            case DataType::Int2:
+                element.Format = DXGI_FORMAT_R32G32_SINT;
+                break;
+            case DataType::Int3:
+                element.Format = DXGI_FORMAT_R32G32B32_SINT;
+                break;
+            case DataType::Int4:
+                element.Format = DXGI_FORMAT_R32G32B32A32_SINT;
+                break;
+            case DataType::UInt:
+                element.Format = DXGI_FORMAT_R32_UINT;
+                break;
+            case DataType::UInt4_10_10_10_2:
+                element.Format = normalized ? DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R10G10B10A2_UINT;
+                break;
+            case DataType::UShort:
+                element.Format = normalized ? DXGI_FORMAT_R16_UNORM : DXGI_FORMAT_R16_UINT;
+                break;
+            case DataType::UShort2:
+                element.Format = normalized ? DXGI_FORMAT_R16G16_UNORM : DXGI_FORMAT_R16G16_UINT;
+                break;
+            case DataType::UShort4:
+                element.Format = normalized ? DXGI_FORMAT_R16G16B16A16_UNORM : DXGI_FORMAT_R16G16B16A16_UINT;
+                break;
+            default:
+                CORELIB_ABORT("Unsupported vertex attribute type.");
+            }
+            
+        }
     }
-    virtual void SetBindingLayout(CoreLib::ArrayView<GameEngine::DescriptorSetLayout *> /*descriptorSets*/) override
+
+    virtual void SetBindingLayout(CoreLib::ArrayView<GameEngine::DescriptorSetLayout *> descriptorSets) override
     {
+        if (rootSignature)
+            rootSignature->Release();
+        auto&state = RendererState::Get();
+        descSetBindingMapping.SetSize(descriptorSets.Count());
+        rootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
+        rootDesc.Desc_1_0.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+        descRanges.Reserve(descriptorSets.Count() * 2);
+        rootParams.Clear();
+        descRanges.Clear();
+        for (int i = 0; i < descriptorSets.Count(); i++)
+        {
+            auto descSet = reinterpret_cast<DescriptorSetLayout *>(descriptorSets[i]);
+            List<D3D12_DESCRIPTOR_RANGE> resourceRanges, samplerRanges;
+            int cbvId = 0, srvId = 0, uavId = 0, samplerId = 0;
+            for (auto &descriptor : descSet->descriptors)
+            {
+                D3D12_DESCRIPTOR_RANGE range;
+                range.RegisterSpace = i;
+                switch (descriptor.Type)
+                {
+                case BindingType::UniformBuffer:
+                    range.BaseShaderRegister = cbvId;
+                    range.NumDescriptors = descriptor.ArraySize;
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+                    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+                    cbvId++;
+                    resourceRanges.Add(range);
+                    break;
+                case BindingType::Texture:
+                    range.BaseShaderRegister = srvId;
+                    range.NumDescriptors = descriptor.ArraySize;
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+                    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+                    srvId++;
+                    resourceRanges.Add(range);
+                    break;
+                case BindingType::StorageBuffer:
+                case BindingType::StorageTexture:
+                    range.BaseShaderRegister = uavId;
+                    range.NumDescriptors = descriptor.ArraySize;
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+                    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+                    uavId++;
+                    resourceRanges.Add(range);
+                    break;
+                case BindingType::Sampler:
+                    range.BaseShaderRegister = samplerId;
+                    range.NumDescriptors = descriptor.ArraySize;
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+                    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+                    samplerId++;
+                    samplerRanges.Add(range);
+                    break;
+                }
+            }
+            descSetBindingMapping[i] = rootParams.Count();
+            if (resourceRanges.Count())
+            {
+                D3D12_ROOT_PARAMETER param;
+                param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+                param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                param.DescriptorTable.NumDescriptorRanges = resourceRanges.Count();
+                param.DescriptorTable.pDescriptorRanges = resourceRanges.Buffer();
+                rootParams.Add(param);
+                descRanges.Add(_Move(resourceRanges));
+            }
+            if (samplerRanges.Count())
+            {
+                D3D12_ROOT_PARAMETER param;
+                param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+                param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                param.DescriptorTable.NumDescriptorRanges = samplerRanges.Count();
+                param.DescriptorTable.pDescriptorRanges = samplerRanges.Buffer();
+                rootParams.Add(param);
+                descRanges.Add(_Move(samplerRanges));
+            }
+        }
+        rootDesc.Desc_1_0.pParameters = rootParams.Buffer();
+        rootDesc.Desc_1_0.NumParameters = rootParams.Count();
+        ID3DBlob *rootSignatureBlob = nullptr;
+        ID3DBlob *serializeError = nullptr;
+        state.serializeVersionedRootSignature(&rootDesc, &rootSignatureBlob, &serializeError);
+        if (serializeError)
+        {
+            auto errMsg = (char *)(serializeError->GetBufferPointer());
+            CoreLib::Diagnostics::DebugWriter() << errMsg;
+            CORELIB_ABORT("Root signature creation failure.");
+        }
+        CHECK_DX(state.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
+            rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
+        rootSignatureBlob->Release();
     }
+
     virtual void SetDebugName(CoreLib::String name) override
     {
         pipelineName = name;
     }
-    virtual GameEngine::Pipeline *ToPipeline(GameEngine::RenderTargetLayout * /*renderTargetLayout*/) override
+
+    D3D12_PRIMITIVE_TOPOLOGY_TYPE TranslateTopologyType(PrimitiveType type)
     {
+        switch (type)
+        {
+        case PrimitiveType::Triangles:
+        case PrimitiveType::TriangleFans:
+        case PrimitiveType::TriangleStrips:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        case PrimitiveType::Points:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+        case PrimitiveType::Lines:
+        case PrimitiveType::LineStrips:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+        default:
+            CORELIB_NOT_IMPLEMENTED("TranslatePrimitiveTopology");
+        }
+    }
+
+    virtual GameEngine::Pipeline *ToPipeline(GameEngine::RenderTargetLayout * renderTargetLayout) override
+    {
+        auto& state = RendererState::Get();
+        ID3D12PipelineState *pipelineState = nullptr;
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+        desc.pRootSignature = rootSignature;
+        desc.InputLayout = inputDesc;
+        for (auto shader : this->d3dShaders)
+        {
+            switch (shader->stage)
+            {
+            case ShaderType::VertexShader:
+                desc.VS.pShaderBytecode = shader->shaderData.Buffer();
+                desc.VS.BytecodeLength = shader->shaderData.Count();
+                break;
+            case ShaderType::FragmentShader:
+                desc.PS.pShaderBytecode = shader->shaderData.Buffer();
+                desc.PS.BytecodeLength = shader->shaderData.Count();
+                break;
+            case ShaderType::DomainShader:
+                desc.DS.pShaderBytecode = shader->shaderData.Buffer();
+                desc.DS.BytecodeLength = shader->shaderData.Count();
+                break;
+            case ShaderType::HullShader:
+                desc.HS.pShaderBytecode = shader->shaderData.Buffer();
+                desc.HS.BytecodeLength = shader->shaderData.Count();
+                break;
+            default:
+                CORELIB_ABORT("Unsupported shader stage.");
+            }
+        }
+        desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+        desc.PrimitiveTopologyType = TranslateTopologyType(FixedFunctionStates.PrimitiveTopology);
+        desc.IBStripCutValue = FixedFunctionStates.PrimitiveRestartEnabled
+                                   ? D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_0xFFFFFFFF
+                                   : D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
+        desc.DepthStencilState.DepthEnable = FixedFunctionStates.DepthCompareFunc != CompareFunc::Disabled;
+        desc.DepthStencilState.DepthFunc = TranslateCompareFunc(FixedFunctionStates.DepthCompareFunc);
+        desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+        desc.DepthStencilState.StencilEnable = FixedFunctionStates.StencilCompareFunc != CompareFunc::Disabled;
+        desc.DepthStencilState.StencilReadMask = (UINT8)FixedFunctionStates.StencilMask;
+        desc.DepthStencilState.StencilWriteMask = (UINT8)FixedFunctionStates.StencilMask;
+        desc.DepthStencilState.FrontFace.StencilFunc = TranslateCompareFunc(FixedFunctionStates.StencilCompareFunc);
+        desc.DepthStencilState.FrontFace.StencilDepthFailOp =
+            TranslateStencilOp(FixedFunctionStates.StencilDepthFailOp);
+        desc.DepthStencilState.FrontFace.StencilFailOp =
+            TranslateStencilOp(FixedFunctionStates.StencilFailOp);
+        desc.DepthStencilState.FrontFace.StencilPassOp = TranslateStencilOp(FixedFunctionStates.StencilDepthPassOp);
+        desc.DepthStencilState.BackFace = desc.DepthStencilState.FrontFace;
+
+        desc.RasterizerState.ConservativeRaster = FixedFunctionStates.ConsevativeRasterization
+                                                      ? D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON
+                                                      : D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON;
+        desc.RasterizerState.CullMode = TranslateCullMode(FixedFunctionStates.cullMode);
+        desc.RasterizerState.FillMode = TranslateFillMode(FixedFunctionStates.PolygonFillMode);
+        desc.RasterizerState.SlopeScaledDepthBias = FixedFunctionStates.PolygonOffsetFactor;
+        desc.RasterizerState.DepthBias = (int)FixedFunctionStates.PolygonOffsetUnits;
+        desc.RasterizerState.FrontCounterClockwise = 1;
+        desc.RasterizerState.DepthClipEnable = 1;
+
+        desc.BlendState.AlphaToCoverageEnable = 0;
+        desc.BlendState.IndependentBlendEnable = 0;
+        desc.BlendState.RenderTarget[0].BlendEnable = FixedFunctionStates.blendMode != BlendMode::Replace;
+        desc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        desc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+        if (FixedFunctionStates.blendMode == BlendMode::AlphaBlend)
+        {
+            desc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC1_ALPHA;
+            desc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC1_ALPHA;
+            desc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_SRC1_ALPHA;
+            desc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC1_ALPHA;
+        }
+        else
+        {
+            desc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+            desc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+            desc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+            desc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+        }
+        desc.BlendState.RenderTarget[0].RenderTargetWriteMask = 0xFF;
+        
+        // Fill frame buffer format
+
+
+        state.device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
         return new Pipeline();
     }
+
     virtual GameEngine::Pipeline *CreateComputePipeline(
         CoreLib::ArrayView<GameEngine::DescriptorSetLayout *> /*descriptorSets*/,
         GameEngine::Shader * /*shader*/) override
@@ -1574,6 +1932,12 @@ public:
             PFN_D3D12_CREATE_DEVICE createDevice =
                 (PFN_D3D12_CREATE_DEVICE)GetProcAddress(dx12module, "D3D12CreateDevice");
             if (!createDevice)
+            {
+                throw HardwareRendererException("cannot load d3d12.dll");
+            }
+            state.serializeVersionedRootSignature = (PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE)GetProcAddress(
+                dx12module, "D3D12SerializeVersionedRootSignature");
+            if (!state.serializeVersionedRootSignature)
             {
                 throw HardwareRendererException("cannot load d3d12.dll");
             }
@@ -1839,9 +2203,9 @@ public:
         return new TextureSampler();
     }
 
-    virtual GameEngine::Shader *CreateShader(ShaderType /*stage*/, const char * /*data*/, int /*size*/) override
+    virtual GameEngine::Shader *CreateShader(ShaderType stage, const char * data, int size) override
     {
-        return new Shader();
+        return new Shader(stage, data, size);
     }
 
     virtual GameEngine::RenderTargetLayout *CreateRenderTargetLayout(

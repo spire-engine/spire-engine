@@ -24,29 +24,29 @@ namespace GameEngine
 		const int NORMALIZED = 1;
 
 		// Always starts with vec3 pos
-		rs.Attributes.Add(VertexAttributeDesc(DataType::Float3, UNNORMALIZED, 0, location));
+		rs.Attributes.Add(VertexAttributeDesc(DataType::Float3, UNNORMALIZED, 0, location, "POSITION"));
 		location++;
 
 		for (int i = 0; i < vertFormat.GetUVChannelCount(); i++)
 		{
-			rs.Attributes.Add(VertexAttributeDesc(DataType::Half2, UNNORMALIZED, vertFormat.GetUVOffset(i), location));
+			rs.Attributes.Add(VertexAttributeDesc(DataType::Half2, UNNORMALIZED, vertFormat.GetUVOffset(i), location, "TEXCOORD" + String(i)));
 			location++;
 		}
 		if (vertFormat.HasTangent())
 		{
-			rs.Attributes.Add(VertexAttributeDesc(DataType::UInt, UNNORMALIZED, vertFormat.GetTangentFrameOffset(), location));
+			rs.Attributes.Add(VertexAttributeDesc(DataType::UInt, UNNORMALIZED, vertFormat.GetTangentFrameOffset(), location, "TANGENT"));
 			location++;
 		}
 		for (int i = 0; i < vertFormat.GetColorChannelCount(); i++)
 		{
-			rs.Attributes.Add(VertexAttributeDesc(DataType::Byte4, NORMALIZED, vertFormat.GetColorOffset(i), location));
+			rs.Attributes.Add(VertexAttributeDesc(DataType::Byte4, NORMALIZED, vertFormat.GetColorOffset(i), location, "COLOR" + String(i)));
 			location++;
 		}
 		if (vertFormat.HasSkinning())
 		{
-			rs.Attributes.Add(VertexAttributeDesc(DataType::UInt, UNNORMALIZED, vertFormat.GetBoneIdsOffset(), location));
+			rs.Attributes.Add(VertexAttributeDesc(DataType::UInt, UNNORMALIZED, vertFormat.GetBoneIdsOffset(), location, "BONEIDS"));
 			location++;
-			rs.Attributes.Add(VertexAttributeDesc(DataType::UInt, UNNORMALIZED, vertFormat.GetBoneWeightsOffset(), location));
+			rs.Attributes.Add(VertexAttributeDesc(DataType::UInt, UNNORMALIZED, vertFormat.GetBoneWeightsOffset(), location, "BONEWEIGHTS"));
 			location++;
 		}
 
