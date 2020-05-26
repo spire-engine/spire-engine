@@ -45,11 +45,12 @@ ParameterBlock<SPECIALIZATION_TYPE_3> gWorldTransform;
 struct VSOutput
 {
 	float4 projPos : SV_POSITION;
-    float4 worldPos_binormalSign;
-    float3 normal, tangent;
+    float4 worldPos_binormalSign : WORLDPOS;
+    float3 normal : NORMAL;
+    float3 tangent : TANGENT;
     SPECIALIZATION_TYPE_4.ColorSet vertColorSet;
     SPECIALIZATION_TYPE_4.UVSet vertUVSet;
-    SPECIALIZATION_TYPE_4.BoneWeightSet.PackedType vertBoneWeightSet;
+    SPECIALIZATION_TYPE_4.BoneWeightSet.PackedType vertBoneWeightSet : BONEWEIGHTSET;
 };
 
 VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn)
@@ -77,7 +78,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn)
     return rs;
 }
 
-float4 ps_main(VSOutput vsOut)
+float4 ps_main(VSOutput vsOut) : SV_Target
 {
     VertexPositionInfo vin;
     vin.vertPos = vsOut.worldPos_binormalSign.xyz;

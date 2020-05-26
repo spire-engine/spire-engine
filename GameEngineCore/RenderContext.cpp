@@ -535,6 +535,9 @@ namespace GameEngine
                     case ShaderVariableType::StorageBuffer:
 						descLayout.Type = BindingType::StorageBuffer;
 						break;
+                    case ShaderVariableType::RWStorageBuffer:
+                        descLayout.Type = BindingType::RWStorageBuffer;
+                        break;
 					default:
 						throw NotImplementedException("unknown shader variable type.");
 					}

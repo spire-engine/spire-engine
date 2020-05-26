@@ -33,9 +33,9 @@ struct VertexIn
 struct VertexOut
 {
     float4 projCoord : SV_POSITION;
-    float2 vertUV;
-	float2 vertPos;
-	int primId;
+    float2 vertUV : TEXCOORD;
+	float2 vertPos : VERTPOS;
+	int primId : PRIMID;
 };
 
 VertexOut vs_main(VertexIn vin)

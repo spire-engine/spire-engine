@@ -587,6 +587,20 @@ DXGI_FORMAT TranslateStorageFormat(StorageFormat format)
     }
 }
 
+DXGI_FORMAT TranslateDepthFormat(StorageFormat format)
+{
+    switch (format)
+    {
+    case StorageFormat::Depth24:
+    case StorageFormat::Depth24Stencil8:
+        return DXGI_FORMAT_D24_UNORM_S8_UINT;
+    case StorageFormat::Depth32:
+        return DXGI_FORMAT_D32_FLOAT;
+    default:
+        CORELIB_NOT_IMPLEMENTED("TranslateDepthFormat");
+    }
+}
+
 int GetResourceSize(StorageFormat format, int width, int height)
 {
     switch (format)
@@ -1274,8 +1288,12 @@ public:
 class RenderTargetLayout : public GameEngine::RenderTargetLayout
 {
 public:
-    RenderTargetLayout()
+    List<AttachmentLayout> attachmentLayouts;
+    bool clearAttachments = false;
+    RenderTargetLayout(CoreLib::ArrayView<AttachmentLayout> bindings, bool clear)
     {
+        attachmentLayouts.AddRange(bindings);
+        clearAttachments = clear;
     }
 
 public:
@@ -1307,7 +1325,6 @@ public:
     DescriptorAddress resourceAddr, samplerAddr;
     int resourceCount, samplerCount;
     List<DescriptorNode> descriptors;
-
 public:
     DescriptorSet(DescriptorSetLayout *layout)
     {
@@ -1328,6 +1345,7 @@ public:
                 samplerCount++;
                 break;
             case BindingType::StorageBuffer:
+            case BindingType::RWStorageBuffer:
             case BindingType::StorageTexture:
             case BindingType::Texture:
             case BindingType::UniformBuffer:
@@ -1469,7 +1487,8 @@ public:
         auto d3dbuffer = reinterpret_cast<Buffer *>(buffer);
         if (length == -1)
             length = d3dbuffer->bufferSize;
-        if (d3dbuffer->usage == BufferUsage::StorageBuffer)
+        auto bindingType = descriptors[location].layout.Type;
+        if (bindingType == BindingType::RWStorageBuffer)
         {
             CORELIB_ASSERT(
                 d3dbuffer->structInfo.StructureStride != 0 && offset % d3dbuffer->structInfo.StructureStride == 0);
@@ -1484,12 +1503,24 @@ public:
             state.device->CreateUnorderedAccessView(
                 d3dbuffer->resource, nullptr, &desc, descriptors[location].address.cpuHandle);
         }
-        else if (d3dbuffer->usage == BufferUsage::UniformBuffer)
+        else if (bindingType == BindingType::UniformBuffer)
         {
             D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
             desc.BufferLocation = d3dbuffer->resource->GetGPUVirtualAddress() + offset;
             desc.SizeInBytes = Align(length, D3DConstantBufferAlignment);
             state.device->CreateConstantBufferView(&desc, descriptors[location].address.cpuHandle);
+        }
+        else if (bindingType == BindingType::StorageBuffer)
+        {
+            D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+            desc.Format = DXGI_FORMAT_UNKNOWN;
+            desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+            desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            desc.Buffer.FirstElement = offset / d3dbuffer->structInfo.StructureStride;
+            desc.Buffer.StructureByteStride = d3dbuffer->structInfo.StructureStride;
+            desc.Buffer.NumElements = d3dbuffer->structInfo.NumElements;
+            state.device->CreateShaderResourceView(d3dbuffer->resource, &desc, descriptors[location].address.cpuHandle);
         }
         else
         {
@@ -1504,8 +1535,19 @@ public:
 class Pipeline : public GameEngine::Pipeline
 {
 public:
-    Pipeline()
+    ID3D12PipelineState *pipelineState = nullptr;
+    ID3D12RootSignature *rootSignature = nullptr;
+    PrimitiveType primitiveTopology;
+    Pipeline(ID3D12PipelineState *pipeline, ID3D12RootSignature *rootSig)
+        : pipelineState(pipeline), rootSignature(rootSig)
     {
+    }
+    ~Pipeline()
+    {
+        if (pipelineState)
+            pipelineState->Release();
+        if (rootSignature)
+            rootSignature->Release();
     }
 };
 
@@ -1527,6 +1569,11 @@ public:
     PipelineBuilder()
     {
     }
+    ~PipelineBuilder()
+    {
+        if (rootSignature)
+            rootSignature->Release();
+    }
 
 public:
     virtual void SetShaders(CoreLib::ArrayView<GameEngine::Shader *> shaders) override
@@ -1543,7 +1590,7 @@ public:
         for (int i = 0; i < format.Attributes.Count(); i++)
         {
             D3D12_INPUT_ELEMENT_DESC element = {};
-            element.SemanticIndex = 0;
+            element.SemanticIndex = format.Attributes[i].SemanticIndex;
             element.SemanticName = format.Attributes[i].Semantic.Buffer();
             element.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
             element.InputSlot = format.Attributes[i].Location;
@@ -1621,30 +1668,35 @@ public:
             default:
                 CORELIB_ABORT("Unsupported vertex attribute type.");
             }
-            
+            inputElementDescs[i] = element;
         }
+        inputDesc.pInputElementDescs = inputElementDescs.Buffer();
     }
 
-    virtual void SetBindingLayout(CoreLib::ArrayView<GameEngine::DescriptorSetLayout *> descriptorSets) override
+    void CreateRootSignature(CoreLib::ArrayView<GameEngine::DescriptorSetLayout *> descriptorSets, bool isGraphics)
     {
         if (rootSignature)
             rootSignature->Release();
-        auto&state = RendererState::Get();
+        auto &state = RendererState::Get();
         descSetBindingMapping.SetSize(descriptorSets.Count());
         rootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
-        rootDesc.Desc_1_0.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+        if (isGraphics)
+            rootDesc.Desc_1_0.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
         descRanges.Reserve(descriptorSets.Count() * 2);
         rootParams.Clear();
         descRanges.Clear();
+        int regSpace = 0;
         for (int i = 0; i < descriptorSets.Count(); i++)
         {
             auto descSet = reinterpret_cast<DescriptorSetLayout *>(descriptorSets[i]);
+            if (!descSet)
+                continue;
             List<D3D12_DESCRIPTOR_RANGE> resourceRanges, samplerRanges;
             int cbvId = 0, srvId = 0, uavId = 0, samplerId = 0;
             for (auto &descriptor : descSet->descriptors)
             {
                 D3D12_DESCRIPTOR_RANGE range;
-                range.RegisterSpace = i;
+                range.RegisterSpace = regSpace;
                 switch (descriptor.Type)
                 {
                 case BindingType::UniformBuffer:
@@ -1652,24 +1704,25 @@ public:
                     range.NumDescriptors = descriptor.ArraySize;
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-                    cbvId++;
+                    cbvId += descriptor.ArraySize;
                     resourceRanges.Add(range);
                     break;
                 case BindingType::Texture:
+                case BindingType::StorageBuffer:
                     range.BaseShaderRegister = srvId;
                     range.NumDescriptors = descriptor.ArraySize;
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-                    srvId++;
+                    srvId += descriptor.ArraySize;
                     resourceRanges.Add(range);
                     break;
-                case BindingType::StorageBuffer:
+                case BindingType::RWStorageBuffer:
                 case BindingType::StorageTexture:
                     range.BaseShaderRegister = uavId;
                     range.NumDescriptors = descriptor.ArraySize;
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-                    uavId++;
+                    uavId += descriptor.ArraySize;
                     resourceRanges.Add(range);
                     break;
                 case BindingType::Sampler:
@@ -1677,7 +1730,7 @@ public:
                     range.NumDescriptors = descriptor.ArraySize;
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-                    samplerId++;
+                    samplerId += descriptor.ArraySize;
                     samplerRanges.Add(range);
                     break;
                 }
@@ -1703,6 +1756,7 @@ public:
                 rootParams.Add(param);
                 descRanges.Add(_Move(samplerRanges));
             }
+            regSpace++;
         }
         rootDesc.Desc_1_0.pParameters = rootParams.Buffer();
         rootDesc.Desc_1_0.NumParameters = rootParams.Count();
@@ -1718,6 +1772,11 @@ public:
         CHECK_DX(state.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
             rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
         rootSignatureBlob->Release();
+    }
+
+    virtual void SetBindingLayout(CoreLib::ArrayView<GameEngine::DescriptorSetLayout *> descriptorSets) override
+    {
+        CreateRootSignature(descriptorSets, true);
     }
 
     virtual void SetDebugName(CoreLib::String name) override
@@ -1745,8 +1804,8 @@ public:
 
     virtual GameEngine::Pipeline *ToPipeline(GameEngine::RenderTargetLayout * renderTargetLayout) override
     {
+        CORELIB_ASSERT(rootSignature != nullptr);
         auto& state = RendererState::Get();
-        ID3D12PipelineState *pipelineState = nullptr;
         D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
         desc.pRootSignature = rootSignature;
         desc.InputLayout = inputDesc;
@@ -1822,20 +1881,52 @@ public:
             desc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
             desc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
         }
-        desc.BlendState.RenderTarget[0].RenderTargetWriteMask = 0xFF;
-        
+        desc.BlendState.RenderTarget[0].RenderTargetWriteMask = 0;
+        desc.SampleDesc.Count = 1;
         // Fill frame buffer format
-
-
-        state.device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
-        return new Pipeline();
+        desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+        desc.NumRenderTargets = 0;
+        auto d3dRenderTargetLayout = reinterpret_cast<RenderTargetLayout *>(renderTargetLayout);
+        for (auto &renderTarget : d3dRenderTargetLayout->attachmentLayouts)
+        {
+            if (renderTarget.Usage == TextureUsage::ColorAttachment ||
+                renderTarget.Usage == TextureUsage::SampledColorAttachment)
+            {
+                desc.RTVFormats[desc.NumRenderTargets] = TranslateStorageFormat(renderTarget.ImageFormat);
+                desc.BlendState.RenderTarget[0].RenderTargetWriteMask |= (1 << desc.NumRenderTargets);
+                desc.NumRenderTargets++;
+            }
+            else
+            {
+                CORELIB_ASSERT(desc.DSVFormat == DXGI_FORMAT_UNKNOWN);
+                desc.DSVFormat = TranslateDepthFormat(renderTarget.ImageFormat);
+            }
+        }
+        ID3D12PipelineState *pipelineState = nullptr;
+        CHECK_DX(state.device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState)));
+        auto pipeline = new Pipeline(pipelineState, rootSignature);
+        pipeline->primitiveTopology = FixedFunctionStates.PrimitiveTopology;
+        rootSignature = nullptr;
+        return pipeline;
     }
 
     virtual GameEngine::Pipeline *CreateComputePipeline(
-        CoreLib::ArrayView<GameEngine::DescriptorSetLayout *> /*descriptorSets*/,
-        GameEngine::Shader * /*shader*/) override
+        CoreLib::ArrayView<GameEngine::DescriptorSetLayout *> descriptorSets,
+        GameEngine::Shader * shader) override
     {
-        return new Pipeline();
+        auto &state = RendererState::Get();
+        D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {};
+        CreateRootSignature(descriptorSets, false);
+        desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+        desc.pRootSignature = rootSignature;
+        auto d3dShader = reinterpret_cast<Shader *>(shader);
+        desc.CS.BytecodeLength = d3dShader->shaderData.Count();
+        desc.CS.pShaderBytecode = d3dShader->shaderData.Buffer();
+        ID3D12PipelineState *pipelineState = nullptr;
+        CHECK_DX(state.device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&pipelineState)));
+        auto pipeline = new Pipeline(pipelineState, rootSignature);
+        rootSignature = nullptr;
+        return pipeline;
     }
 };
 
@@ -2209,9 +2300,9 @@ public:
     }
 
     virtual GameEngine::RenderTargetLayout *CreateRenderTargetLayout(
-        CoreLib::ArrayView<AttachmentLayout> /*bindings*/, bool /*ignoreInitialContent*/) override
+        CoreLib::ArrayView<AttachmentLayout> bindings, bool ignoreInitialContent) override
     {
-        return new RenderTargetLayout();
+        return new RenderTargetLayout(bindings, ignoreInitialContent);
     }
 
     virtual GameEngine::PipelineBuilder *CreatePipelineBuilder() override

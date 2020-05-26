@@ -60,7 +60,7 @@ struct VertexIn
 struct VertexOut
 {
     float4 vertPos : SV_POSITION;
-    float2 vertUV;
+    float2 vertUV : TEXCOORD0;
 };
 
 VertexOut vs_main(VertexIn vin)

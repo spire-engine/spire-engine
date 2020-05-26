@@ -12,8 +12,8 @@ namespace GameEngine
 	{
 		// Create deferred pipeline
 		VertexFormat deferredVertexFormat;
-		deferredVertexFormat.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 0, 0, "POSITION"));
-		deferredVertexFormat.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 2 * sizeof(float), 1, "TEXCOORD0"));
+		deferredVertexFormat.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 0, 0, "POSITION", 0));
+		deferredVertexFormat.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 2 * sizeof(float), 1, "TEXCOORD", 0));
 		RefPtr<PipelineBuilder> pipelineBuilder = hwRenderer->CreatePipelineBuilder();
 		pipelineBuilder->SetVertexLayout(deferredVertexFormat);
 		ShaderCompilationResult rs;

@@ -54,6 +54,7 @@ namespace GameEngine
                 descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.samplerBinding);
                 break;
             case ResourceBinding::BindingType::StorageBuffer:
+            case ResourceBinding::BindingType::RWStorageBuffer:
             {
                 int bufLen = resources[i].bufferLength;
                 if (bufLen == -1)

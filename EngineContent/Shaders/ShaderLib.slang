@@ -539,6 +539,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
                 CASCADE_LOOP_BODY(6)
                 CASCADE_LOOP_BODY(7)
 #else
+                [loop]
                 for (int i = 0; i < lightEnv.numCascades; i++)
                 {
                     if (-viewPos.z < lightEnv.zPlanes[i >> 2][i & 3])
@@ -567,6 +568,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
         int tileY = int(pixelLocation.y / 16);
         int lightListOffset = (tileY * lightEnv.lightListTilesX + tileX) * MaxLightsPerTile;
         int lightCount = 0;
+        [loop]
 		for (int i = 0; i < MaxLightsPerTile; i++)
 		{
             uint bufferContent = lightEnv.tiledLightList[lightListOffset + i];
@@ -638,6 +640,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
             float3 diffuseIBL = 0.0;
             float specularWeights = 0.0;
             float diffuseWeights = 0.0;
+            [loop]
             for (int i = 0; i < MaxLightsPerTile; i++)
             {
                 uint bufferContent = lightEnv.tiledLightList[lightListOffset + i];

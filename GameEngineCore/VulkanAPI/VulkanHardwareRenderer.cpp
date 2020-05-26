@@ -927,16 +927,25 @@ namespace VK
 
 	vk::DescriptorType TranslateBindingType(BindingType bindType)
 	{
-		switch (bindType)
-		{
-		case BindingType::Texture: return vk::DescriptorType::eSampledImage;
-        case BindingType::StorageTexture: return vk::DescriptorType::eStorageImage;
-		case BindingType::Sampler: return vk::DescriptorType::eSampler;
-		case BindingType::UniformBuffer: return vk::DescriptorType::eUniformBuffer; //TODO: dynamic?
-		case BindingType::StorageBuffer: return vk::DescriptorType::eStorageBuffer; //TODO: ^
-		case BindingType::Unused: throw HardwareRendererException("Attempting to use unused binding");
-		default: CORELIB_NOT_IMPLEMENTED("TranslateBindingType");
-		}
+        switch (bindType)
+        {
+        case BindingType::Texture:
+            return vk::DescriptorType::eSampledImage;
+        case BindingType::StorageTexture:
+            return vk::DescriptorType::eStorageImage;
+        case BindingType::Sampler:
+            return vk::DescriptorType::eSampler;
+        case BindingType::UniformBuffer:
+            return vk::DescriptorType::eUniformBuffer;
+        case BindingType::StorageBuffer:
+            return vk::DescriptorType::eStorageBuffer;
+        case BindingType::RWStorageBuffer:
+            return vk::DescriptorType::eStorageBuffer;
+        case BindingType::Unused:
+            throw HardwareRendererException("Attempting to use unused binding");
+        default:
+            CORELIB_NOT_IMPLEMENTED("TranslateBindingType");
+        }
 	}
 
 	vk::ShaderStageFlags TranslateStageFlags(StageFlags flag)

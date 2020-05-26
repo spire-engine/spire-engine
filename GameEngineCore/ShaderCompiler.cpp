@@ -250,7 +250,10 @@ namespace GameEngine
                 {
                 case SLANG_STRUCTURED_BUFFER:
                 case SLANG_BYTE_ADDRESS_BUFFER:
-                    return BindingType::StorageBuffer;
+                    if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+                        return BindingType::RWStorageBuffer;
+                    else
+                        return BindingType::StorageBuffer;
                 default:
                     if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
                         return BindingType::StorageTexture;
@@ -332,13 +335,13 @@ namespace GameEngine
                 int anyErrors = spCompile(req);
                 if (anyErrors)
                 {
-                    const char* diagMsg = spGetDiagnosticOutput(req);
+                    const char *diagMsg = spGetDiagnosticOutput(req);
                     Print("Error compiling shader.\n%s\n", diagMsg);
                     spDestroyCompileRequest(req);
                     src.Diagnostics = diagMsg;
                     return false;
                 }
-
+                
                 List<char*> glslOutput;
 
                 for (int i = 0; i < entryPointsToCompile.Count(); i++)
@@ -355,6 +358,7 @@ namespace GameEngine
                     }
                 }
 
+
                 // extract reflection data
                 slang::ShaderReflection * reflection = slang::ShaderReflection::get(req);
                 int paramCount = (int)reflection->getParameterCount();
@@ -366,7 +370,7 @@ namespace GameEngine
                     {
                         auto layout = param->getTypeLayout();
                         DescriptorSetInfo set;
-                        set.BindingPoint = param->getBindingSpace();
+                        set.BindingPoint = src.BindingLayouts.Count();
                         set.Name = paramName;
                         auto resType = layout->getElementVarLayout()->getTypeLayout();
                         auto reslayout = layout->getElementVarLayout();
@@ -446,7 +450,8 @@ namespace GameEngine
                     spAddCodeGenTarget(compileRequest, SLANG_GLSL);
             }
 
-            #if 0
+            #if 1
+                spSetLineDirectiveMode(compileRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
                 spSetDumpIntermediates(compileRequest, 1);
             #endif
             int shaderLibUnit = spAddTranslationUnit(compileRequest, SLANG_SOURCE_LANGUAGE_SLANG, "ShaderLib");
@@ -537,6 +542,9 @@ namespace GameEngine
                         break;
                     case BindingType::StorageBuffer:
                         varLayout.Type = ShaderVariableType::StorageBuffer;
+                        break;
+                    case BindingType::RWStorageBuffer:
+                        varLayout.Type = ShaderVariableType::RWStorageBuffer;
                         break;
                     default:
                         throw InvalidProgramException("Unknown binding type.");

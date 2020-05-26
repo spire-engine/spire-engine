@@ -67,7 +67,7 @@ namespace GameEngine
 
 	enum class BindingType
 	{
-		Unused, UniformBuffer, StorageBuffer, Texture, StorageTexture, Sampler
+		Unused, UniformBuffer, StorageBuffer, RWStorageBuffer, Texture, StorageTexture, Sampler
 	};
 
 	enum class DataType
@@ -362,6 +362,7 @@ namespace GameEngine
 	{
 	public:
         CoreLib::String Semantic;
+        int SemanticIndex;
 		DataType Type;
 		int Normalized : 1;
 		int StartOffset : 31;
@@ -370,13 +371,14 @@ namespace GameEngine
 		{
 			Location = -1;
 		}
-		VertexAttributeDesc(DataType type, int normalized, int offset, int location, CoreLib::String semantic)
+		VertexAttributeDesc(DataType type, int normalized, int offset, int location, CoreLib::String semantic, int semanticIndex)
 		{
 			this->Type = type;
 			this->Normalized = normalized;
 			this->StartOffset = offset;
 			this->Location = location;
             this->Semantic = semantic;
+            this->SemanticIndex = semanticIndex;
 		}
 	};
 	
