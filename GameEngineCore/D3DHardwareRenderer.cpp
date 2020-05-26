@@ -193,6 +193,7 @@ public:
     ID3D12Device *device = nullptr;
     ID3D12CommandQueue *queue = nullptr;
     DescriptorHeap resourceDescHeap, rtvDescHeap, samplerDescHeap;
+    IDXGIFactory4 *dxgiFactory = nullptr;
 
     int version = 0;
     CoreLib::List<ID3D12Resource *> stagingBuffers;
@@ -306,6 +307,8 @@ public:
             stagingBuffer->Release();
         if (state.queue)
             state.queue->Release();
+        if (state.dxgiFactory)
+            state.dxgiFactory->Release();
         if (state.device)
             state.device->Release();
         state.tempCommandListAllocPtr = decltype(state.tempCommandListAllocPtr)();
@@ -1988,20 +1991,61 @@ public:
 class WindowSurface : public GameEngine::WindowSurface
 {
 public:
-    WindowSurface()
+    WindowHandle windowHandle;
+    IDXGISwapChain1 *swapchain = nullptr;
+    int w, h;
+    void CreateSwapchain(int width, int height)
     {
+        auto &state = RendererState::Get();
+        this->w = width;
+        this->h = height;
+        DXGI_SWAP_CHAIN_DESC1 desc = {};
+        desc.Width = width;
+        desc.Height = height;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.Stereo = 0;
+        desc.SampleDesc.Count = 1;
+        desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        desc.BufferCount = 2;
+        desc.Scaling = DXGI_SCALING_STRETCH;
+        desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+        if (swapchain)
+        {
+            swapchain->Release();
+            swapchain = nullptr;
+        }
+        CHECK_DX(state.dxgiFactory->CreateSwapChainForHwnd(
+            state.queue, (HWND)windowHandle, &desc, nullptr, nullptr, &swapchain));
     }
 
 public:
+    WindowSurface(WindowHandle windowHandle, int width, int height)
+    {
+        this->windowHandle = windowHandle;
+        CreateSwapchain(width, height);
+    }
+    ~WindowSurface()
+    {
+        if (swapchain)
+            swapchain->Release();
+    }
+public:
     virtual WindowHandle GetWindowHandle() override
     {
-        return WindowHandle();
+        return windowHandle;
     }
-    virtual void Resize(int /*width*/, int /*height*/) override
+    virtual void Resize(int width, int height) override
     {
+        if (width != w && height != h && width > 1 && height > 1)
+        {
+            CreateSwapchain(width, height);
+        }
     }
-    virtual void GetSize(int & /*width*/, int & /*height*/) override
+    virtual void GetSize(int & width, int & height) override
     {
+        width = this->w;
+        height = this->h;
     }
 };
 
@@ -2044,13 +2088,12 @@ public:
             }
             // Initialize D3D Context
 
-            IDXGIFactory4 *dxgiFactory;
-            CHECK_DX(createDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)));
+            CHECK_DX(createDXGIFactory1(IID_PPV_ARGS(&state.dxgiFactory)));
             CoreLib::List<IDXGIAdapter1 *> adapters;
             if (useSoftwareDevice)
             {
                 IDXGIAdapter1 *adapter = nullptr;
-                CHECK_DX(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&adapter)));
+                CHECK_DX(state.dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&adapter)));
                 adapters.Add(adapter);
             }
             else
@@ -2058,7 +2101,7 @@ public:
                 IDXGIAdapter1 *adapter = nullptr;
                 for (unsigned i = 0;; i++)
                 {
-                    if (DXGI_ERROR_NOT_FOUND == dxgiFactory->EnumAdapters1(i, &adapter))
+                    if (DXGI_ERROR_NOT_FOUND == state.dxgiFactory->EnumAdapters1(i, &adapter))
                     {
                         // No more adapters to enumerate.
                         break;
@@ -2160,8 +2203,11 @@ public:
             d3dfence->fence->SetEventOnCompletion(value, d3dfence->waitEvent);
         }
     }
-    virtual void Present(GameEngine::WindowSurface * /*surface*/, GameEngine::Texture2D * /*srcImage*/) override
+    virtual void Present(GameEngine::WindowSurface * surface, GameEngine::Texture2D * srcImage) override
     {
+        auto d3dsurface = reinterpret_cast<WindowSurface *>(surface);
+       
+        d3dsurface->swapchain->Present(0, 0);
     }
     virtual void Blit(GameEngine::Texture2D * /*dstImage*/, GameEngine::Texture2D * /*srcImage*/,
         VectorMath::Vec2i /*destOffset*/, bool /*flipSrc*/) override
@@ -2347,9 +2393,9 @@ public:
     }
 
     virtual GameEngine::WindowSurface *CreateSurface(
-        WindowHandle /*windowHandle*/, int /*width*/, int /*height*/) override
+        WindowHandle windowHandle, int width, int height) override
     {
-        return new WindowSurface();
+        return new WindowSurface(windowHandle, width, height);
     }
 
     virtual CoreLib::String GetRendererName() override
