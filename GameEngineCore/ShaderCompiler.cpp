@@ -450,7 +450,7 @@ namespace GameEngine
                     spAddCodeGenTarget(compileRequest, SLANG_GLSL);
             }
 
-            #if 1
+            #if 0
                 spSetLineDirectiveMode(compileRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
                 spSetDumpIntermediates(compileRequest, 1);
             #endif
