@@ -927,16 +927,25 @@ namespace VK
 
 	vk::DescriptorType TranslateBindingType(BindingType bindType)
 	{
-		switch (bindType)
-		{
-		case BindingType::Texture: return vk::DescriptorType::eSampledImage;
-        case BindingType::StorageTexture: return vk::DescriptorType::eStorageImage;
-		case BindingType::Sampler: return vk::DescriptorType::eSampler;
-		case BindingType::UniformBuffer: return vk::DescriptorType::eUniformBuffer; //TODO: dynamic?
-		case BindingType::StorageBuffer: return vk::DescriptorType::eStorageBuffer; //TODO: ^
-		case BindingType::Unused: throw HardwareRendererException("Attempting to use unused binding");
-		default: CORELIB_NOT_IMPLEMENTED("TranslateBindingType");
-		}
+        switch (bindType)
+        {
+        case BindingType::Texture:
+            return vk::DescriptorType::eSampledImage;
+        case BindingType::StorageTexture:
+            return vk::DescriptorType::eStorageImage;
+        case BindingType::Sampler:
+            return vk::DescriptorType::eSampler;
+        case BindingType::UniformBuffer:
+            return vk::DescriptorType::eUniformBuffer;
+        case BindingType::StorageBuffer:
+            return vk::DescriptorType::eStorageBuffer;
+        case BindingType::RWStorageBuffer:
+            return vk::DescriptorType::eStorageBuffer;
+        case BindingType::Unused:
+            throw HardwareRendererException("Attempting to use unused binding");
+        default:
+            CORELIB_NOT_IMPLEMENTED("TranslateBindingType");
+        }
 	}
 
 	vk::ShaderStageFlags TranslateStageFlags(StageFlags flag)
@@ -1896,6 +1905,10 @@ namespace VK
 			for (auto& currentLayout : currentSubresourceLayouts)
 				currentLayout = LayoutFromUsage(this->usage);
 		}
+		void* Ptr()
+		{
+			return this;
+		}
 	};
 
 	class Texture2D : public VK::Texture, public GameEngine::Texture2D
@@ -1931,6 +1944,10 @@ namespace VK
 		{
 			VK::Texture::GetData(mipLevel, 0, data, bufSize);
 		}
+		void* GetInternalPtr() override
+		{
+			return VK::Texture::Ptr();
+		}
 	};
 
 	class Texture2DArray : public VK::Texture, public GameEngine::Texture2DArray
@@ -1957,6 +1974,11 @@ namespace VK
 		virtual void BuildMipmaps() override
 		{
 			VK::Texture::BuildMipmaps();
+		}
+		
+		void* GetInternalPtr() override
+		{
+			return VK::Texture::Ptr();
 		}
 	};
 
@@ -1986,6 +2008,11 @@ namespace VK
         {
             return this->format == StorageFormat::Depth24 || this->format == StorageFormat::Depth24Stencil8 || this->format == StorageFormat::Depth32;
         }
+
+		void* GetInternalPtr() override
+		{
+			return VK::Texture::Ptr();
+		}
 	};
 
 	class TextureCubeArray : public VK::Texture, public GameEngine::TextureCubeArray
@@ -2018,6 +2045,11 @@ namespace VK
         {
             return this->format == StorageFormat::Depth24 || this->format == StorageFormat::Depth24Stencil8 || this->format == StorageFormat::Depth32;
         }
+
+		void* GetInternalPtr() override
+		{
+			return VK::Texture::Ptr();
+		}
 	};
 
 	class Texture3D : public VK::Texture, public GameEngine::Texture3D
@@ -2040,6 +2072,11 @@ namespace VK
         {
             return this->format == StorageFormat::Depth24 || this->format == StorageFormat::Depth24Stencil8 || this->format == StorageFormat::Depth32;
         }
+
+		void* GetInternalPtr() override
+		{
+			return VK::Texture::Ptr();
+		}
 	};
 
 	class TextureSampler : public GameEngine::TextureSampler
@@ -4792,14 +4829,15 @@ namespace VK
           	((VkWindowSurface*)surface)->Present(srcImage);
 		}
 
-		virtual BufferObject* CreateBuffer(BufferUsage usage, int size) override
+		virtual BufferObject* CreateBuffer(BufferUsage usage, int size, const BufferStructureInfo* structInfo) override
 		{
-			//return CreateMappedBuffer(usage, size);
+			CORELIB_UNUSED(structInfo);
 			return new BufferObject(TranslateUsageFlags(usage) | vk::BufferUsageFlagBits::eTransferSrc, size, vk::MemoryPropertyFlagBits::eDeviceLocal);
 		}
 
-		virtual BufferObject* CreateMappedBuffer(BufferUsage usage, int size) override
+		virtual BufferObject* CreateMappedBuffer(BufferUsage usage, int size, const BufferStructureInfo* structInfo) override
 		{
+			CORELIB_UNUSED(structInfo);
 			return new BufferObject(TranslateUsageFlags(usage), size, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 		}
 

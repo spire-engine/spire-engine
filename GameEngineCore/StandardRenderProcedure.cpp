@@ -141,7 +141,9 @@ namespace GameEngine
         RefPtr<Buffer> CreateRandomDirectionsBuffer()
         {
             size_t bufferSize = sizeof(VectorMath::Vec4) * 16 * 16 * 16;
-            RefPtr<Buffer> rs = sharedRes->hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, (int)bufferSize);
+            auto structInfo = BufferStructureInfo(sizeof(VectorMath::Vec4), 16 * 16 * 16);
+            RefPtr<Buffer> rs =
+                sharedRes->hardwareRenderer->CreateBuffer(BufferUsage::StorageBuffer, (int)bufferSize, &structInfo);
             List<VectorMath::Vec4> dirs;
             dirs.SetSize(16 * 16 * 16);
             Random random(7291);
@@ -236,7 +238,7 @@ namespace GameEngine
                 clearHistogramComputeTaskInstance = computeTaskManager->CreateComputeTaskInstance(clearHistogramComputeKernel, sizeof(int), false);
                 clearHistogramComputeTaskInstance->SetUniformData((void*)&histogramSize, sizeof(int));
                 Array<ResourceBinding, 1> clearHistogramBindings;
-                clearHistogramBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, -1));
+                clearHistogramBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, -1, false));
                 clearHistogramComputeTaskInstance->SetBinding(clearHistogramBindings.GetArrayView());
                 histogramBuildingComputeKernel = computeTaskManager->LoadKernel("BuildHistogram.slang", "cs_BuildHistogram");
                 histogramBuildingComputeTaskInstance = computeTaskManager->CreateComputeTaskInstance(histogramBuildingComputeKernel, sizeof(BuildHistogramUniforms), true);
@@ -255,7 +257,7 @@ namespace GameEngine
                 randomDirectionBuffer = CreateRandomDirectionsBuffer();
             }
             // initialize forwardBasePassModule and lightingModule
-            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
+            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment(), nullptr);
             sharedRes->CreateModuleInstance(viewParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), &renderPassUniformMemory);
             lighting.Init(*sharedRes, &renderPassUniformMemory, useEnvMap);
             UpdateSharedResourceBinding();
@@ -453,7 +455,7 @@ namespace GameEngine
                 Array<ResourceBinding, 3> ssaoBindings;
                 ssaoBindings.Add(ResourceBinding(prezTextures[0]));
                 ssaoBindings.Add(ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage));
-                ssaoBindings.Add(ResourceBinding(randomDirectionBuffer.Ptr(), 0, -1));
+                ssaoBindings.Add(ResourceBinding(randomDirectionBuffer.Ptr(), 0, -1, true));
 
                 ssaoUniforms.width = w;
                 ssaoUniforms.height = h;
@@ -485,9 +487,9 @@ namespace GameEngine
             Array<ResourceBinding, 5> buildLightListBindings;
             buildLightListBindings.Add(ResourceBinding(prezTextures[0]));
             buildLightListBindings.Add(ResourceBinding(prezTextures[1]));
-            buildLightListBindings.Add(ResourceBinding(lighting.lightBuffer.Ptr(), lighting.moduleInstance.GetCurrentVersion()*lighting.lightBufferSize, lighting.lightBufferSize));
-            buildLightListBindings.Add(ResourceBinding(lighting.lightProbeBuffer.Ptr(), lighting.moduleInstance.GetCurrentVersion()*lighting.lightProbeBufferSize, lighting.lightProbeBufferSize));
-            buildLightListBindings.Add(ResourceBinding(lighting.tiledLightListBufffer.Ptr(), 0, lighting.tiledLightListBufferSize));
+            buildLightListBindings.Add(ResourceBinding(lighting.lightBuffer.Ptr(), lighting.moduleInstance.GetCurrentVersion()*lighting.lightBufferSize, lighting.lightBufferSize, true));
+            buildLightListBindings.Add(ResourceBinding(lighting.lightProbeBuffer.Ptr(), lighting.moduleInstance.GetCurrentVersion()*lighting.lightProbeBufferSize, lighting.lightProbeBufferSize, true));
+            buildLightListBindings.Add(ResourceBinding(lighting.tiledLightListBufffer.Ptr(), 0, lighting.tiledLightListBufferSize, false));
             lightListBuildingComputeTaskInstance->UpdateVersionedParameters(&buildLightListUniforms, sizeof(buildLightListUniforms), buildLightListBindings.GetArrayView());
             lightListBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
 
@@ -567,14 +569,14 @@ namespace GameEngine
                 buildHistogramUniforms.histogramSize = histogramSize;
                 Array<ResourceBinding, 5> buildHistogramBindings;
                 buildHistogramBindings.Add(ResourceBinding(lightingOutput));
-                buildHistogramBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, sizeof(int32_t)*128));
+                buildHistogramBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, sizeof(int32_t)*128, false));
                 histogramBuildingComputeTaskInstance->UpdateVersionedParameters(&buildHistogramUniforms, sizeof(buildHistogramUniforms), buildHistogramBindings.GetArrayView());
                 histogramBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
 
                 // compute adapted luminance
                 Array<ResourceBinding, 5> eyeAdaptationBindings;
-                eyeAdaptationBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, sizeof(int32_t) * 128));
-                eyeAdaptationBindings.Add(ResourceBinding(sharedRes->adaptedLuminanceBuffer.Ptr(), 0, sizeof(float)));
+                eyeAdaptationBindings.Add(ResourceBinding(sharedRes->histogramBuffer.Ptr(), 0, sizeof(int32_t) * 128, true));
+                eyeAdaptationBindings.Add(ResourceBinding(sharedRes->adaptedLuminanceBuffer.Ptr(), 0, sizeof(float), false));
                 eyeAdaptationComputeTaskInstance->UpdateVersionedParameters(&eyeAdaptationUniforms, sizeof(eyeAdaptationUniforms), eyeAdaptationBindings.GetArrayView());
                 eyeAdaptationComputeTaskInstance->Queue(1, 1, 1);
 

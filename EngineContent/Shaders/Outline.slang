@@ -11,14 +11,14 @@ ParameterBlock<OutlinePassParams> params;
 
 struct VertexIn
 {
-    float2 vertPos;
-    float2 vertUV;
+    float2 vertPos : POSITION;
+    float2 vertUV : TEXCOORD0;
 };
 
 struct VertexOut
 {
     float4 vertPos : SV_POSITION;
-    float2 vertUV;
+    float2 vertUV : TEXCOORD0;
 };
 
 VertexOut vs_main(VertexIn vin)
@@ -34,7 +34,7 @@ int getVal(float2 uv)
     float val = params.srcDepth.Sample(params.nearestSampler, uv).x;
     return val == 1.0 ? 1 : 0;
 }
-float4 ps_main(VertexOut vin)
+float4 ps_main(VertexOut vin) : SV_Target
 {
     float4 src = params.srcColor.Sample(params.nearestSampler, vin.vertUV);
     int thisVal = getVal(vin.vertUV);

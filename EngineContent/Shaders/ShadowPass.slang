@@ -39,12 +39,13 @@ ParameterBlock<SPECIALIZATION_TYPE_2 > gWorldTransform;
 struct VSOutput
 {
 	float4 projPos : SV_POSITION;
-    float3 worldPos;
-    float3 normal, tangent;
-    float binormalSign;
+    float3 worldPos : WORLDPOS;
+    float3 normal : NORMAL;
+    float3 tangent : TANGENT;
+    float binormalSign : BINORMALSIGN;
     SPECIALIZATION_TYPE_3.ColorSet vertColorSet;
     SPECIALIZATION_TYPE_3.UVSet vertUVSet;
-    SPECIALIZATION_TYPE_3.BoneWeightSet.PackedType vertBoneWeightSet;
+    SPECIALIZATION_TYPE_3.BoneWeightSet.PackedType vertBoneWeightSet : BONEWEIGHTSET;
 };
 
 VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)

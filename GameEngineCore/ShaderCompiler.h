@@ -15,7 +15,12 @@ namespace GameEngine
 
     enum class ShaderVariableType
     {
-        Data, Texture, StorageBuffer, UniformBuffer, Sampler
+        Data,
+        Texture,
+        StorageBuffer,
+        RWStorageBuffer,
+        UniformBuffer,
+        Sampler
     };
 
     struct ShaderVariableLayout

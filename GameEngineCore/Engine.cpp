@@ -150,6 +150,7 @@ namespace GameEngine
             startTime = lastGameLogicTime = lastRenderingTime = Diagnostics::PerformanceCounter::Start();
 
             GpuId = args.GpuId;
+			useSoftwareRenderer = args.UseSoftwareRenderer;
             RecompileShaders = args.RecompileShaders;
 
             if (args.Editor)
@@ -221,6 +222,9 @@ namespace GameEngine
 			{
 			case RenderAPI::Vulkan:
 				Print("Vulkan: %s\n", renderer->GetHardwareRenderer()->GetRendererName().Buffer());
+				break;
+			case RenderAPI::D3D12:
+				Print("Direct3D 12: %s\n", renderer->GetHardwareRenderer()->GetRendererName().Buffer());
 				break;
 			case RenderAPI::Dummy:
 				Print("Using dummy renderer.\n");

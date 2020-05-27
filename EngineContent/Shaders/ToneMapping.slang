@@ -53,14 +53,14 @@ float3 ACESFitted(float3 color)
 
 struct VertexIn
 {
-    float2 vertPos;
-    float2 vertUV;
+    float2 vertPos : POSITION;
+    float2 vertUV : TEXCOORD0;
 };
 
 struct VertexOut
 {
     float4 vertPos : SV_POSITION;
-    float2 vertUV;
+    float2 vertUV : TEXCOORD0;
 };
 
 VertexOut vs_main(VertexIn vin)
@@ -71,7 +71,7 @@ VertexOut vs_main(VertexIn vin)
     return rs;
 }
 
-float4 ps_main(VertexOut vin)
+float4 ps_main(VertexOut vin) : SV_Target
 {
     float adaptedIllum = params.adaptedLuminance[0];
     float3 src = params.litColor.Sample(params.nearestSampler, vin.vertUV).xyz;

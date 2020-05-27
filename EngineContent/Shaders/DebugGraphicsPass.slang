@@ -51,7 +51,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
     return rs;
 }
 
-float4 ps_main(VSOutput vsOut)
+float4 ps_main(VSOutput vsOut) : SV_Target
 {
     return vsOut.color;
 }

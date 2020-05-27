@@ -26,7 +26,7 @@ MAKEFILEGEN_DEP = CoreLib/LibString.cpp CoreLib/LibIO.cpp CoreLib/Stream.cpp Cor
 build/makefilegen: MakefileGen/builder.cpp | build_dir
 	@$(CXX) MakefileGen/builder.cpp $(MAKEFILEGEN_DEP) -g -o $@ -std=c++17
 
-SLANG_VERSION=0.12.4
+SLANG_VERSION=0.13.2
 ExternalLibs/Slang ExternalLibs/Slang/bin/linux-x64 :
 	@echo "Downloading external libraries..."
 	wget "https://github.com/csyonghe/SpireMiniEngineExtBinaries/raw/master/Slang-$(SLANG_VERSION).tar.gz" -O Slang.tar.gz

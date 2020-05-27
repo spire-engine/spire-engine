@@ -133,7 +133,7 @@ namespace GameEngine
             atmospherePass->Init(renderer);
 
             // initialize forwardBasePassModule and lightingModule
-            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment());
+            renderPassUniformMemory.Init(sharedRes->hardwareRenderer.Ptr(), BufferUsage::UniformBuffer, true, 22, sharedRes->hardwareRenderer->UniformBufferAlignment(), nullptr);
             sharedRes->CreateModuleInstance(viewParams, Engine::GetShaderCompiler()->LoadSystemTypeSymbol("ViewParams"), &renderPassUniformMemory);
             lighting.Init(*sharedRes, &renderPassUniformMemory, false);
             UpdateSharedResourceBinding();
@@ -294,9 +294,14 @@ namespace GameEngine
             Array<ResourceBinding, 5> buildLightListBindings;
             buildLightListBindings.Add(ResourceBinding(prezTextures[0]));
             buildLightListBindings.Add(ResourceBinding(prezTextures[1]));
-            buildLightListBindings.Add(ResourceBinding(lighting.lightBuffer.Ptr(), lighting.moduleInstance.GetCurrentVersion()*lighting.lightBufferSize, lighting.lightBufferSize));
-            buildLightListBindings.Add(ResourceBinding(lighting.lightProbeBuffer.Ptr(), lighting.moduleInstance.GetCurrentVersion()*lighting.lightProbeBufferSize, lighting.lightProbeBufferSize));
-            buildLightListBindings.Add(ResourceBinding(lighting.tiledLightListBufffer.Ptr(), 0, lighting.tiledLightListBufferSize));
+            buildLightListBindings.Add(ResourceBinding(lighting.lightBuffer.Ptr(),
+                lighting.moduleInstance.GetCurrentVersion() * lighting.lightBufferSize, lighting.lightBufferSize,
+                true));
+            buildLightListBindings.Add(ResourceBinding(lighting.lightProbeBuffer.Ptr(),
+                lighting.moduleInstance.GetCurrentVersion() * lighting.lightProbeBufferSize,
+                lighting.lightProbeBufferSize, true));
+            buildLightListBindings.Add(
+                ResourceBinding(lighting.tiledLightListBufffer.Ptr(), 0, lighting.tiledLightListBufferSize, true));
             lightListBuildingComputeTaskInstance->UpdateVersionedParameters(&buildLightListUniforms, sizeof(buildLightListUniforms), buildLightListBindings.GetArrayView());
             lightListBuildingComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
 

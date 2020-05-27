@@ -188,7 +188,7 @@ namespace GameEngine
     class SlangShaderCompiler : public IShaderCompiler
     {
     public:
-        bool dumpGLSL = true;
+        bool dumpShaderSource = true;
         EnumerableDictionary<String, SlangCompileRequest*> reflectionCompileRequests;
         EnumerableDictionary<String, RefPtr<ShaderEntryPoint>> shaderEntryPoints;
         EnumerableDictionary<String, RefPtr<ShaderTypeSymbol>> shaderTypeSymbols;
@@ -198,7 +198,6 @@ namespace GameEngine
         SlangShaderCompiler()
         {
             cache.Load(Engine::Instance()->GetDirectory(false, ResourceType::ShaderCache), Engine::Instance()->GetTargetShadingLanguage());
-            dumpGLSL = dumpGLSL && Engine::Instance()->GetTargetShadingLanguage() == TargetShadingLanguage::SPIRV;
         }
         ~SlangShaderCompiler()
         {
@@ -251,7 +250,10 @@ namespace GameEngine
                 {
                 case SLANG_STRUCTURED_BUFFER:
                 case SLANG_BYTE_ADDRESS_BUFFER:
-                    return BindingType::StorageBuffer;
+                    if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+                        return BindingType::RWStorageBuffer;
+                    else
+                        return BindingType::StorageBuffer;
                 default:
                     if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
                         return BindingType::StorageTexture;
@@ -311,6 +313,8 @@ namespace GameEngine
                     auto ep = entryPoints[eid];
                     int unit = 0;
                     auto path = Engine::Instance()->FindFile(ep->FileName, ResourceType::Shader);
+                    if (path.Length() == 0)
+                        throw IOException(String("Shader file not found: ") + ep->FileName + String("\nDid you forget to specify '-enginedir'?"));
                     if (!addedTUs.TryGetValue(path, unit))
                     {
                         unit = spAddTranslationUnit(req, SLANG_SOURCE_LANGUAGE_SLANG, ep->FileName.Buffer());
@@ -331,13 +335,13 @@ namespace GameEngine
                 int anyErrors = spCompile(req);
                 if (anyErrors)
                 {
-                    const char* diagMsg = spGetDiagnosticOutput(req);
+                    const char *diagMsg = spGetDiagnosticOutput(req);
                     Print("Error compiling shader.\n%s\n", diagMsg);
                     spDestroyCompileRequest(req);
                     src.Diagnostics = diagMsg;
                     return false;
                 }
-
+                
                 List<char*> glslOutput;
 
                 for (int i = 0; i < entryPointsToCompile.Count(); i++)
@@ -347,12 +351,13 @@ namespace GameEngine
                     int size = (int)outBlob->getBufferSize();
                     src.ShaderCode[entryPointsToCompile[i]].SetSize(size);
                     memcpy(src.ShaderCode[entryPointsToCompile[i]].Buffer(), outBlob->getBufferPointer(), size);
-                    if (dumpGLSL)
+                    if (dumpShaderSource)
                     {
                         spGetEntryPointCodeBlob(req, i, 1, &outBlob);
                         glslOutput.Add((char*)outBlob->getBufferPointer());
                     }
                 }
+
 
                 // extract reflection data
                 slang::ShaderReflection * reflection = slang::ShaderReflection::get(req);
@@ -365,7 +370,7 @@ namespace GameEngine
                     {
                         auto layout = param->getTypeLayout();
                         DescriptorSetInfo set;
-                        set.BindingPoint = param->getBindingSpace();
+                        set.BindingPoint = src.BindingLayouts.Count();
                         set.Name = paramName;
                         auto resType = layout->getElementVarLayout()->getTypeLayout();
                         auto reslayout = layout->getElementVarLayout();
@@ -411,7 +416,7 @@ namespace GameEngine
                 {
                     auto eid = entryPointsToCompile[i];
                     char* glsl = nullptr;
-                    if (dumpGLSL)
+                    if (dumpShaderSource)
                         glsl = glslOutput[i];
                     cache.UpdateEntry(keys[eid], src.ShaderCode[eid], glsl, src.BindingLayouts);
                 }
@@ -437,10 +442,16 @@ namespace GameEngine
 
             spAddCodeGenTarget(compileRequest, GetSlangTarget());
             spSetTargetProfile(compileRequest, 0, spFindProfile(session, "sm_5_1"));
-            if (dumpGLSL)
-                spAddCodeGenTarget(compileRequest, SLANG_GLSL);
+            if (dumpShaderSource)
+            {
+                if (GetSlangTarget() == SLANG_DXBC)
+                    spAddCodeGenTarget(compileRequest, SLANG_HLSL);
+                else
+                    spAddCodeGenTarget(compileRequest, SLANG_GLSL);
+            }
 
             #if 0
+                spSetLineDirectiveMode(compileRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
                 spSetDumpIntermediates(compileRequest, 1);
             #endif
             int shaderLibUnit = spAddTranslationUnit(compileRequest, SLANG_SOURCE_LANGUAGE_SLANG, "ShaderLib");
@@ -531,6 +542,9 @@ namespace GameEngine
                         break;
                     case BindingType::StorageBuffer:
                         varLayout.Type = ShaderVariableType::StorageBuffer;
+                        break;
+                    case BindingType::RWStorageBuffer:
+                        varLayout.Type = ShaderVariableType::RWStorageBuffer;
                         break;
                     default:
                         throw InvalidProgramException("Unknown binding type.");

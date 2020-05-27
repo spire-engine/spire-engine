@@ -26,7 +26,7 @@ namespace GameEngine
         } resourceHandles;
         enum class BindingType
         {
-            Texture, TextureArray, Sampler, StorageBuffer, StorageImage
+            Texture, TextureArray, Sampler, StorageBuffer, RWStorageBuffer, StorageImage
         };
         BindingType type;
         int bufferOffset;
@@ -43,9 +43,9 @@ namespace GameEngine
             type = BindingType::Sampler;
             resourceHandles.samplerBinding = sampler;
         }
-        ResourceBinding(Buffer* buffer, int offset, int size)
+        ResourceBinding(Buffer* buffer, int offset, int size, bool readOnly)
         {
-            type = BindingType::StorageBuffer;
+            type = readOnly ? BindingType::StorageBuffer : BindingType::RWStorageBuffer;
             resourceHandles.storageBufferBinding = buffer;
             bufferOffset = offset;
             bufferLength = size;

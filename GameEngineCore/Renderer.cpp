@@ -150,6 +150,10 @@ namespace GameEngine
 				hardwareRenderer = CreateVulkanHardwareRenderer(Engine::Instance()->GpuId, 
                     Path::Combine(Engine::Instance()->GetDirectory(false, ResourceType::ShaderCache), "pipeline_cache.tmp"));
 				break;
+			case RenderAPI::D3D12:
+				hardwareRenderer = CreateD3DHardwareRenderer(Engine::Instance()->GpuId, Engine::Instance()->UseSoftwareRenderer(),
+					Path::Combine(Engine::Instance()->GetDirectory(false, ResourceType::ShaderCache), "pipeline_cache_d3d.tmp"));
+				break;
 			case RenderAPI::Dummy:
 				hardwareRenderer = CreateDummyHardwareRenderer();
 				break;

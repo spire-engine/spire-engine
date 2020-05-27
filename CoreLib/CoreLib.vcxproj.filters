@@ -230,6 +230,7 @@
       <Filter>LibUI</Filter>
     </ClInclude>
     <ClInclude Include="ShortList.h" />
+    <ClInclude Include="VariableSizeAllocator.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="corelib.natvis" />

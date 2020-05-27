@@ -24,8 +24,6 @@ CoreLib::String RemoveQuote(CoreLib::String dir)
 
 void RegisterTestUserActor();
 
-#include "FrustumCulling.h"
-
 #if COMMAND || !defined(_WIN32)
 int main(int argc, const char ** argv)
 {
@@ -49,12 +47,20 @@ int __stdcall wWinMain(
 			int h = 1080;
 
 			args.API = RenderAPI::Vulkan;
+
 			args.GpuId = 0;
 			args.RecompileShaders = false;
 
 			auto& parser = OsApplication::GetCommandLineParser();
 			if (parser.OptionExists("-vk"))
 				args.API = RenderAPI::Vulkan;
+			else if (parser.OptionExists("-dx") || parser.OptionExists("-d3d"))
+				args.API = RenderAPI::D3D12;
+			if (parser.OptionExists("-d3dwarp"))
+			{
+				args.API = RenderAPI::D3D12;
+				args.UseSoftwareRenderer = true;
+			}
 			if (parser.OptionExists("-no_renderer"))
 				args.API = RenderAPI::Dummy;
 			if (parser.OptionExists("-dir"))

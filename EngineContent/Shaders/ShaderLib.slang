@@ -351,7 +351,9 @@ struct Light
     float3 position;
     uint direction;
     float3 color;
+    float padding;
     float4x4 lightMatrix;
+    float4 padding2;
 };
 
 struct LightProbe
@@ -537,6 +539,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
                 CASCADE_LOOP_BODY(6)
                 CASCADE_LOOP_BODY(7)
 #else
+                [loop]
                 for (int i = 0; i < lightEnv.numCascades; i++)
                 {
                     if (-viewPos.z < lightEnv.zPlanes[i >> 2][i & 3])
@@ -565,6 +568,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
         int tileY = int(pixelLocation.y / 16);
         int lightListOffset = (tileY * lightEnv.lightListTilesX + tileX) * MaxLightsPerTile;
         int lightCount = 0;
+        [loop]
 		for (int i = 0; i < MaxLightsPerTile; i++)
 		{
             uint bufferContent = lightEnv.tiledLightList[lightListOffset + i];
@@ -636,6 +640,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
             float3 diffuseIBL = 0.0;
             float specularWeights = 0.0;
             float diffuseWeights = 0.0;
+            [loop]
             for (int i = 0; i < MaxLightsPerTile; i++)
             {
                 uint bufferContent = lightEnv.tiledLightList[lightListOffset + i];
@@ -860,8 +865,8 @@ struct StandardBoneWeightSet : IBoneWeightSet
 {
 	struct PackedType
 	{
-		uint boneIds;
-		uint boneWeights;
+		uint boneIds : BONEIDS;
+		uint boneWeights : BONEWEIGHTS;
 	};
 	PackedType value;
 	PackedType getPackedRepresentation() { return value; }
@@ -911,7 +916,7 @@ struct NoTangentFrame : ITangentFrame
 
 struct StandardTangentFrame : ITangentFrame
 {
-	uint packedQuaternion;
+	uint packedQuaternion : TANGENT;
 	TangentFrame get()
 	{
 		TangentFrame rs;
@@ -925,7 +930,7 @@ struct StandardVertexFormat<TUVSet : IVertexUVSet, TTangentFrame : ITangentFrame
 	typedef TUVSet UVSet;
 	typedef TColorSet ColorSet;
 	typedef TBoneWeightSet BoneWeightSet;
-	float3 vertPos;
+	float3 vertPos:POSITION;
 	TUVSet uvSet;
 	TTangentFrame vertTangentFrame;
 	TColorSet colorSet;

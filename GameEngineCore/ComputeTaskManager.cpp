@@ -54,6 +54,7 @@ namespace GameEngine
                 descriptorSet->Update(bindingOffset + i, resources[i].resourceHandles.samplerBinding);
                 break;
             case ResourceBinding::BindingType::StorageBuffer:
+            case ResourceBinding::BindingType::RWStorageBuffer:
             {
                 int bufLen = resources[i].bufferLength;
                 if (bufLen == -1)
@@ -140,7 +141,7 @@ namespace GameEngine
     {
         shaderCompiler = compiler;
         hardwareRenderer = hw;
-        memory.Init(hw, BufferUsage::UniformBuffer, true, 21, hardwareRenderer->UniformBufferAlignment());
+        memory.Init(hw, BufferUsage::UniformBuffer, true, 21, hardwareRenderer->UniformBufferAlignment(), nullptr);
     }
 
 }

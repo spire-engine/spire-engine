@@ -57,8 +57,8 @@ namespace GameEngine
 		RefPtr<PipelineBuilder> pb = hw->CreatePipelineBuilder();
 		VertexFormat quadVert;
 		pb->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
-		quadVert.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 0, 0));
-		quadVert.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 8, 1));
+		quadVert.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 0, 0, "POSITION", 0));
+		quadVert.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 8, 1, "TEXCOORD", 0));
 		pb->SetVertexLayout(quadVert);
 		RefPtr<DescriptorSetLayout> copyPassLayout = hw->CreateDescriptorSetLayout(MakeArray(
 			DescriptorLayout(StageFlags::sfGraphics, 0, BindingType::Texture),
