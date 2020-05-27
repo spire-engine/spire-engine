@@ -170,7 +170,7 @@ namespace GameEngine
 		CoreLib::RefPtr<TextureCubeArray> envMapArray;
         CoreLib::RefPtr<Buffer> histogramBuffer, adaptedLuminanceBuffer;
 		CoreLib::RefPtr<Buffer> fullScreenQuadVertBuffer;
-		DeviceMemory indexBufferMemory, vertexBufferMemory;
+		DeviceMemory indexBufferMemory, vertexBufferMemory, blendShapeMemory;
 		PipelineContext pipelineManager;
 	public:
 		RendererSharedResource(RenderAPI pAPI)

@@ -83,7 +83,6 @@ namespace GameEngine
 		reader.Read(Indices.Buffer(), indexCount);
 		ElementRanges.SetSize(header.ElementCount);
 		reader.Read(ElementRanges.Buffer(), ElementRanges.Count());
-		reader.ReleaseStream();
 		if (ElementRanges.Count() == 0)
 		{
 			MeshElementRange range;
@@ -91,6 +90,25 @@ namespace GameEngine
 			range.Count = indexCount;
 			ElementRanges.Add(range);
 		}
+        if (header.HasBlendShapes)
+        {
+            int blendShapeChannelCount = reader.ReadInt32();
+            ElementBlendShapeChannels.SetSize(blendShapeChannelCount);
+            CORELIB_ASSERT(blendShapeChannelCount == ElementRanges.Count());
+            for (auto &blendShapes : ElementBlendShapeChannels)
+            {
+                blendShapes.SetSize(reader.ReadInt32());
+                for (auto &blendShape : blendShapes)
+                {
+                    reader.Read(blendShape.Name);
+                    reader.Read(blendShape.ChannelId);
+                    reader.Read(blendShape.BlendShapes);
+                    reader.Read(blendShape.Reserved, sizeof(blendShape.Reserved));
+                }
+            }
+            reader.Read(BlendShapeVertices);
+        }
+		reader.ReleaseStream();
 		fileName = String("mesh_") + String(uid++);
 	}
 
@@ -117,6 +135,7 @@ namespace GameEngine
         header.PrimitiveType = WritePrimitiveType(primitiveType);
         header.MinLightmapResolution = minLightmapResolution;
         header.SurfaceArea = surfaceArea;
+        header.HasBlendShapes = BlendShapeVertices.Count() != 0;
 		writer.Write(header);
 		writer.Write(GetVertexTypeId());
 		writer.Write(vertCount);
@@ -125,6 +144,22 @@ namespace GameEngine
 		writer.Write((char*)GetVertexBuffer(), vertCount * GetVertexSize());
 		writer.Write(Indices.Buffer(), Indices.Count());
 		writer.Write(ElementRanges.Buffer(), ElementRanges.Count());
+        if (header.HasBlendShapes)
+        {
+            writer.Write(ElementBlendShapeChannels.Count());
+            for (auto &blendShapeChannels : ElementBlendShapeChannels)
+            {
+                writer.Write(blendShapeChannels.Count());
+                for (auto &blendShapeChannel : blendShapeChannels)
+                {
+                    writer.Write(blendShapeChannel.Name);
+                    writer.Write(blendShapeChannel.ChannelId);
+                    writer.Write(blendShapeChannel.BlendShapes);
+                    writer.Write(blendShapeChannel.Reserved, sizeof(blendShapeChannel.Reserved));
+                }
+            }
+            writer.Write(BlendShapeVertices);
+        }
 		writer.ReleaseStream();
 	}
 

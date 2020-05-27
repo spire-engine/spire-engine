@@ -46,7 +46,11 @@ namespace GameEngine
                     p.Transforms[simpleAnimation->Channels[i].BoneId] = simpleAnimation->Channels[i].Sample(animTime);
                 }
             }
-
+            for (int i = 0; i < simpleAnimation->BlendShapeChannels.Count(); i++)
+            {
+                p.BlendShapeWeights[simpleAnimation->BlendShapeChannels[i].Name] =
+                    simpleAnimation->BlendShapeChannels[i].Sample(animTime);
+            }
             for (int i = 0; i < TargetActors->Count(); i++)
             {
                 if (auto target = GetTargetActor(i))
@@ -61,12 +65,12 @@ namespace GameEngine
 		if (AnimationFile.GetValue().Length())
 			simpleAnimation = level->LoadSkeletalAnimation(*AnimationFile);
 		else
-			throw CoreLib::ArgumentException("The animation file path is not defined.");
+			Engine::Print("The animation file path is not defined.\n");
 
         if (SkeletonFile.GetValue().Length())
             skeleton = level->LoadSkeleton(*SkeletonFile);
 		else
-			throw CoreLib::ArgumentException("The skeleton file path is not defined.");
+            Engine::Print("The skeleton file path is not defined.\n");
 
         UpdateStates();
         AnimationFile.OnChanging.Bind(this, &SimpleAnimationControllerActor::AnimationFileName_Changing);

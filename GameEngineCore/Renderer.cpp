@@ -62,9 +62,6 @@ namespace GameEngine
 			{
 				auto sceneResources = renderer->sceneRes.Ptr();
 				renderer->sharedRes.CreateModuleInstance(rs, Engine::GetShaderCompiler()->LoadSystemTypeSymbol(name), &sceneResources->transformMemory, uniformBufferSize);
-                uint32_t lightmapId = 0xFFFFFFFF;
-                for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
-                    rs.SetUniformData(&lightmapId, sizeof(lightmapId));
 			}
 
 			virtual CoreLib::RefPtr<Drawable> CreateStaticDrawable(Mesh * mesh, int elementId, Material * material, bool cacheMesh) override
@@ -77,7 +74,12 @@ namespace GameEngine
 				rs->type = DrawableType::Static;
                 rs->primType = mesh->GetPrimitiveType();
 				rs->elementRange = mesh->ElementRanges[elementId];
-				CreateTransformModuleInstance(*rs->transformModule, "StaticMeshTransform", (int)(sizeof(Vec4) * 4));
+				CreateTransformModuleInstance(*rs->transformModule, "StaticMeshTransform", (int)(sizeof(Vec4) * 5));
+                uint32_t lightmapId = 0xFFFFFFFF;
+                for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
+                {
+                    rs->transformModule->SetUniformData(&lightmapId, sizeof(lightmapId));
+                }
 				return rs;
 			}
 			virtual CoreLib::RefPtr<Drawable> CreateSkeletalDrawable(Mesh * mesh, int elementId, Skeleton * skeleton, Material * material, bool cacheMesh) override
@@ -89,8 +91,15 @@ namespace GameEngine
                 rs->primType = mesh->GetPrimitiveType();
 				rs->elementRange = mesh->ElementRanges[elementId];
 				rs->skeleton = skeleton;
-				int poseMatrixSize = skeleton->Bones.Count() * (sizeof(Vec4) * 4);
-				CreateTransformModuleInstance(*rs->transformModule, "SkeletalAnimationTransform", poseMatrixSize);
+				CreateTransformModuleInstance(*rs->transformModule, "SkeletalAnimationTransform", 4096);
+                for (int i = 0; i < DynamicBufferLengthMultiplier; i++)
+                {
+                    auto descSet = rs->transformModule->GetDescriptorSet(i);
+                    descSet->BeginUpdate();
+                    descSet->Update(1, rs->mesh->GetBlendShapeBuffer(), rs->mesh->blendShapeBufferOffset,
+                        rs->mesh->blendShapeVertexCount == 0 ? -1 : rs->mesh->blendShapeVertexCount * sizeof(BlendShapeVertex));
+					descSet->EndUpdate();
+                }
 				return rs;
 			}
 		};

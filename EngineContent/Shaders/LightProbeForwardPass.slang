@@ -53,7 +53,7 @@ struct VSOutput
     SPECIALIZATION_TYPE_4.BoneWeightSet.PackedType vertBoneWeightSet : BONEWEIGHTSET;
 };
 
-VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn)
+VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn, uint vertexIndex : SV_VertexID)
 {
 	VSOutput rs;
     rs.vertColorSet = vertexIn.getColorSet();
@@ -67,6 +67,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn)
 
     VertexPositionInfo vin;
     vin.vertPos = vertexIn.getPos();
+    vin.vertIndex = vertexIndex;
     vin.tangentFrame = vertexIn.getTangentFrame();
     VertexPositionInfo worldPos = gWorldTransform.getWorldSpacePos(vin, vattribs);
     rs.normal = worldPos.tangentFrame.vertNormal;

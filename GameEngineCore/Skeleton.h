@@ -122,7 +122,7 @@ namespace GameEngine
 	{
 	public:
 		CoreLib::List<BoneTransformation> Transforms;
-
+        CoreLib::Dictionary<CoreLib::String, float> BlendShapeWeights;
 		void GetMatrices(const Skeleton * skeleton, CoreLib::List<VectorMath::Matrix4> & matrices, bool multiplyInversePose = true, RetargetFile * retarget = nullptr) const;
 	};
 
@@ -133,6 +133,29 @@ namespace GameEngine
 		BoneTransformation Transform;
 	};
 
+	template <typename TKeyFrame> int BinarySearchForKeyFrame(CoreLib::List<TKeyFrame> &KeyFrames, float time)
+    {
+        int begin = 0;
+        int end = KeyFrames.Count();
+        while (begin < end)
+        {
+            int mid = (begin + end) >> 1;
+            if (KeyFrames[mid].Time > time)
+                end = mid;
+            else if (KeyFrames[mid].Time == time)
+                return mid;
+            else
+                begin = mid + 1;
+        }
+        if (begin >= KeyFrames.Count())
+            begin = KeyFrames.Count() - 1;
+        if (KeyFrames[begin].Time > time)
+            begin--;
+        if (begin < 0)
+            begin = 0;
+        return begin;
+    }
+
 	class AnimationChannel
 	{
 	public:
@@ -140,29 +163,20 @@ namespace GameEngine
 		int BoneId = -1;
 		CoreLib::List<AnimationKeyFrame> KeyFrames;
 		BoneTransformation Sample(float time);
-		int BinarySearchForKeyFrame(float time)
-		{
-			int begin = 0;
-			int end = KeyFrames.Count();
-			while (begin < end)
-			{
-				int mid = (begin + end) >> 1;
-				if (KeyFrames[mid].Time > time)
-					end = mid;
-				else if (KeyFrames[mid].Time == time)
-					return mid;
-				else
-					begin = mid + 1;
-			}
-			if (begin >= KeyFrames.Count())
-				begin = KeyFrames.Count() - 1;
-			if (KeyFrames[begin].Time > time)
-				begin--;
-			if (begin < 0)
-				begin = 0;
-			return begin;
-		}
 	};
+
+	struct BlendShapeAnimationKeyFrame
+    {
+		float Time;
+        float Weight;
+    };
+
+	struct BlendShapeAnimationChannel
+    {
+        CoreLib::String Name;
+        CoreLib::List<BlendShapeAnimationKeyFrame> KeyFrames;
+        float Sample(float time);
+    };
 
 	class SkeletalAnimation
 	{
@@ -171,8 +185,10 @@ namespace GameEngine
 		float Speed;
 		float Duration;
 		float FPS;
-		int Reserved[15];
+        int BlendShapeChannelCount = 0;
+        int Reserved[14] = {};
 		CoreLib::List<AnimationChannel> Channels;
+        CoreLib::List<BlendShapeAnimationChannel> BlendShapeChannels;
 		void SaveToStream(CoreLib::IO::Stream * stream);
 		void LoadFromStream(CoreLib::IO::Stream * stream);
 		void SaveToFile(const CoreLib::String & filename);

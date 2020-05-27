@@ -4,11 +4,11 @@
 namespace GameEngine
 {
 	using namespace CoreLib::IO;
-
+	
 	BoneTransformation AnimationChannel::Sample(float animTime)
 	{
 		BoneTransformation result;
-		int frame0 = BinarySearchForKeyFrame(animTime);
+		int frame0 = BinarySearchForKeyFrame(KeyFrames, animTime);
 		int frame1 = frame0 + 1;
 		float t = 0.0f;
 		if (frame0 < KeyFrames.Count() - 1)
@@ -25,6 +25,25 @@ namespace GameEngine
 		return BoneTransformation::Lerp(f0.Transform, f1.Transform, t);
 
 	}
+
+	float BlendShapeAnimationChannel::Sample(float animTime)
+    {
+        int frame0 = BinarySearchForKeyFrame(KeyFrames, animTime);
+        int frame1 = frame0 + 1;
+        float t = 0.0f;
+        if (frame0 < KeyFrames.Count() - 1)
+        {
+            t = (animTime - KeyFrames[frame0].Time) / (KeyFrames[frame1].Time - KeyFrames[frame0].Time);
+        }
+        else
+        {
+            t = 0.0f;
+            frame1 = 0;
+        }
+        auto &f0 = KeyFrames[frame0];
+        auto &f1 = KeyFrames[frame1];
+        return f0.Weight * (1.0f - t) + f1.Weight * t;
+    }
 
     Skeleton Skeleton::TopologySort()
     {
@@ -119,6 +138,7 @@ namespace GameEngine
 		writer.Write(Speed);
 		writer.Write(FPS);
 		writer.Write(Duration);
+        writer.Write(BlendShapeChannels.Count());
 		writer.Write(Reserved);
 		writer.Write(Channels.Count());
 		for (int i = 0; i < Channels.Count(); i++)
@@ -126,6 +146,11 @@ namespace GameEngine
 			writer.Write(Channels[i].BoneName);
 			writer.Write(Channels[i].KeyFrames);
 		}
+        for (int i = 0; i < BlendShapeChannels.Count(); i++)
+        {
+            writer.Write(BlendShapeChannels[i].Name);
+            writer.Write(BlendShapeChannels[i].KeyFrames);
+        }
 		writer.ReleaseStream();
 	}
 	void SkeletalAnimation::LoadFromStream(CoreLib::IO::Stream * stream)
@@ -135,6 +160,8 @@ namespace GameEngine
 		reader.Read(Speed);
 		reader.Read(FPS);
 		reader.Read(Duration);
+        BlendShapeChannelCount = reader.ReadInt32();
+        BlendShapeChannels.SetSize(BlendShapeChannelCount);
 		reader.Read(Reserved);
 		int channelCount = reader.ReadInt32();
 		Channels.SetSize(channelCount);
@@ -143,6 +170,11 @@ namespace GameEngine
 			reader.Read(Channels[i].BoneName);
 			reader.Read(Channels[i].KeyFrames);
 		}
+        for (int i = 0; i < BlendShapeChannels.Count(); i++)
+        {
+            reader.Read(BlendShapeChannels[i].Name);
+            reader.Read(BlendShapeChannels[i].KeyFrames);
+        }
 		reader.ReleaseStream();
 	}
 	void SkeletalAnimation::SaveToFile(const CoreLib::String & filename)

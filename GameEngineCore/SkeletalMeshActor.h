@@ -13,6 +13,7 @@ namespace GameEngine
 	{
 	private:
 		Pose nextPose;
+        CoreLib::List<BlendShapeWeightInfo> blendShapeWeights;
 		CoreLib::RefPtr<ModelPhysicsInstance> physInstance, errorPhysInstance;
 		ModelDrawableInstance modelInstance, errorModelInstance;
 		bool disableRetargetFile = false;

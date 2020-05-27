@@ -89,13 +89,46 @@ namespace GameEngine
         int PrimitiveType = 0; // 0 = Triangles
         int MinLightmapResolution = 0;
         float SurfaceArea = 0.0f;
-        unsigned char Reserved[20] = { };
+        bool HasBlendShapes = false;
+        unsigned char Reserved[19] = { };
 	};
 
 	struct MeshElementRange
 	{
 		int StartIndex, Count;
 	};
+
+	struct BlendShapeVertex
+    {
+        VectorMath::Vec3 DeltaPosition;
+        uint32_t Normal;
+    };
+
+	class BlendShape
+    {
+    public:
+        int BlendShapeVertexStartIndex = 0;
+        float FullWeightPercentage;
+    };
+
+	class BlendShapeChannel
+    {
+    public:
+        CoreLib::String Name;
+        int ChannelId = 0;
+        CoreLib::List<BlendShape> BlendShapes;
+        unsigned char Reserved[32] = {};
+    };
+
+	inline unsigned int PackTangentFrame(VectorMath::Quaternion vq)
+    {
+        unsigned char packedQ[4];
+        packedQ[0] = (unsigned char)CoreLib::Math::Clamp((int)((vq.x + 1.0f) * 255.0f * 0.5f), 0, 255);
+        packedQ[1] = (unsigned char)CoreLib::Math::Clamp((int)((vq.y + 1.0f) * 255.0f * 0.5f), 0, 255);
+        packedQ[2] = (unsigned char)CoreLib::Math::Clamp((int)((vq.z + 1.0f) * 255.0f * 0.5f), 0, 255);
+        packedQ[3] = (unsigned char)CoreLib::Math::Clamp((int)((vq.w + 1.0f) * 255.0f * 0.5f), 0, 255);
+        return packedQ[0] + (packedQ[1] << 8) + (packedQ[2] << 16) + (packedQ[3] << 24);
+    }
 
 	class Mesh : public CoreLib::Object 
 	{
@@ -112,6 +145,8 @@ namespace GameEngine
 		CoreLib::Graphics::BBox Bounds;
 		CoreLib::Basic::List<int> Indices;
 		CoreLib::Basic::List<MeshElementRange> ElementRanges;
+        CoreLib::Basic::List<CoreLib::Basic::List<BlendShapeChannel>> ElementBlendShapeChannels;
+        CoreLib::Basic::List<BlendShapeVertex> BlendShapeVertices;
 		Mesh();
 		CoreLib::String GetUID();
         CoreLib::String GetFileName();
@@ -150,12 +185,9 @@ namespace GameEngine
 		}
 		void SetVertexTangentFrame(int vertId, const VectorMath::Quaternion & vq)
 		{
-			unsigned char packedQ[4];
-			packedQ[0] = (unsigned char)CoreLib::Math::Clamp((int)((vq.x + 1.0f) * 255.0f * 0.5f), 0, 255);
-			packedQ[1] = (unsigned char)CoreLib::Math::Clamp((int)((vq.y + 1.0f) * 255.0f * 0.5f), 0, 255);
-			packedQ[2] = (unsigned char)CoreLib::Math::Clamp((int)((vq.z + 1.0f) * 255.0f * 0.5f), 0, 255);
-			packedQ[3] = (unsigned char)CoreLib::Math::Clamp((int)((vq.w + 1.0f) * 255.0f * 0.5f), 0, 255);
-			*(unsigned int*)((unsigned char *)vertexData.Buffer() + vertId * vertexFormat.GetVertexSize() + vertexFormat.GetTangentFrameOffset()) = packedQ[0] + (packedQ[1] << 8) + (packedQ[2] << 16) + (packedQ[3] << 24);
+            auto tangentFrame = PackTangentFrame(vq);
+            *(unsigned int *)((unsigned char *)vertexData.Buffer() + vertId * vertexFormat.GetVertexSize() +
+                              vertexFormat.GetTangentFrameOffset()) = tangentFrame;
 		}
 		VectorMath::Quaternion GetVertexTangentFrame(int vertId)
 		{

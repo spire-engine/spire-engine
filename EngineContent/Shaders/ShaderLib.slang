@@ -77,6 +77,7 @@ struct TangentFrame
 struct VertexPositionInfo
 {
 	float3 vertPos;
+    uint vertIndex;
     TangentFrame tangentFrame;
 };
 
@@ -106,11 +107,18 @@ struct StaticMeshTransform : IWorldSpaceTransform
 	}
 };
 
+#define MAX_BLEND_SHAPES 32
+
 struct SkeletalAnimationTransform : IWorldSpaceTransform
 {
     //uint4 lightmapId;
     float4x4 worldMat;
-    float4 boneTransforms[78 * 2]; // dual quaternions
+    float4 boneTransforms[80 * 2]; // dual quaternions
+    uint4 blendShapeVertexStart[MAX_BLEND_SHAPES / 4];
+    float4 blendShapeWeights[MAX_BLEND_SHAPES / 4];
+    int blendShapeCount;
+    StructuredBuffer<float4> blendshapeVertices;
+
     VertexPositionInfo getWorldSpacePos<TVertAttribs : IVertexAttribs>(VertexPositionInfo input, TVertAttribs vertAttribs)
     {
         VertexPositionInfo result;
@@ -119,6 +127,32 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
         result.tangentFrame.vertTangent = float3(0.0);
         float4 q = float4(0.0);
         float4 qe = float4(0.0);
+        // Compute blend blend shapes
+        TangentFrame originalTangentFrame = input.tangentFrame;
+        float3 normalBlendShapeBias = 0;
+        if (blendShapeCount)
+        {
+            [loop]
+            for (int i = 0; i < blendShapeCount; i++)
+            {
+                uint vertStart = blendShapeVertexStart[i>>2][i&3];
+                float weight = blendShapeWeights[i>>2][i&3];
+                if (weight > 0.0f)
+                {
+                    float4 bsVert = blendshapeVertices[input.vertIndex + vertStart];
+                    float3 bsPosition = bsVert.xyz;
+                    input.vertPos += bsPosition * weight;
+                    uint packedNormal = asuint(bsVert.w);
+                    float inv1023 = 2.0 / 1023.0;
+                    float3 newNormal = float3((packedNormal & 1023) * inv1023,
+                                              ((packedNormal >> 10) & 1023) * inv1023,
+                                              ((packedNormal >> 20) & 1023) * inv1023) - 1;
+                    normalBlendShapeBias += (newNormal - input.tangentFrame.vertNormal) * weight;
+                }
+            }
+            input.tangentFrame.vertBinormal = normalize(input.tangentFrame.vertBinormal);
+            input.tangentFrame.vertTangent = normalize(input.tangentFrame.vertTangent);
+        }
         for (int i = 0; i < vertAttribs.getMaxBoneCount(); i++)
         {
             uint boneId = vertAttribs.getBoneId(i);
@@ -151,6 +185,19 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
         result.tangentFrame.vertTangent = mul(worldRotMat, QuaternionRotate(q, input.tangentFrame.vertTangent));
         result.vertPos = mul(worldMat, float4(result.vertPos, 1.0)).xyz;
 		result.tangentFrame.vertNormal = cross(result.tangentFrame.vertBinormal, result.tangentFrame.vertTangent);
+        
+        if (blendShapeCount)
+        {
+            float3 newNormal = result.tangentFrame.vertNormal + normalBlendShapeBias;
+            if (dot(newNormal, result.tangentFrame.vertNormal) > 0.6)
+            {
+                result.tangentFrame.vertNormal += normalBlendShapeBias;
+                result.tangentFrame.vertNormal = normalize(result.tangentFrame.vertNormal);
+                result.tangentFrame.vertBinormal = normalize(cross(result.tangentFrame.vertTangent, result.tangentFrame.vertNormal));
+                result.tangentFrame.vertTangent = cross(result.tangentFrame.vertNormal, result.tangentFrame.vertBinormal);
+            }
+        }
+        
         return result;
     }
 	uint getLightmapId()
@@ -629,10 +676,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
                 color += light.color * lightingColor;
             }
 		}
-#if 0
-        if (lightCount > 0)
-            color = lerp(color, lerp(float3(0.0, 1.0, 0.0), float3(1.0, 0.0, 0.0), min(float(lightCount)/8.0f,1.0)), 0.6);
-#endif
+
         if (useSpecularBRDF)
         {
             // weighted sum over light probes

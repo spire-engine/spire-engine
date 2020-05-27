@@ -26,10 +26,13 @@ namespace GameEngine
         MeshVertexFormat meshVertexFormat;
 		int vertexBufferOffset;
 		int indexBufferOffset;
+        int blendShapeBufferOffset = 0;
 		int vertexCount = 0;
 		int indexCount = 0;
-		Buffer * GetVertexBuffer();
-		Buffer * GetIndexBuffer();
+        int blendShapeVertexCount = 0;
+		Buffer *GetVertexBuffer();
+		Buffer *GetIndexBuffer();
+        Buffer *GetBlendShapeBuffer();
 		DrawableMesh(RendererSharedResource * pRenderRes)
 		{
 			renderRes = pRenderRes;
@@ -55,6 +58,17 @@ namespace GameEngine
 	{
 		Static, Skeletal
 	};
+
+	struct BlendShapeWeight
+    {
+        int BlendShapeStartVertexIndex;
+        float Weight;
+    };
+
+    struct BlendShapeWeightInfo
+    {
+        CoreLib::List<BlendShapeWeight> Weights;
+    };
 
 	class Drawable : public CoreLib::RefObject
 	{
@@ -108,7 +122,8 @@ namespace GameEngine
 		void UpdateMaterialUniform();
         void UpdateLightmapIndex(uint32_t lightmapIndex);
 		void UpdateTransformUniform(const VectorMath::Matrix4 & localTransform);
-		void UpdateTransformUniform(const VectorMath::Matrix4 & localTransform, const Pose & pose, RetargetFile * retarget = nullptr);
+		void UpdateTransformUniform(const VectorMath::Matrix4 & localTransform, const Pose & pose, RetargetFile * retarget = nullptr, 
+			BlendShapeWeightInfo *blendShapeInfo = nullptr);
 	};
 
 	class DrawableSink
