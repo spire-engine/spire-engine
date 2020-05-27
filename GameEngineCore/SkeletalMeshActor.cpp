@@ -168,7 +168,72 @@ namespace GameEngine
 			return;
 		}
 		
-		modelInstance.UpdateTransformUniform(*LocalTransform, nextPose, disableRetargetFile ? nullptr : retargetFile);
+        auto mesh = model->GetMesh();
+        bool hasBlendShape = (mesh->BlendShapeVertices.Count() != 0);
+        if (hasBlendShape)
+        {
+            blendShapeWeights.SetSize(mesh->ElementRanges.Count());
+            for (int i = 0; i < mesh->ElementRanges.Count(); i++)
+            {
+                auto &blendWeightsOut = blendShapeWeights[i];
+                blendWeightsOut.Weights.Clear();
+                auto &channels = mesh->ElementBlendShapeChannels[i];
+                for (int j = 0; j < channels.Count(); j++)
+                {
+                    auto &channel = channels[j];
+                    float channelWeight = 0.0f;
+                    if (nextPose.BlendShapeWeights.TryGetValue(channel.Name, channelWeight))
+                    {
+                        int blendShape0 = 0, blendShape1 = channel.BlendShapes.Count() - 1;
+                        float internalWeight = 0.0f;
+                        for (int k = 1; k < channel.BlendShapes.Count(); k++)
+                        {
+                            if (channel.BlendShapes[k].FullWeightPercentage >= channelWeight)
+                            {
+                                blendShape1 = k;
+                                blendShape0 = k - 1;
+                                internalWeight =
+                                    (channelWeight - channel.BlendShapes[blendShape0].FullWeightPercentage) /
+                                    (channel.BlendShapes[blendShape1].FullWeightPercentage -
+                                        channel.BlendShapes[blendShape0].FullWeightPercentage);
+                                break;
+                            }
+                        }
+                        if (blendShape0 != blendShape1)
+                        {
+                            if (1.0f - internalWeight > 0.001f)
+                            {
+                                blendWeightsOut.Weights.Add(
+                                    BlendShapeWeight{channel.BlendShapes[blendShape0].BlendShapeVertexStartIndex,
+                                        1.0f - internalWeight});
+                            }
+                            if (internalWeight > 0.001f)
+                            {
+								blendWeightsOut.Weights.Add(BlendShapeWeight{
+									channel.BlendShapes[blendShape1].BlendShapeVertexStartIndex, internalWeight});
+                            }
+                        }
+                        else
+                        {
+                            if (channelWeight > 0.01f)
+                            {
+								blendWeightsOut.Weights.Add(BlendShapeWeight{
+									channel.BlendShapes[blendShape0].BlendShapeVertexStartIndex, channelWeight * 0.01f});
+                            }
+                        }
+                    }
+                }
+                if (blendWeightsOut.Weights.Count() > MaxBlendShapes)
+				{
+                    blendWeightsOut.Weights.Sort([](auto w0, auto w1) { return fabs(w0.Weight) > fabs(w1.Weight); });
+                    blendWeightsOut.Weights.SetSize(MaxBlendShapes);
+				}
+            }
+        }
+        auto blendShapeWeightsView = blendShapeWeights.GetArrayView();
+		modelInstance.UpdateTransformUniform(*LocalTransform, nextPose,
+			disableRetargetFile ? nullptr : retargetFile, 
+			hasBlendShape ? &blendShapeWeightsView : nullptr);
         AddDrawable(params, &modelInstance);
 	}
 

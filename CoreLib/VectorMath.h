@@ -2077,12 +2077,14 @@ namespace VectorMath
     };
 
 	enum class EulerAngleOrder
-	{
-		// order is from right to left
-		YZX,   // RotX * RotZ * RotY
-		ZXY,   // RotY * RotX * RotZ
-		YXZ    // RotZ * RotX * RotY
-	};
+    {
+        // order is from right to left
+        YZX, // RotX * RotZ * RotY
+        ZXY, // RotY * RotX * RotZ
+        YXZ, // RotZ * RotX * RotY
+        ZYX,
+        XYZ
+    };
 	void EulerAngleToQuaternion(VectorMath::Quaternion & q, float x, float y, float z, EulerAngleOrder order);
 	void QuaternionToEulerAngle(const VectorMath::Quaternion & q, float & x, float &  y, float & z, EulerAngleOrder order);
 	void MatrixToEulerAngle(const Matrix3 mat, float & x, float &  y, float & z, EulerAngleOrder order);

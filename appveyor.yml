@@ -30,7 +30,7 @@ install:
 
     {
         "ExampleGame directory not found, downloading..."
-        appveyor DownloadFile "https://github.com/spire-engine/spire-engine/releases/download/v0.21/ExampleGame.zip"
+        appveyor DownloadFile "https://github.com/spire-engine/spire-engine/releases/download/v0.22/ExampleGame.zip"
         # Unzip.
         Expand-Archive -Path $fileName -DestinationPath '.\'
 

@@ -22,7 +22,8 @@ namespace GameEngine
 			return Drawables.Count() == 0;
 		}
 		void UpdateTransformUniform(VectorMath::Matrix4 localTransform);
-		void UpdateTransformUniform(VectorMath::Matrix4 localTransform, Pose & pose, RetargetFile * retargetFile);
+        void UpdateTransformUniform(VectorMath::Matrix4 localTransform, Pose &pose, RetargetFile *retargetFile,
+            CoreLib::ArrayView<BlendShapeWeightInfo> * blendShapeInfo);
 	};
 
 	class ModelPhysicsInstance

@@ -2203,7 +2203,7 @@ public:
             d3dfence->fence->SetEventOnCompletion(value, d3dfence->waitEvent);
         }
     }
-    virtual void Present(GameEngine::WindowSurface * surface, GameEngine::Texture2D * srcImage) override
+    virtual void Present(GameEngine::WindowSurface * surface, GameEngine::Texture2D * /*srcImage*/) override
     {
         auto d3dsurface = reinterpret_cast<WindowSurface *>(surface);
        

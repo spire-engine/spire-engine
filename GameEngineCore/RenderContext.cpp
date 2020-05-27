@@ -91,44 +91,71 @@ namespace GameEngine
 		transformModule->SetUniformData((void*)&localTransform, sizeof(Matrix4), 16);
 	}
 
-	void Drawable::UpdateTransformUniform(const VectorMath::Matrix4 & localTransform, const Pose & pose, RetargetFile * retarget)
+	struct SkeletalAnimationTransform
+    {
+        VectorMath::Matrix4 worldMat;
+        DualQuaternion boneTransforms[80];
+        uint32_t blendShapeVertexStart[MaxBlendShapes];
+        float blendShapeWeights[MaxBlendShapes] = {};
+        int blendShapeCount = 0;
+    };
+
+	void Drawable::UpdateTransformUniform(const VectorMath::Matrix4 &localTransform, const Pose &pose,
+        RetargetFile *retarget, BlendShapeWeightInfo *blendShapeInfo)
 	{
 		if (type != DrawableType::Skeletal)
 			throw InvalidOperationException("cannot update static drawable with skeletal transform data.");
 		if (!transformModule->UniformMemory)
 			throw InvalidOperationException("invalid buffer.");
 
-		const int poseMatrixSize = skeleton->Bones.Count() * sizeof(Matrix4);
-
 		// ensure allocated transform buffer is sufficient 
-		assert(transformModule->BufferLength >= poseMatrixSize);
+		assert(transformModule->BufferLength >= sizeof(SkeletalAnimationTransform));
 
 		List<Matrix4> matrices;
 		pose.GetMatrices(skeleton, matrices, true, retarget);
-        Array<VectorMath::Vec4, 160> transformData;
-        transformData.SetSize(matrices.Count() * 2 + 4);
-        memcpy(transformData.Buffer(), &localTransform, sizeof(Matrix4));
+        SkeletalAnimationTransform transformData;
+        transformData.worldMat = localTransform;
         for (int i = 0; i < matrices.Count(); i++)
         {
             DualQuaternion dq;
             dq.FromRotationTranslation(Quaternion::FromMatrix(matrices[i].GetMatrix3()),
                 VectorMath::Vec3::Create(matrices[i].values[12], matrices[i].values[13], matrices[i].values[14]));
-            ((Quaternion*)transformData.Buffer())[4 + i * 2] = dq.q;
-            ((Quaternion*)transformData.Buffer())[4 + i * 2 + 1] = dq.qe;
+            transformData.boneTransforms[i] = dq;
         }
-		transformModule->SetUniformData((void*)transformData.Buffer(), sizeof(Vec4) * transformData.Count(), 0);
+        if (blendShapeInfo)
+        {
+			transformData.blendShapeCount = blendShapeInfo->Weights.Count();
+            CORELIB_ASSERT(blendShapeInfo->Weights.Count() <= MaxBlendShapes);
+            for (int i = 0; i < blendShapeInfo->Weights.Count(); i++)
+            {
+				transformData.blendShapeVertexStart[i] = blendShapeInfo->Weights[i].BlendShapeStartVertexIndex;
+                transformData.blendShapeWeights[i] = blendShapeInfo->Weights[i].Weight;
+            }
+            transformData.blendShapeCount = blendShapeInfo->Weights.Count();
+        }
+		transformModule->SetUniformData((void *)&transformData, sizeof(transformData), 0);
 	}
     RefPtr<DrawableMesh> SceneResource::CreateDrawableMesh(Mesh * mesh)
     {
         RefPtr<DrawableMesh> result = new DrawableMesh(rendererResource);
         result->vertexBufferOffset = (int)((char*)rendererResource->vertexBufferMemory.Alloc(mesh->GetVertexCount() * mesh->GetVertexSize()) - (char*)rendererResource->vertexBufferMemory.BufferPtr());
         result->indexBufferOffset = (int)((char*)rendererResource->indexBufferMemory.Alloc(mesh->Indices.Count() * sizeof(mesh->Indices[0])) - (char*)rendererResource->indexBufferMemory.BufferPtr());
+
         result->meshVertexFormat = mesh->GetVertexFormat();
         result->vertexFormat = rendererResource->pipelineManager.LoadVertexFormat(mesh->GetVertexFormat());
         result->vertexCount = mesh->GetVertexCount();
+        result->blendShapeVertexCount = mesh->BlendShapeVertices.Count();
         rendererResource->indexBufferMemory.SetDataAsync(result->indexBufferOffset, mesh->Indices.Buffer(), mesh->Indices.Count() * sizeof(mesh->Indices[0]));
         rendererResource->vertexBufferMemory.SetDataAsync(result->vertexBufferOffset, mesh->GetVertexBuffer(), mesh->GetVertexCount() * result->vertexFormat.Size());
         result->indexCount = mesh->Indices.Count();
+        if (mesh->BlendShapeVertices.Count())
+        {
+            result->blendShapeBufferOffset = (int)((char *)rendererResource->blendShapeMemory.Alloc(
+                                                       mesh->BlendShapeVertices.Count() * sizeof(BlendShapeVertex)) -
+                                                   (char *)rendererResource->blendShapeMemory.BufferPtr());
+            rendererResource->blendShapeMemory.SetDataAsync(result->blendShapeBufferOffset,
+                mesh->BlendShapeVertices.Buffer(), mesh->BlendShapeVertices.Count() * sizeof(BlendShapeVertex));
+        }
         return result;
     }
     void SceneResource::UpdateDrawableMesh(Mesh * mesh)
@@ -608,6 +635,9 @@ namespace GameEngine
 
 		indexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::IndexBuffer, false, 26, 256, nullptr);
 		vertexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::ArrayBuffer, false, 28, 256, nullptr);
+        auto blendShapeMemoryStructInfo =
+            BufferStructureInfo(sizeof(BlendShapeVertex), (1 << 26) / sizeof(BlendShapeVertex));
+        blendShapeMemory.Init(hardwareRenderer.Ptr(), BufferUsage::StorageBuffer, false, 26, 256, &blendShapeMemoryStructInfo);
 
 		envMapArray = hardwareRenderer->CreateTextureCubeArray("envMapArray", TextureUsage::SampledColorAttachment, EnvMapSize, Math::Log2Floor(EnvMapSize) + 1, MaxEnvMapCount, StorageFormat::RGBA_F16);
 	
@@ -667,13 +697,22 @@ namespace GameEngine
 	{
 		return renderRes->indexBufferMemory.GetBuffer();
 	}
+    Buffer *DrawableMesh::GetBlendShapeBuffer()
+    {
+        return renderRes->blendShapeMemory.GetBuffer();
+    }
     void DrawableMesh::Free()
     {
         if (vertexCount)
             renderRes->vertexBufferMemory.Free((char*)renderRes->vertexBufferMemory.BufferPtr() + vertexBufferOffset, vertexCount * vertexFormat.Size());
         if (indexCount)
             renderRes->indexBufferMemory.Free((char*)renderRes->indexBufferMemory.BufferPtr() + indexBufferOffset, indexCount * sizeof(int));
-        vertexCount = indexCount = 0;
+        if (blendShapeVertexCount)
+        {
+            renderRes->blendShapeMemory.Free((char *)renderRes->blendShapeMemory.BufferPtr() + blendShapeBufferOffset,
+                blendShapeVertexCount * sizeof(BlendShapeVertex));
+        }
+		vertexCount = indexCount = 0;
     }
 	DrawableMesh::~DrawableMesh()
 	{

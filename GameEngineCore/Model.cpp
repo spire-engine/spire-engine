@@ -182,10 +182,15 @@ namespace GameEngine
 		for (auto & drawable : Drawables)
 			drawable->UpdateTransformUniform(localTransform);
 	}
-	void ModelDrawableInstance::UpdateTransformUniform(VectorMath::Matrix4 localTransform, Pose & pose, RetargetFile * retargetFile)
+    void ModelDrawableInstance::UpdateTransformUniform(VectorMath::Matrix4 localTransform, Pose &pose,
+        RetargetFile *retargetFile, ArrayView<BlendShapeWeightInfo> *blendShapeInfo)
 	{
-		for (auto & drawable : Drawables)
-			drawable->UpdateTransformUniform(localTransform, pose, retargetFile);
+        int elementId = 0;
+        for (auto &drawable : Drawables)
+        {
+            drawable->UpdateTransformUniform(localTransform, pose, retargetFile, blendShapeInfo ? &(*blendShapeInfo)[elementId] : nullptr);
+            elementId++;
+        }
 	}
 	void ModelPhysicsInstance::SetTransform(VectorMath::Matrix4 localTransform)
 	{

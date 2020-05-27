@@ -17,11 +17,12 @@
 #define CORELIB_UNREACHABLE(x) {printf("Unreachable path executed: %s\n", x); abort(); }
 template <typename... Args> inline void corelib_unused_f(Args&&...) {}
 #define CORELIB_UNUSED(...) corelib_unused_f(__VA_ARGS__)
-#define CORELIB_ASSERT(x) assert(x)
 #ifdef _DEBUG
 #define CORELIB_DEBUG_ASSERT(x) CORELIB_ASSERT(x)
+#define CORELIB_ASSERT(x) assert(x)
 #else
 #define CORELIB_DEBUG_ASSERT(x)
+#define CORELIB_ASSERT(x) (x)
 #endif
 namespace CoreLib
 {

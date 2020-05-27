@@ -1082,9 +1082,9 @@ public:
 			if (targetSkeleton)
 			{
 				p = GetCurrentPose();
-				sourceSkeletonDrawable->UpdateTransformUniform(identity, p, &retargetFile);
-				sourceModelInstance.UpdateTransformUniform(identity, p, &retargetFile);
-				highlightModelInstance.UpdateTransformUniform(identity, p, &retargetFile);
+                sourceSkeletonDrawable->UpdateTransformUniform(identity, p, &retargetFile, nullptr);
+				sourceModelInstance.UpdateTransformUniform(identity, p, &retargetFile, nullptr);
+                highlightModelInstance.UpdateTransformUniform(identity, p, &retargetFile, nullptr);
 				skeletonPhysInstance->SetTransform(identity, p, &retargetFile);
 				physInstance->SetTransform(identity, p, &retargetFile);
 			}
@@ -1093,9 +1093,9 @@ public:
 				p.Transforms.SetSize(sourceSkeleton->Bones.Count());
 				for (int i = 0; i < p.Transforms.Count(); i++)
 					p.Transforms[i] = sourceSkeleton->Bones[i].BindPose;
-				sourceSkeletonDrawable->UpdateTransformUniform(identity, p, &retargetFile);
-				sourceModelInstance.UpdateTransformUniform(identity, p, &retargetFile);
-				highlightModelInstance.UpdateTransformUniform(identity, p, &retargetFile);
+                sourceSkeletonDrawable->UpdateTransformUniform(identity, p, &retargetFile, nullptr);
+                sourceModelInstance.UpdateTransformUniform(identity, p, &retargetFile, nullptr);
+				highlightModelInstance.UpdateTransformUniform(identity, p, &retargetFile, nullptr);
 				skeletonPhysInstance->SetTransform(identity, p, &retargetFile);
 				physInstance->SetTransform(identity, p, &retargetFile);
 			}
