@@ -56,7 +56,7 @@ namespace GameEngine
 		auto sharedRes = renderer->GetSharedResource();
 		RefPtr<PipelineBuilder> pb = hw->CreatePipelineBuilder();
 		VertexFormat quadVert;
-		pb->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
+		pb->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleStrips;
 		quadVert.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 0, 0, "POSITION", 0));
 		quadVert.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 8, 1, "TEXCOORD", 0));
 		pb->SetVertexLayout(quadVert);
@@ -158,7 +158,7 @@ namespace GameEngine
 				cmdBuffer->Draw(0, 4);
 				cmdBuffer->EndRecording();
 				commandBuffers.Add(cmdBuffer);
-				hw->QueueRenderPass(fb0.Ptr(), MakeArrayView(cmdBuffer));
+				hw->QueueRenderPass(fb0.Ptr(), true, MakeArrayView(cmdBuffer));
 			}
 
 			// copy to level 0 of result
@@ -176,15 +176,16 @@ namespace GameEngine
 				cmdBuffer->Draw(0, 4);
 				cmdBuffer->EndRecording();
 				commandBuffers.Add(cmdBuffer);
-				hw->QueueRenderPass(fb1.Ptr(), MakeArrayView(cmdBuffer));
+				hw->QueueRenderPass(fb1.Ptr(), true, MakeArrayView(cmdBuffer));
 			}
             hw->EndJobSubmission(fence.Ptr());
             fence->Wait();
             fence->Reset();
+            hw->ResetTempBufferVersion(0);
 		}
 		// prefilter
 		RefPtr<PipelineBuilder> pb2 = hw->CreatePipelineBuilder();
-		pb2->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
+		pb2->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleStrips;
 		pb2->SetVertexLayout(quadVert);
 		RefPtr<DescriptorSetLayout> prefilterPassLayout = hw->CreateDescriptorSetLayout(MakeArray(
 			DescriptorLayout(StageFlags::sfGraphics, 0, BindingType::UniformBuffer),
@@ -267,10 +268,11 @@ namespace GameEngine
 				cmdBuffer->EndRecording();
 				commandBuffers.Add(cmdBuffer);
                 hw->BeginJobSubmission();
-				hw->QueueRenderPass(fb.Ptr(), cmdBuffer);
+				hw->QueueRenderPass(fb.Ptr(), true, cmdBuffer);
                 hw->EndJobSubmission(fence.Ptr());
                 fence->Wait();
                 fence->Reset();
+                hw->ResetTempBufferVersion(0);
 			}
 		}
 	}

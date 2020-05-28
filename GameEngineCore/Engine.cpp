@@ -116,7 +116,7 @@ namespace GameEngine
             {
                 auto entry = sysWindow.Value->uiEntry.Ptr();
                 auto uiCommands = entry->DrawUI();
-                uiSystemInterface->TransferDrawCommands(sysWindow.Value, (mainWindow == sysWindow.Key), uiCommands);
+                uiSystemInterface->TransferDrawCommands(sysWindow.Value, uiCommands);
             }
 			for (auto sysWindow : uiSystemInterface->windowContexts)
 			{
@@ -362,7 +362,7 @@ namespace GameEngine
                 continue;
             auto uiEntry = sysWindow.Value->uiEntry.Ptr();
             auto uiCommands = uiEntry->DrawUI();
-            uiSystemInterface->TransferDrawCommands(sysWindow.Value, (mainWindow == sysWindow.Key), uiCommands);
+            uiSystemInterface->TransferDrawCommands(sysWindow.Value, uiCommands);
         }
 		
 		stats.CpuTime += CoreLib::Diagnostics::PerformanceCounter::EndSeconds(cpuTimePoint);

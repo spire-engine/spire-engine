@@ -90,7 +90,7 @@ namespace GameEngine
 
 	enum class PrimitiveType
 	{
-		Points = 0, Lines = 1, LineStrips = 3, Triangles = 4, TriangleStrips = 5, TriangleFans = 6, Quads = 7, Patches = 14
+		Points = 0, Lines = 1, LineStrips = 3, Triangles = 4, TriangleStrips = 5, Patches = 14
 	};
 
 	enum class ShaderDataType
@@ -805,12 +805,7 @@ namespace GameEngine
 	protected:
 		CommandBuffer() {};
 	public:
-		// Begin recording non-render-pass-specific commands
-		virtual void BeginRecording() = 0;
-		// Specifying the FrameBuffer can result in better performance, but will need to be re-recorded when FrameBuffer changes
 		virtual void BeginRecording(FrameBuffer* frameBuffer) = 0;
-		// Not specifying a specific FrameBuffer may result in worse performance, but can be used with any compatible FrameBuffer
-		virtual void BeginRecording(RenderTargetLayout* renderTargetLayout) = 0;
 		virtual void EndRecording() = 0;
 		virtual void SetViewport(int x, int y, int width, int height) = 0;
 		virtual void BindVertexBuffer(Buffer* vertexBuffer, int byteOffset) = 0;
@@ -822,7 +817,6 @@ namespace GameEngine
 		virtual void DrawIndexed(int firstIndex, int indexCount) = 0;
 		virtual void DrawIndexedInstanced(int numInstances, int firstIndex, int indexCount) = 0;
 		virtual void DispatchCompute(int groupCountX, int groupCountY, int groupCountZ) = 0;
-		virtual void ClearAttachments(FrameBuffer * frameBuffer) = 0;
 	};
 
     class WindowSurface : public CoreLib::RefObject
@@ -856,9 +850,11 @@ namespace GameEngine
 	{
 	public:
         virtual void ThreadInit(int threadId) = 0;
-		virtual void ClearTexture(GameEngine::Texture2D* texture) = 0;
         virtual void BeginJobSubmission() = 0;
-		virtual void QueueRenderPass(FrameBuffer* frameBuffer, CoreLib::ArrayView<CommandBuffer*> commands, PipelineBarriers barriers = PipelineBarriers::MemoryAndImage) = 0;
+        virtual void QueueRenderPass(FrameBuffer *frameBuffer,
+			bool clearFrameBuffer,
+            CoreLib::ArrayView<CommandBuffer *> commands,
+            PipelineBarriers barriers = PipelineBarriers::MemoryAndImage) = 0;
         virtual void QueueComputeTask(Pipeline* computePipeline, DescriptorSet* descriptorSet, int x, int y, int z, PipelineBarriers barriers = PipelineBarriers::MemoryAndImage) = 0;
         virtual void EndJobSubmission(GameEngine::Fence* fence) = 0;
 		virtual void Present(WindowSurface * surface, Texture2D* srcImage) = 0;
@@ -885,7 +881,6 @@ namespace GameEngine
 		virtual PipelineBuilder* CreatePipelineBuilder() = 0;
 		virtual DescriptorSetLayout* CreateDescriptorSetLayout(CoreLib::ArrayView<DescriptorLayout> descriptors) = 0;
 		virtual DescriptorSet* CreateDescriptorSet(DescriptorSetLayout* layout) = 0;
-		virtual int GetDescriptorPoolCount() = 0;
 		virtual CommandBuffer* CreateCommandBuffer() = 0;
 		virtual TargetShadingLanguage GetShadingLanguage() = 0;
 		virtual int UniformBufferAlignment() = 0;

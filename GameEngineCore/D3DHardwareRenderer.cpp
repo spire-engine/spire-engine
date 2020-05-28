@@ -33,6 +33,9 @@ static constexpr int SharedStagingBufferDataSizeThreshold = 1 << 20;
 
 static constexpr int ResourceDescriptorHeapSize = 1000000;
 static constexpr int SamplerDescriptorHeapSize = 512;
+static constexpr int RtvDescriptorHeapSize = 1024;
+static constexpr int DsvDescriptorHeapSize = 1024;
+
 
 int Align(int size, int alignment)
 {
@@ -50,8 +53,8 @@ class DescriptorHeap
 public:
     D3D12_DESCRIPTOR_HEAP_DESC desc;
     ID3D12DescriptorHeap *heap;
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuHeapStart;
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuHeapStart;
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuHeapStart = {};
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuHeapStart = {};
     UINT handleIncrementSize;
     VariableSizeAllocator allocator;
     DescriptorAddress GetAddress(int offsetInDescSlots)
@@ -74,7 +77,8 @@ public:
         CHECK_DX(pDevice->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), (void **)&heap));
 
         cpuHeapStart = heap->GetCPUDescriptorHandleForHeapStart();
-        gpuHeapStart = heap->GetGPUDescriptorHandleForHeapStart();
+        if (shaderVisible)
+            gpuHeapStart = heap->GetGPUDescriptorHandleForHeapStart();
 
         handleIncrementSize = pDevice->GetDescriptorHandleIncrementSize(desc.Type);
 
@@ -97,12 +101,23 @@ public:
         return GetAddress(offset);
     }
 
-    void Free(DescriptorAddress addr, int numDescs)
+    void FreeAll()
+    {
+        allocator.Destroy();
+        allocator.InitPool(desc.NumDescriptors);
+    }
+
+    void Free(D3D12_CPU_DESCRIPTOR_HANDLE addr, int numDescs)
     {
         if (numDescs == 0)
             return;
-        int offset = (int)(addr.cpuHandle.ptr - cpuHeapStart.ptr) / handleIncrementSize;
+        int offset = (int)(addr.ptr - cpuHeapStart.ptr) / handleIncrementSize;
         allocator.Free(offset, numDescs);
+    }
+
+    void Free(DescriptorAddress addr, int numDescs)
+    {
+        Free(addr.cpuHandle, numDescs);
     }
 };
 
@@ -187,12 +202,60 @@ D3D12_STENCIL_OP TranslateStencilOp(StencilOp op)
     }
 }
 
+D3D12_PRIMITIVE_TOPOLOGY_TYPE TranslateTopologyType(PrimitiveType type)
+{
+    switch (type)
+    {
+    case PrimitiveType::Triangles:
+    case PrimitiveType::TriangleStrips:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    case PrimitiveType::Points:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+    case PrimitiveType::Lines:
+    case PrimitiveType::LineStrips:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    default:
+        CORELIB_NOT_IMPLEMENTED("TranslatePrimitiveTopology");
+    }
+}
+
+D3D12_PRIMITIVE_TOPOLOGY TranslatePrimitiveTopology(PrimitiveType type)
+{
+    switch (type)
+    {
+    case PrimitiveType::Triangles:
+        return D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    case PrimitiveType::TriangleStrips:
+        return D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+    case PrimitiveType::Points:
+        return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+    case PrimitiveType::Lines:
+        return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+    case PrimitiveType::LineStrips:
+        return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+    default:
+        CORELIB_NOT_IMPLEMENTED("TranslatePrimitiveTopology");
+    }
+}
+
+typedef HRESULT(__stdcall *PFN_D3DCOMPILE)(LPCVOID pSrcData,
+  SIZE_T SrcDataSize,
+  LPCSTR pSourceName,
+  const D3D_SHADER_MACRO *pDefines,
+  ID3DInclude *pInclude,
+  LPCSTR pEntrypoint,
+  LPCSTR pTarget,
+  UINT Flags1,
+  UINT Flags2,
+  ID3DBlob **ppCode,
+  ID3DBlob **ppErrorMsgs);
+
 class RendererState
 {
 public:
     ID3D12Device *device = nullptr;
     ID3D12CommandQueue *queue = nullptr;
-    DescriptorHeap resourceDescHeap, rtvDescHeap, samplerDescHeap;
+    DescriptorHeap resourceDescHeap, rtvDescHeap, dsvDescHeap, samplerDescHeap;
     IDXGIFactory4 *dxgiFactory = nullptr;
 
     int version = 0;
@@ -214,6 +277,7 @@ public:
     ID3D12Fence *waitFences[MaxRenderThreads] = {};
     HANDLE waitEvents[MaxRenderThreads] = {};
     PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE serializeVersionedRootSignature = nullptr;
+    PFN_D3DCOMPILE d3dCompile = nullptr;
 
     ID3D12GraphicsCommandList *GetTempCommandList()
     {
@@ -297,6 +361,8 @@ public:
         }
         state.resourceDescHeap.Destroy();
         state.samplerDescHeap.Destroy();
+        state.rtvDescHeap.Destroy();
+        state.dsvDescHeap.Destroy();
         for (auto &cmdLists : state.tempCommandLists)
             for (auto cmdList : cmdLists)
                 cmdList->Release();
@@ -748,6 +814,63 @@ public:
         }
     }
 
+    void TransferState(int subresourceId, D3D12_RESOURCE_STATES targetState, List<D3D12_RESOURCE_BARRIER> &barriers)
+    {
+        if (subresourceId == -1)
+        {
+            bool subresourceStatesConsistent = true;
+            for (int i = 1; i < subresourceStates.Count(); i++)
+            {
+                if (subresourceStates[i] != subresourceStates[0])
+                {
+                    subresourceStatesConsistent = false;
+                    break;
+                }
+            }
+            if (subresourceStatesConsistent && subresourceStates[0] != targetState)
+            {
+                D3D12_RESOURCE_BARRIER barrier = {};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Transition.pResource = resource;
+                barrier.Transition.StateBefore = subresourceStates[0];
+                barrier.Transition.StateAfter = targetState;
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                barriers.Add(barrier);
+                for (int i = 0; i < subresourceStates.Count(); i++)
+                    subresourceStates[i] = targetState;
+            }
+            else
+            {
+                for (int i = 0; i < subresourceStates.Count(); i++)
+                {
+                    if (subresourceStates[i] != targetState)
+                    {
+                        D3D12_RESOURCE_BARRIER barrier = {};
+                        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                        barrier.Transition.pResource = resource;
+                        barrier.Transition.StateBefore = subresourceStates[i];
+                        barrier.Transition.StateAfter = targetState;
+                        barrier.Transition.Subresource = i;
+                        barriers.Add(barrier);
+                        subresourceStates[i] = targetState;
+                    }
+                }
+            }
+            return;
+        }
+        if (subresourceStates[subresourceId] != targetState)
+        {
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = resource;
+            barrier.Transition.StateBefore = subresourceStates[subresourceId];
+            barrier.Transition.StateAfter = targetState;
+            barrier.Transition.Subresource = subresourceId;
+            barriers.Add(barrier);
+            subresourceStates[subresourceId] = targetState;
+        }
+    }
+
     void SetData(int mipLevel, int layer, int xOffset, int yOffset, int zOffset, int width, int height, int depth,
         DataType inputType, void *data, D3D12_RESOURCE_STATES newState)
     {
@@ -964,6 +1087,53 @@ public:
 
         // Build mipmaps
         BuildMipmaps();
+    }
+};
+
+class Texture2DProxy : public GameEngine::Texture2D
+{
+public:
+    D3DTexture texture;
+
+public:
+    Texture2DProxy(ID3D12Resource *resource, D3D12_RESOURCE_STATES state)
+    {
+        texture.resource = resource;
+        texture.subresourceStates.Add(state);
+    }
+    ~Texture2DProxy()
+    {
+        texture.resource = nullptr;
+    }
+    virtual void GetSize(int &/*width*/, int &/*height*/) override
+    {
+        CORELIB_UNREACHABLE("unreachable");
+    }
+    virtual void SetData(int /*level*/, int /*width*/, int /*height*/, int /*samples*/, DataType /*inputType*/, void * /*data*/) override
+    {
+        CORELIB_UNREACHABLE("unreachable");
+    }
+    virtual void SetData(int /*width*/, int /*height*/, int /*samples*/, DataType /*inputType*/, void * /*data*/) override
+    {
+        CORELIB_UNREACHABLE("unreachable");
+    }
+    virtual void GetData(int /*mipLevel*/, void * /*data*/, int /*bufSize*/) override
+    {
+        CORELIB_UNREACHABLE("unreachable");
+    }
+    virtual void BuildMipmaps() override
+    {
+        CORELIB_UNREACHABLE("unreachable");
+    }
+    virtual bool IsDepthStencilFormat() override
+    {
+        auto format = texture.properties.format;
+        return format == StorageFormat::Depth24 || format == StorageFormat::Depth24Stencil8 ||
+               format == StorageFormat::Depth32;
+    }
+    virtual void *GetInternalPtr() override
+    {
+        return &texture;
     }
 };
 
@@ -1250,8 +1420,25 @@ class FrameBuffer : public GameEngine::FrameBuffer
 {
 public:
     RenderAttachments renderAttachments;
+    D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc;
+    D3DTexture *depthStencilTexture = nullptr;
+    D3D12_RENDER_TARGET_VIEW_DESC renderTargetViewDescs[8];
+    D3DTexture *renderTargetTextures[8] = {};
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[8] = {};
+    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = {};
+    int rtvCount = 0;
+    int dsvCount = 0;
     FrameBuffer(const RenderAttachments &attachments) : renderAttachments(attachments)
     {
+    }
+
+    ~FrameBuffer()
+    {
+        auto &state = RendererState::Get();
+        for (int i = 0; i < rtvCount; i++)
+            state.rtvDescHeap.Free(rtvHandles[i], 1);
+        if (dsvCount)
+            state.dsvDescHeap.Free(dsvHandle, 1);
     }
 
 public:
@@ -1302,7 +1489,103 @@ public:
 public:
     virtual GameEngine::FrameBuffer *CreateFrameBuffer(const RenderAttachments &attachments) override
     {
-        return new FrameBuffer(attachments);
+        auto framebuffer = new FrameBuffer(attachments);
+        auto &state = RendererState::Get();
+        CORELIB_ASSERT(attachments.attachments.Count() == attachmentLayouts.Count());
+
+        int &rtvCount = framebuffer->rtvCount;
+        for (int i = 0; i < attachmentLayouts.Count(); i++)
+        {
+            auto &renderTarget = attachmentLayouts[i];
+            auto &attachment = attachments.attachments[i];
+            if (renderTarget.Usage == TextureUsage::ColorAttachment ||
+                renderTarget.Usage == TextureUsage::SampledColorAttachment)
+            {
+                auto &rtv = framebuffer->renderTargetViewDescs[rtvCount];
+                rtv.Format = TranslateStorageFormat(renderTarget.ImageFormat);
+                D3DTexture *d3dtexture = nullptr;
+                if (attachment.handle.tex2D)
+                {
+                    rtv.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+                    rtv.Texture2D.MipSlice = attachment.level;
+                    rtv.Texture2D.PlaneSlice = 0;
+                    d3dtexture = static_cast<D3DTexture *>(attachment.handle.tex2D->GetInternalPtr());
+                }
+                else if (attachment.handle.tex2DArray)
+                {
+                    rtv.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+                    rtv.Texture2DArray.MipSlice = attachment.level;
+                    rtv.Texture2DArray.FirstArraySlice = attachment.layer;
+                    rtv.Texture2DArray.ArraySize = 1;
+                    rtv.Texture2DArray.PlaneSlice = 0;
+                    d3dtexture = static_cast<D3DTexture *>(attachment.handle.tex2DArray->GetInternalPtr());
+                }
+                else if (attachment.handle.texCube)
+                {
+                    rtv.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+                    rtv.Texture2DArray.MipSlice = attachment.level;
+                    rtv.Texture2DArray.FirstArraySlice = (int)attachment.face;
+                    rtv.Texture2DArray.ArraySize = 1;
+                    rtv.Texture2DArray.PlaneSlice = 0;
+                    d3dtexture = static_cast<D3DTexture *>(attachment.handle.texCube->GetInternalPtr());
+                }
+                else if (attachment.handle.texCubeArray)
+                {
+                    rtv.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+                    rtv.Texture2DArray.MipSlice = attachment.level;
+                    rtv.Texture2DArray.FirstArraySlice = (int)attachment.face + attachment.layer * 6;
+                    rtv.Texture2DArray.ArraySize = 1;
+                    rtv.Texture2DArray.PlaneSlice = 0;
+                    d3dtexture = static_cast<D3DTexture *>(attachment.handle.texCubeArray->GetInternalPtr());
+                }
+                framebuffer->rtvHandles[rtvCount] = state.rtvDescHeap.Alloc(1).cpuHandle;
+                state.device->CreateRenderTargetView(d3dtexture->resource, &rtv, framebuffer->rtvHandles[rtvCount]);
+                rtvCount++;
+            }
+            else
+            {
+                auto &dsv = framebuffer->depthStencilViewDesc;
+                CORELIB_ASSERT(framebuffer->dsvCount == 0);
+                framebuffer->dsvCount++;
+                dsv.Flags = D3D12_DSV_FLAG_NONE;
+                dsv.Format = TranslateDepthFormat(renderTarget.ImageFormat);
+                D3DTexture *d3dtexture = nullptr;
+                if (attachment.handle.tex2D)
+                {
+                    dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+                    dsv.Texture2D.MipSlice = attachment.level;
+                    d3dtexture = static_cast<D3DTexture *>(attachment.handle.tex2D->GetInternalPtr());
+                }
+                else if (attachment.handle.tex2DArray)
+                {
+                    dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+                    dsv.Texture2DArray.MipSlice = attachment.level;
+                    dsv.Texture2DArray.FirstArraySlice = attachment.layer;
+                    dsv.Texture2DArray.ArraySize = 1;
+                    d3dtexture = static_cast<D3DTexture *>(attachment.handle.tex2DArray->GetInternalPtr());
+                }
+                else if (attachment.handle.texCube)
+                {
+                    dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+                    dsv.Texture2DArray.MipSlice = attachment.level;
+                    dsv.Texture2DArray.FirstArraySlice = (int)attachment.face;
+                    dsv.Texture2DArray.ArraySize = 1;
+                    d3dtexture = static_cast<D3DTexture *>(attachment.handle.texCube->GetInternalPtr());
+                }
+                else if (attachment.handle.texCubeArray)
+                {
+                    dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+                    dsv.Texture2DArray.MipSlice = attachment.level;
+                    dsv.Texture2DArray.FirstArraySlice = (int)attachment.face + attachment.layer * 6;
+                    dsv.Texture2DArray.ArraySize = 1;
+                    d3dtexture = static_cast<D3DTexture *>(attachment.handle.texCubeArray->GetInternalPtr());
+                }
+                framebuffer->dsvHandle = state.dsvDescHeap.Alloc(1).cpuHandle;
+                state.device->CreateDepthStencilView(d3dtexture->resource, &dsv,
+                    framebuffer->dsvHandle);
+            }
+        }
+        return framebuffer;
     }
 };
 
@@ -1322,12 +1605,21 @@ struct DescriptorNode
     DescriptorAddress address;
 };
 
+struct ResourceUse
+{
+    D3DTexture *texture;
+    int subresourceId;
+    D3D12_RESOURCE_STATES targetState;
+};
+
 class DescriptorSet : public GameEngine::DescriptorSet
 {
 public:
     DescriptorAddress resourceAddr, samplerAddr;
     int resourceCount, samplerCount;
     List<DescriptorNode> descriptors;
+    List<List<ResourceUse>> resourceUses;
+
 public:
     DescriptorSet(DescriptorSetLayout *layout)
     {
@@ -1335,6 +1627,7 @@ public:
         resourceCount = 0;
         samplerCount = 0;
         descriptors.Reserve(layout->descriptors.Count());
+        resourceUses.SetSize(layout->descriptors.Count());
         for (auto &desc : layout->descriptors)
         {
             DescriptorNode node;
@@ -1445,6 +1738,12 @@ public:
     }
     virtual void Update(int location, GameEngine::Texture *texture, TextureAspect aspect) override
     {
+        ResourceUse resourceUse;
+        resourceUse.subresourceId = -1;
+        resourceUse.targetState =
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        resourceUse.texture = static_cast<D3DTexture *>(texture->GetInternalPtr());
+        resourceUses[location].Add(resourceUse);
         CreateDescriptorFromTexture(texture, aspect, descriptors[location].address.cpuHandle);
     }
     virtual void Update(int location, CoreLib::ArrayView<GameEngine::Texture *> textures, TextureAspect aspect) override
@@ -1454,6 +1753,12 @@ public:
         {
             auto descAddr = descriptors[location].address.cpuHandle;
             descAddr.ptr += state.resourceDescHeap.handleIncrementSize * i;
+            ResourceUse resourceUse;
+            resourceUse.subresourceId = -1;
+            resourceUse.targetState =
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            resourceUse.texture = static_cast<D3DTexture *>(textures[i]->GetInternalPtr());
+            resourceUses[location].Add(resourceUse);
             CreateDescriptorFromTexture(textures[i], aspect, descAddr);
         }
     }
@@ -1465,6 +1770,11 @@ public:
         {
             auto d3dTexture = static_cast<D3DTexture *>(textures[i]->GetInternalPtr());
             CORELIB_ASSERT(d3dTexture->properties.defaultViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D);
+            ResourceUse resourceUse;
+            resourceUse.subresourceId = -1;
+            resourceUse.targetState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            resourceUse.texture = static_cast<D3DTexture *>(textures[i]->GetInternalPtr());
+            resourceUses[location].Add(resourceUse);
             UINT planeSlice = 0;
             if (aspect == TextureAspect::Stencil && d3dTexture->properties.format == StorageFormat::Depth24Stencil8)
                 planeSlice = 1;
@@ -1540,7 +1850,9 @@ class Pipeline : public GameEngine::Pipeline
 public:
     ID3D12PipelineState *pipelineState = nullptr;
     ID3D12RootSignature *rootSignature = nullptr;
-    PrimitiveType primitiveTopology;
+    FixedFunctionPipelineStates FixedFunctionStates;
+    VertexFormat vertexFormat;
+
     Pipeline(ID3D12PipelineState *pipeline, ID3D12RootSignature *rootSig)
         : pipelineState(pipeline), rootSignature(rootSig)
     {
@@ -1564,10 +1876,9 @@ private:
     List<List<D3D12_DESCRIPTOR_RANGE>> descRanges;
     D3D12_INPUT_LAYOUT_DESC inputDesc = {};
     List<D3D12_INPUT_ELEMENT_DESC> inputElementDescs;
-
     List<int> descSetBindingMapping; // DescriptorSet slot index -> D3D DescriptorTable Index.
     ID3D12RootSignature *rootSignature = nullptr;
-
+    VertexFormat vertexFormat;
 public:
     PipelineBuilder()
     {
@@ -1588,6 +1899,7 @@ public:
     
     virtual void SetVertexLayout(VertexFormat format) override
     {
+        this->vertexFormat = format;
         inputElementDescs.SetSize(format.Attributes.Count());
         inputDesc.NumElements = format.Attributes.Count();
         for (int i = 0; i < format.Attributes.Count(); i++)
@@ -1598,7 +1910,7 @@ public:
             element.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
             element.InputSlot = format.Attributes[i].Location;
             element.InstanceDataStepRate = 0;
-            element.AlignedByteOffset = format.Attributes[i].StartOffset;
+            element.AlignedByteOffset = 0;
             bool normalized = format.Attributes[i].Normalized;
             switch (format.Attributes[i].Type)
             {
@@ -1787,24 +2099,6 @@ public:
         pipelineName = name;
     }
 
-    D3D12_PRIMITIVE_TOPOLOGY_TYPE TranslateTopologyType(PrimitiveType type)
-    {
-        switch (type)
-        {
-        case PrimitiveType::Triangles:
-        case PrimitiveType::TriangleFans:
-        case PrimitiveType::TriangleStrips:
-            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        case PrimitiveType::Points:
-            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
-        case PrimitiveType::Lines:
-        case PrimitiveType::LineStrips:
-            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
-        default:
-            CORELIB_NOT_IMPLEMENTED("TranslatePrimitiveTopology");
-        }
-    }
-
     virtual GameEngine::Pipeline *ToPipeline(GameEngine::RenderTargetLayout * renderTargetLayout) override
     {
         CORELIB_ASSERT(rootSignature != nullptr);
@@ -1908,7 +2202,8 @@ public:
         ID3D12PipelineState *pipelineState = nullptr;
         CHECK_DX(state.device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState)));
         auto pipeline = new Pipeline(pipelineState, rootSignature);
-        pipeline->primitiveTopology = FixedFunctionStates.PrimitiveTopology;
+        pipeline->FixedFunctionStates = FixedFunctionStates;
+        pipeline->vertexFormat = this->vertexFormat;
         rootSignature = nullptr;
         return pipeline;
     }
@@ -1936,55 +2231,143 @@ public:
 class CommandBuffer : public GameEngine::CommandBuffer
 {
 public:
-    CommandBuffer()
-    {
-    }
+    Buffer *vertexBuffer = nullptr;
+    int vertexBufferOffset = 0;
+    
+    // Current descriptor set bindings.
+    Array<DescriptorSet *, 16> descSetBindings;
+
+    // All descriptor sets referenced in this command buffer.
+    List<DescriptorSet *> descSets;
+
+    Pipeline* currentPipeline = nullptr;
+    bool pipelineChanged = false, descBindingChanged = false;
 
 public:
-    virtual void BeginRecording() override
+    ID3D12GraphicsCommandList *commandList;
+    CommandBuffer()
     {
+        auto &state = RendererState::Get();
+        CHECK_DX(state.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.commandAllocators[state.version],
+            nullptr, IID_PPV_ARGS(&commandList)));
+        commandList->Close();
     }
+    void MaybeUpdatePipelineBindings()
+    {
+        if (pipelineChanged)
+        {
+            commandList->SetPipelineState(currentPipeline->pipelineState);
+            commandList->SetGraphicsRootSignature(currentPipeline->rootSignature);
+            commandList->OMSetStencilRef(currentPipeline->FixedFunctionStates.StencilReference);
+            Array<D3D12_VERTEX_BUFFER_VIEW, 16> vbView;
+            vbView.SetSize(currentPipeline->vertexFormat.Attributes.Count());
+            int vertexSize = currentPipeline->vertexFormat.Size();
+            for (int i = 0; i < currentPipeline->vertexFormat.Attributes.Count(); i++)
+            {
+                vbView[i].StrideInBytes = vertexSize;
+                vbView[i].SizeInBytes = vertexBuffer->bufferSize - vertexBufferOffset;
+                vbView[i].BufferLocation = vertexBuffer->resource->GetGPUVirtualAddress() + vertexBufferOffset +
+                                           currentPipeline->vertexFormat.Attributes[i].StartOffset;
+            }
+            commandList->IASetVertexBuffers(0, vbView.Count(), vbView.Buffer());
+            commandList->IASetPrimitiveTopology(TranslatePrimitiveTopology(currentPipeline->FixedFunctionStates.PrimitiveTopology));
+            descBindingChanged = true;
+        }
+        if (descBindingChanged)
+        {
+            int rootIndex = 0;
+            for (int i = 0; i < descSetBindings.Count(); i++)
+            {
+                if (descSetBindings[i]->resourceCount)
+                {
+                    commandList->SetGraphicsRootDescriptorTable(rootIndex, descSetBindings[i]->resourceAddr.gpuHandle);
+                    rootIndex++;
+                }
+                if (descSetBindings[i]->samplerCount)
+                {
+                    commandList->SetGraphicsRootDescriptorTable(rootIndex, descSetBindings[i]->samplerAddr.gpuHandle);
+                    rootIndex++;
+                }
+            }
+        }
+    }
+public:
     virtual void BeginRecording(GameEngine::FrameBuffer * /*frameBuffer*/) override
     {
+        auto &state = RendererState::Get();
+        commandList->Reset(state.commandAllocators[state.version], nullptr);
+        pipelineChanged = false;
+        descBindingChanged = false;
+        descSets.Clear();
     }
-    virtual void BeginRecording(GameEngine::RenderTargetLayout * /*renderTargetLayout*/) override
-    {
-    }
+
     virtual void EndRecording() override
     {
+        commandList->Close();
     }
-    virtual void SetViewport(int /*x*/, int /*y*/, int /*width*/, int /*height*/) override
+    virtual void SetViewport(int x, int y, int width, int height) override
     {
+        D3D12_VIEWPORT viewport = {};
+        viewport.TopLeftX = (float)x;
+        viewport.TopLeftY = (float)y;
+        viewport.Height = (float)height;
+        viewport.Width = (float)width;
+        viewport.MinDepth = 0.0f;
+        viewport.MaxDepth = 1.0f;
+        commandList->RSSetViewports(1, &viewport);
     }
-    virtual void BindVertexBuffer(GameEngine::Buffer * /*vertexBuffer*/, int /*byteOffset*/) override
+    virtual void BindVertexBuffer(GameEngine::Buffer * buffer, int byteOffset) override
     {
+        vertexBuffer = reinterpret_cast<Buffer*>(buffer);
+        vertexBufferOffset = byteOffset;
     }
-    virtual void BindIndexBuffer(GameEngine::Buffer * /*indexBuffer*/, int /*byteOffset*/) override
+    virtual void BindIndexBuffer(GameEngine::Buffer * indexBuffer, int byteOffset) override
     {
+        auto d3dbuffer = reinterpret_cast<Buffer *>(indexBuffer);
+        D3D12_INDEX_BUFFER_VIEW view = {};
+        view.BufferLocation = d3dbuffer->resource->GetGPUVirtualAddress() + byteOffset;
+        view.Format = DXGI_FORMAT_R32_UINT;
+        view.SizeInBytes = d3dbuffer->bufferSize - byteOffset;
+        commandList->IASetIndexBuffer(&view);
     }
-    virtual void BindPipeline(GameEngine::Pipeline * /*pipeline*/) override
+    virtual void BindPipeline(GameEngine::Pipeline * pipeline) override
     {
+        pipelineChanged = (reinterpret_cast<Pipeline *>(pipeline) != currentPipeline);
+        currentPipeline = reinterpret_cast<Pipeline*>(pipeline);
     }
-    virtual void BindDescriptorSet(int /*binding*/, GameEngine::DescriptorSet * /*descSet*/) override
+    virtual void BindDescriptorSet(int binding, GameEngine::DescriptorSet * descSet) override
     {
+        auto d3dDescSet = reinterpret_cast<DescriptorSet *>(descSet);
+        descSets.Add(d3dDescSet);
+        for (int i = descSetBindings.Count(); i <= binding; i++)
+            descSetBindings.Add(nullptr);
+        descBindingChanged = d3dDescSet != descSetBindings[binding];
+        descSetBindings[binding] = d3dDescSet;
     }
-    virtual void Draw(int /*firstVertex*/, int /*vertexCount*/) override
+    virtual void Draw(int firstVertex, int vertexCount) override
     {
+        MaybeUpdatePipelineBindings();
+        commandList->DrawInstanced(vertexCount, 1, firstVertex, 0);
     }
-    virtual void DrawInstanced(int /*numInstances*/, int /*firstVertex*/, int /*vertexCount*/) override
+    virtual void DrawInstanced(int numInstances, int firstVertex, int vertexCount) override
     {
+        MaybeUpdatePipelineBindings();
+        commandList->DrawInstanced(vertexCount, numInstances, firstVertex, 0);
     }
-    virtual void DrawIndexed(int /*firstIndex*/, int /*indexCount*/) override
+    virtual void DrawIndexed(int firstIndex, int indexCount) override
     {
+        MaybeUpdatePipelineBindings();
+        commandList->DrawIndexedInstanced(indexCount, 1, firstIndex, 0, 0);
     }
-    virtual void DrawIndexedInstanced(int /*numInstances*/, int /*firstIndex*/, int /*indexCount*/) override
+    virtual void DrawIndexedInstanced(int numInstances, int firstIndex, int indexCount) override
     {
+        MaybeUpdatePipelineBindings();
+        commandList->DrawIndexedInstanced(indexCount, numInstances, firstIndex, 0, 0);
     }
-    virtual void DispatchCompute(int /*groupCountX*/, int /*groupCountY*/, int /*groupCountZ*/) override
+    virtual void DispatchCompute(int groupCountX, int groupCountY, int groupCountZ) override
     {
-    }
-    virtual void ClearAttachments(GameEngine::FrameBuffer * /*frameBuffer*/) override
-    {
+        MaybeUpdatePipelineBindings();
+        commandList->Dispatch(groupCountX, groupCountY, groupCountZ);
     }
 };
 
@@ -1992,7 +2375,7 @@ class WindowSurface : public GameEngine::WindowSurface
 {
 public:
     WindowHandle windowHandle;
-    IDXGISwapChain1 *swapchain = nullptr;
+    IDXGISwapChain3 *swapchain = nullptr;
     int w, h;
     void CreateSwapchain(int width, int height)
     {
@@ -2015,8 +2398,10 @@ public:
             swapchain->Release();
             swapchain = nullptr;
         }
+        IDXGISwapChain1 *swapchain1 = nullptr;
         CHECK_DX(state.dxgiFactory->CreateSwapChainForHwnd(
-            state.queue, (HWND)windowHandle, &desc, nullptr, nullptr, &swapchain));
+            state.queue, (HWND)windowHandle, &desc, nullptr, nullptr, &swapchain1));
+        CHECK_DX(swapchain1->QueryInterface(IID_PPV_ARGS(&swapchain)));
     }
 
 public:
@@ -2052,6 +2437,72 @@ public:
 class HardwareRenderer : public GameEngine::HardwareRenderer
 {
 private:
+    ID3D12GraphicsCommandList *pendingCommands[MaxRenderThreads] = {};
+    List<D3D12_RESOURCE_BARRIER> pendingBarriers[MaxRenderThreads];
+
+    ID3D12PipelineState *blitPipeline;
+    ID3D12RootSignature *blitRootSignature;
+    Array<DescriptorHeap, 4> internalDescriptorHeap;
+    const char *blitShaderSrc = R"(
+    Texture2D inputTexture : register(t0);
+    RWTexture2D outputTexture : register(u0);
+    cbuffer Params : register(b0)
+    {
+        uint originX;
+        uint originY;
+        uint flip;
+    }
+    [numthreads(16, 16, 1)]
+    void CSMain( uint3 index : SV_DispatchThreadID )
+    {
+        int2 origin = int2(originX, originY);
+        uint srcWidth, srcHeight, srcLevels;
+        inputTexture.GetDimensions(0, srcWidth, srcHeight, srcLevels);
+        if (flip)
+            outputTexture[index.xy + origin] = inputTexture.Load(int3(index.x, srcHeight - index.y - 1, 0));
+        else
+            outputTexture[index.xy + origin] = inputTexture.Load(int3(index.xy, 0));
+    }
+    )";
+    void InitBlitPipeline()
+    {
+        auto &state = RendererState::Get();
+        ID3DBlob *code = nullptr, *errMsg = nullptr;
+        CHECK_DX(state.d3dCompile(blitShaderSrc, strlen(blitShaderSrc), "blitShader", nullptr, nullptr, "CSMain", "cs_5_0", 0, 0,
+            &code, &errMsg));
+        if (errMsg)
+        {
+            throw HardwareRendererException((const char *)errMsg->GetBufferPointer());
+        }
+        ID3D12RootSignature *rootSignature = nullptr;
+        ID3DBlob *rootSignatureBlob = nullptr;
+        D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+        rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
+        rootSignatureDesc.Desc_1_0.NumParameters = 2;
+        D3D12_ROOT_PARAMETER rootParams[3] = {};
+        rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        rootParams[0].Constants.Num32BitValues = 3;
+        rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        rootParams[1].DescriptorTable.NumDescriptorRanges = 2;
+        D3D12_DESCRIPTOR_RANGE descRanges[2] = {};
+        descRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        descRanges[0].NumDescriptors = 1;
+        descRanges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+        descRanges[1].NumDescriptors = 1;
+        descRanges[1].OffsetInDescriptorsFromTableStart = state.resourceDescHeap.handleIncrementSize;
+        rootParams[1].DescriptorTable.pDescriptorRanges = descRanges;
+        rootSignatureDesc.Desc_1_0.pParameters = rootParams; 
+        CHECK_DX(state.serializeVersionedRootSignature(&rootSignatureDesc, &rootSignatureBlob, nullptr));
+        CHECK_DX(state.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(),
+            IID_PPV_ARGS(&blitRootSignature)));
+        rootSignatureBlob->Release();
+        D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineDesc = {};
+        pipelineDesc.CS.BytecodeLength = code->GetBufferSize();
+        pipelineDesc.CS.pShaderBytecode = code->GetBufferPointer();
+        pipelineDesc.pRootSignature = rootSignature;
+        CHECK_DX(state.device->CreateComputePipelineState(&pipelineDesc, IID_PPV_ARGS(&blitPipeline)));
+    }
+
 public:
     HardwareRenderer(int gpuId, bool useSoftwareDevice, CoreLib::String cacheLocation)
     {
@@ -2085,6 +2536,16 @@ public:
             if (!createDXGIFactory1)
             {
                 throw HardwareRendererException("cannot load dxgi.dll");
+            }
+            HMODULE d3dCompilerModule = LoadLibrary(L"d3dcompiler.dll");
+            if (!d3dCompilerModule)
+            {
+                throw HardwareRendererException("cannot load d3dcompiler.dll");
+            }
+            state.d3dCompile = (PFN_D3DCOMPILE)GetProcAddress(d3dCompilerModule, "D3DCompile");
+            if (!state.d3dCompile)
+            {
+                throw HardwareRendererException("cannot load d3dcompiler.dll");
             }
             // Initialize D3D Context
 
@@ -2159,6 +2620,12 @@ public:
                 state.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, ResourceDescriptorHeapSize, true);
             state.samplerDescHeap.Create(
                 state.device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, SamplerDescriptorHeapSize, true);
+            state.rtvDescHeap.Create(
+                state.device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RtvDescriptorHeapSize, true);
+            state.dsvDescHeap.Create(
+                state.device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, DsvDescriptorHeapSize, true);
+
+            InitBlitPipeline();
         }
         state.rendererCount++;
     }
@@ -2166,6 +2633,8 @@ public:
     {
         auto &state = RendererState::Get();
         state.rendererCount--;
+        blitPipeline->Release();
+        blitRootSignature->Release();
         if (state.rendererCount == 0)
         {
             RendererState::Free();
@@ -2176,25 +2645,151 @@ public:
         CORELIB_ASSERT(threadId < MaxRenderThreads);
         renderThreadId = threadId;
     }
-    virtual void ClearTexture(GameEngine::Texture2D * /*texture*/) override
-    {
-    }
+    
     virtual void BeginJobSubmission() override
     {
+        auto &state = RendererState::Get();
+        pendingCommands[renderThreadId] = state.GetTempCommandList();
     }
-    virtual void QueueRenderPass(GameEngine::FrameBuffer * /*frameBuffer*/,
-        CoreLib::ArrayView<GameEngine::CommandBuffer *> /*commands*/, PipelineBarriers /*barriers*/) override
+    virtual void QueueRenderPass(GameEngine::FrameBuffer * frameBuffer, bool clearFrameBuffer,
+        CoreLib::ArrayView<GameEngine::CommandBuffer *> commands, PipelineBarriers barriers) override
     {
+        auto cmdList = pendingCommands[renderThreadId];
+        auto d3dframeBuffer = reinterpret_cast<FrameBuffer *>(frameBuffer);
+
+        auto &state = RendererState::Get();
+        if (barriers == PipelineBarriers::MemoryAndImage)
+        {
+            auto &pendingBarrierList = pendingBarriers[state.version];
+            pendingBarrierList.Clear();
+            // Collect texture uses in descriptor tables.
+            for (auto cmd : commands)
+            {
+                auto d3dcmd = reinterpret_cast<CommandBuffer *>(cmd);
+                for (auto descSet : d3dcmd->descSets)
+                {
+                    for (auto &useList : descSet->resourceUses)
+                    {
+                        for (auto &resUse : useList)
+                        {
+                            resUse.texture->TransferState(resUse.subresourceId, resUse.targetState, pendingBarrierList);
+                        }
+                    }
+                }
+            }
+            // Collect texture uses from framebuffer.
+            for (int i = 0; i < d3dframeBuffer->renderAttachments.attachments.Count(); i++)
+            {
+                auto &attachment = d3dframeBuffer->renderAttachments.attachments[i];
+                if (attachment.handle.tex2D)
+                {
+                    static_cast<D3DTexture *>(attachment.handle.tex2D->GetInternalPtr())
+                        ->TransferState(0,
+                            attachment.handle.tex2D->IsDepthStencilFormat() ? D3D12_RESOURCE_STATE_DEPTH_WRITE
+                                                                            : D3D12_RESOURCE_STATE_RENDER_TARGET,
+                            pendingBarrierList);
+                }
+                else if (attachment.handle.tex2DArray)
+                {
+                    auto d3dTexture = static_cast<D3DTexture *>(attachment.handle.tex2DArray->GetInternalPtr());
+                    d3dTexture->TransferState(attachment.layer * d3dTexture->properties.mipLevels + attachment.level,
+                        isDepthFormat(d3dTexture->properties.format) ? D3D12_RESOURCE_STATE_DEPTH_WRITE
+                                                                     : D3D12_RESOURCE_STATE_RENDER_TARGET,
+                        pendingBarrierList);
+                }
+                else if (attachment.handle.texCube)
+                {
+                    auto d3dTexture = static_cast<D3DTexture *>(attachment.handle.texCube->GetInternalPtr());
+                    d3dTexture->TransferState((int)attachment.face * d3dTexture->properties.mipLevels + attachment.level,
+                        isDepthFormat(d3dTexture->properties.format) ? D3D12_RESOURCE_STATE_DEPTH_WRITE
+                                                                     : D3D12_RESOURCE_STATE_RENDER_TARGET,
+                        pendingBarrierList);
+                }
+                else if (attachment.handle.texCubeArray)
+                {
+                    auto d3dTexture = static_cast<D3DTexture *>(attachment.handle.texCubeArray->GetInternalPtr());
+                    d3dTexture->TransferState(
+                        (attachment.layer * 6 + (int)attachment.face) * d3dTexture->properties.mipLevels +
+                            attachment.level,
+                        isDepthFormat(d3dTexture->properties.format) ? D3D12_RESOURCE_STATE_DEPTH_WRITE
+                                                                     : D3D12_RESOURCE_STATE_RENDER_TARGET,
+                        pendingBarrierList);
+                }
+            }
+            cmdList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
+        }
+
+        cmdList->OMSetRenderTargets(d3dframeBuffer->rtvCount, d3dframeBuffer->rtvHandles, false,
+            d3dframeBuffer->dsvCount ? &d3dframeBuffer->dsvHandle : nullptr);
+        if (clearFrameBuffer)
+        {
+            if (d3dframeBuffer->dsvCount)
+            {
+                if (d3dframeBuffer->depthStencilTexture->properties.format == StorageFormat::Depth24Stencil8)
+                {
+                    cmdList->ClearDepthStencilView(d3dframeBuffer->dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 
+                        1.0f, 0, 0, nullptr);
+                }
+                else
+                {
+                    cmdList->ClearDepthStencilView(d3dframeBuffer->dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+                }
+            }
+            for (int i = 0; i < d3dframeBuffer->rtvCount; i++)
+            {
+                float zero[4] = {0.0f};
+                cmdList->ClearRenderTargetView(d3dframeBuffer->rtvHandles[i], zero, 0, nullptr);
+            }
+        }
+
+        for (auto cmd : commands)
+            cmdList->ExecuteBundle(reinterpret_cast<CommandBuffer *>(cmd)->commandList);
     }
-    virtual void QueueComputeTask(GameEngine::Pipeline * /*computePipeline*/,
-        GameEngine::DescriptorSet * /*descriptorSet*/, int /*x*/, int /*y*/, int /*z*/,
-        PipelineBarriers /*barriers*/) override
+
+    virtual void QueueComputeTask(GameEngine::Pipeline * computePipeline,
+        GameEngine::DescriptorSet * descriptorSet, int x, int y, int z,
+        PipelineBarriers barriers) override
     {
+        auto &state = RendererState::Get();
+        auto cmdList = pendingCommands[renderThreadId];
+        auto pipeline = reinterpret_cast<Pipeline *>(computePipeline);
+        cmdList->SetPipelineState(pipeline->pipelineState);
+        cmdList->SetComputeRootSignature(pipeline->rootSignature);
+        int rootIndex = 0;
+        auto descSet = reinterpret_cast<DescriptorSet *>(descriptorSet);
+        if (descSet->resourceCount)
+        {
+            cmdList->SetComputeRootDescriptorTable(rootIndex, descSet->resourceAddr.gpuHandle);
+            rootIndex++;
+        }
+        if (descSet->samplerCount)
+        {
+            cmdList->SetComputeRootDescriptorTable(rootIndex, descSet->samplerAddr.gpuHandle);
+            rootIndex++;
+        }
+        
+        // Collect texture uses in descriptor tables.
+        if (barriers == PipelineBarriers::MemoryAndImage)
+        {
+            auto &pendingBarrierList = pendingBarriers[state.version];
+            pendingBarrierList.Clear();
+            for (auto &useList : descSet->resourceUses)
+            {
+                for (auto &resUse : useList)
+                {
+                    resUse.texture->TransferState(resUse.subresourceId, resUse.targetState, pendingBarrierList);
+                }
+            }
+            cmdList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
+        }
+
+        cmdList->Dispatch(x, y, z);
     }
     virtual void EndJobSubmission(GameEngine::Fence *fence) override
     {
         auto &state = RendererState::Get();
-
+        CHECK_DX(pendingCommands[renderThreadId]->Close());
+        state.queue->ExecuteCommandLists(1, (ID3D12CommandList**)&pendingCommands[renderThreadId]);
         if (fence)
         {
             auto d3dfence = dynamic_cast<D3DRenderer::Fence *>(fence);
@@ -2203,24 +2798,78 @@ public:
             d3dfence->fence->SetEventOnCompletion(value, d3dfence->waitEvent);
         }
     }
-    virtual void Present(GameEngine::WindowSurface * surface, GameEngine::Texture2D * /*srcImage*/) override
+    
+    virtual void Present(GameEngine::WindowSurface * surface, GameEngine::Texture2D * srcImage) override
     {
+        auto &state = RendererState::Get();
         auto d3dsurface = reinterpret_cast<WindowSurface *>(surface);
-       
-        d3dsurface->swapchain->Present(0, 0);
+        auto bufferIndex = d3dsurface->swapchain->GetCurrentBackBufferIndex();
+        ID3D12Resource *backBuffer = nullptr;
+        d3dsurface->swapchain->GetBuffer(bufferIndex, IID_PPV_ARGS(&backBuffer));
+        Texture2DProxy proxyTexture(backBuffer, D3D12_RESOURCE_STATE_PRESENT);
+        auto cmdList = state.GetTempCommandList();
+        BlitImpl(cmdList, &proxyTexture, srcImage, VectorMath::Vec2i::Create(0, 0), false);
+        auto &pendingBarrierList = pendingBarriers[state.version];
+        pendingBarrierList.Clear();
+        proxyTexture.texture.TransferState(0, D3D12_RESOURCE_STATE_PRESENT, pendingBarrierList);
+        cmdList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
+        state.queue->ExecuteCommandLists(1, (ID3D12CommandList **)&cmdList);
+        CHECK_DX(d3dsurface->swapchain->Present(0, 0));
     }
-    virtual void Blit(GameEngine::Texture2D * /*dstImage*/, GameEngine::Texture2D * /*srcImage*/,
-        VectorMath::Vec2i /*destOffset*/, bool /*flipSrc*/) override
+
+    void BlitImpl(ID3D12GraphicsCommandList *cmdList, GameEngine::Texture2D *dstImage, GameEngine::Texture2D *srcImage,
+        VectorMath::Vec2i destOffset, bool flipSrc)
     {
+        auto &state = RendererState::Get();
+        auto srcTexture = static_cast<D3DTexture *>(srcImage->GetInternalPtr());
+        auto dstTexture = static_cast<D3DTexture *>(dstImage->GetInternalPtr());
+        cmdList->SetPipelineState(blitPipeline);
+        cmdList->SetComputeRootSignature(blitRootSignature);
+        uint32_t arguments[3] = {(uint32_t)destOffset.x, (uint32_t)destOffset.y, flipSrc ? 1u : 0u};
+        cmdList->SetComputeRoot32BitConstants(0, 3, arguments, 0);
+        auto descriptorTable = internalDescriptorHeap[state.version].Alloc(2);
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        state.device->CreateShaderResourceView(srcTexture->resource, &srvDesc, descriptorTable.cpuHandle);
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        auto uavDescHandle = descriptorTable.cpuHandle;
+        uavDescHandle.ptr += internalDescriptorHeap[state.version].handleIncrementSize;
+        state.device->CreateUnorderedAccessView(dstTexture->resource, nullptr, &uavDesc, uavDescHandle);
+        cmdList->SetComputeRootDescriptorTable(1, descriptorTable.gpuHandle);
+        int width = 0, height = 0;
+        srcImage->GetSize(width, height);
+        auto &pendingBarrierList = pendingBarriers[state.version];
+        pendingBarrierList.Clear();
+        srcTexture->TransferState(0, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, pendingBarrierList);
+        dstTexture->TransferState(0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, pendingBarrierList);
+        cmdList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
+        cmdList->Dispatch(width, height, 1);
     }
+
+    virtual void Blit(GameEngine::Texture2D * dstImage, GameEngine::Texture2D * srcImage,
+        VectorMath::Vec2i destOffset, bool flipSrc) override
+    {
+        auto &state = RendererState::Get();
+        auto cmdList = state.GetTempCommandList();
+        BlitImpl(cmdList, dstImage, srcImage, destOffset, flipSrc);
+        state.queue->ExecuteCommandLists(1, (ID3D12CommandList **)&cmdList);
+    }
+
     virtual void Wait() override
     {
         RendererState::Get().Wait();
     }
+
     virtual void SetMaxTempBufferVersions(int versionCount) override
     {
         auto &state = RendererState::Get();
         CORELIB_ASSERT(state.stagingBuffers.Count() == 0);
+        internalDescriptorHeap.SetSize(versionCount);
+        for (int i = 0; i < versionCount; i++)
+            internalDescriptorHeap[i].Create(state.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
+
         state.stagingBuffers.SetSize(versionCount);
         state.stagingBufferAllocPtr.SetSize(versionCount);
         state.commandAllocators.SetSize(versionCount);
@@ -2245,6 +2894,8 @@ public:
         state.version = version;
         state.stagingBufferAllocPtr[state.version] = 0;
         state.tempCommandListAllocPtr[state.version] = 0;
+        internalDescriptorHeap[version].FreeAll();
+        CHECK_DX(state.commandAllocators[state.version]->Reset());
     }
     virtual GameEngine::Fence *CreateFence() override
     {
@@ -2365,11 +3016,6 @@ public:
     virtual GameEngine::DescriptorSet *CreateDescriptorSet(GameEngine::DescriptorSetLayout *layout) override
     {
         return new DescriptorSet(dynamic_cast<D3DRenderer::DescriptorSetLayout *>(layout));
-    }
-
-    virtual int GetDescriptorPoolCount() override
-    {
-        return 1;
     }
 
     virtual GameEngine::CommandBuffer *CreateCommandBuffer() override

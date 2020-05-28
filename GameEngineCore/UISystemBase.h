@@ -132,7 +132,7 @@ namespace GameEngine
             return textBufferObj.Ptr();
         }
         GraphicsUI::IImage * CreateImageObject(const CoreLib::Imaging::Bitmap & bmp);
-        void TransferDrawCommands(UIWindowContext * ctx, bool hasBackground, CoreLib::List<GraphicsUI::DrawCommand> & commands);
+        void TransferDrawCommands(UIWindowContext * ctx, CoreLib::List<GraphicsUI::DrawCommand> & commands);
         void QueueDrawCommands(Texture2D* baseTexture, UIWindowContext* ctx, WindowBounds viewport, Fence* frameFence);
         FrameBuffer * CreateFrameBuffer(Texture2D * texture);
         CoreLib::RefPtr<UIWindowContext> CreateWindowContext(SystemWindow* handle, int w, int h, int log2BufferSize);

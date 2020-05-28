@@ -339,7 +339,7 @@ Mesh ExportMesh(
         int mvptr = startVertId;
         int vertexId = 0;
         List<int> vertexIdToControlPointIndex;
-        List<Quaternion> originalTangentFrames;
+        List<Vec3> originalNormals;
         List<Vec3> originalVerts;
         vertexIdToControlPointIndex.SetSize(meshNumVerts);
         for (int i = 0; i < mesh->GetPolygonCount(); i++)
@@ -495,7 +495,17 @@ Mesh ExportMesh(
                     }
                     else if (leNormal->GetMappingMode() == FbxGeometryElement::eByControlPoint)
                     {
-                        vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(controlPointIndex));
+                        switch (leNormal->GetReferenceMode())
+                        {
+                        case FbxGeometryElement::eDirect:
+                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(controlPointIndex));
+                            break;
+                        case FbxGeometryElement::eIndexToDirect: {
+                            int index = leNormal->GetIndexArray().GetAt(controlPointIndex);
+                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(index));
+                            break;
+                        }
+                        }
                     }
                 }
 
@@ -551,7 +561,7 @@ Mesh ExportMesh(
                     vq = -vq;
                 if (Vec3::Dot(refBitangent, vertTangent) < 0.0f)
                     vq = -vq;
-                originalTangentFrames.Add(vq);
+                originalNormals.Add(vertNormal);
                 originalVerts.Add(vertPos);
                 meshOut->SetVertexTangentFrame(mvptr + j, vq);
                 vertexId++;
@@ -689,37 +699,53 @@ Mesh ExportMesh(
                         CORELIB_ASSERT(fbxTargetShape->GetControlPointsCount() == mesh->GetControlPointsCount());
                         auto shapeControlPoints = fbxTargetShape->GetControlPoints();
                         auto shapeIndices = mesh->GetPolygonVertices();
+                        auto leNormal = fbxTargetShape->GetElementNormal(0);
                         for (auto f = 0; f < mesh->GetPolygonCount(); f++)
                         {
                             auto srcPolygonIndices = shapeIndices + mesh->GetPolygonVertexIndex(f);
-                            for (auto k = 0; k < mesh->GetPolygonSize(i); k++)
+                            for (auto k = 0; k < mesh->GetPolygonSize(f); k++)
                             {
                                 int controlPointIndex = srcPolygonIndices[k];
                                 auto srcVert = shapeControlPoints[srcPolygonIndices[k]];
                                 auto vertPos = Vec3::Create((float)srcVert[0], (float)srcVert[1], (float)srcVert[2]);
                                 vertPos = transformMat.TransformHomogeneous(vertPos);
-                                VectorMath::Vec3 vertNormal;
-                                vertNormal.SetZero();
-                                auto leNormal = fbxTargetShape->GetElementNormal(0);
-                                if (!leNormal)
-                                    throw InvalidOperationException("Blendshape has no normal data.");
-                                if (leNormal->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+                                VectorMath::Vec3 vertNormal = originalNormals[bsVertId];
+                                #if 0 // Normals in blend shapes are wrong, for now we don't morph normals.
+                                if (leNormal)
                                 {
-                                    switch (leNormal->GetReferenceMode())
+                                    if (leNormal->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
                                     {
-                                    case FbxGeometryElement::eDirect:
-                                        vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(vertexId));
+                                        switch (leNormal->GetReferenceMode())
+                                        {
+                                        case FbxGeometryElement::eDirect:
+                                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(vertexId));
+                                            break;
+                                        case FbxGeometryElement::eIndexToDirect: {
+                                            int id = leNormal->GetIndexArray().GetAt(vertexId);
+                                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(id));
+                                        }
                                         break;
-                                    case FbxGeometryElement::eIndexToDirect: {
-                                        int id = leNormal->GetIndexArray().GetAt(vertexId);
-                                        vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(id));
+                                        default:
+                                            break; // other reference modes not shown here!
+                                        }
                                     }
-                                    break;
-                                    default:
-                                        break; // other reference modes not shown here!
+                                    else if (leNormal->GetMappingMode() == FbxGeometryElement::eByControlPoint)
+                                    {
+                                        switch (leNormal->GetReferenceMode())
+                                        {
+                                        case FbxGeometryElement::eDirect:
+                                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(controlPointIndex));
+                                            break;
+                                        case FbxGeometryElement::eIndexToDirect: {
+                                            int index = leNormal->GetIndexArray().GetAt(controlPointIndex);
+                                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(index));
+                                            break;
+                                        }
+                                        }
                                     }
+                                    vertNormal = normMat.TransformNormal(vertNormal);
                                 }
-                                vertNormal = transformMat.TransformNormal(vertNormal);
+                                #endif
                                 int quantizedNormal[3] = {
                                     Math::Clamp((int)((vertNormal.x + 1.0f) * 511.5f), 0, 1023),
                                     Math::Clamp((int)((vertNormal.y + 1.0f) * 511.5f), 0, 1023),

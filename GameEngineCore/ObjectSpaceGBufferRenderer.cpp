@@ -117,7 +117,6 @@ namespace GameEngine
             hwRenderer->BeginJobSubmission();
             cmdBuffer->BeginRecording(frameBuffer.Ptr());
             cmdBuffer->SetViewport(0, 0, width, height);
-            cmdBuffer->ClearAttachments(frameBuffer.Ptr());
             
             for (int k = 0; k < 3; k++)
             {
@@ -171,7 +170,7 @@ namespace GameEngine
             }
             cmdBuffer->EndRecording();
 
-            hwRenderer->QueueRenderPass(frameBuffer.Ptr(), MakeArrayView(cmdBuffer.Ptr()));
+            hwRenderer->QueueRenderPass(frameBuffer.Ptr(), true, MakeArrayView(cmdBuffer.Ptr()));
             hwRenderer->EndJobSubmission(fence.Ptr());
             fence->Wait();
             fence->Reset();

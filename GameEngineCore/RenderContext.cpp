@@ -602,8 +602,8 @@ namespace GameEngine
 		{
 			-1.0f, -1.0f, 0.0f, 0.0f,
 			1.0f, -1.0f, 1.0f, 0.0f,
-			1.0f, 1.0f, 1.0f, 1.0f,
-			-1.0f, 1.0f, 0.0f, 1.0f
+			-1.0f, 1.0f, 0.0f, 1.0f,
+			1.0f, 1.0f, 1.0f, 1.0f
 		};
 		fullScreenQuadVertBuffer = hardwareRenderer->CreateBuffer(BufferUsage::ArrayBuffer, sizeof(fsTri));
 		fullScreenQuadVertBuffer->SetData((void*)&fsTri[0], sizeof(fsTri));
@@ -740,8 +740,6 @@ namespace GameEngine
 		auto cmdBuf = cmd0->BeginRecording(renderOutput->GetFrameBuffer());
 		apiCommandBuffers.Add(cmdBuf);
 		cmdBuf->SetViewport(viewport.X, viewport.Y, viewport.Width, viewport.Height);
-		if (clearOutput)
-			cmdBuf->ClearAttachments(renderOutput->GetFrameBuffer());
 		DescriptorSetBindingArray bindings;
 		pipelineManager.GetBindings(bindings);
 		for (int i = 0; i < bindings.Count(); i++)
@@ -872,7 +870,7 @@ namespace GameEngine
 		stats.NumMaterials += numMaterials;
 		stats.NumShaders += numShaders;
 		
-		hwRenderer->QueueRenderPass(renderOutput->GetFrameBuffer(),
+		hwRenderer->QueueRenderPass(renderOutput->GetFrameBuffer(), clearOutput,
 			MakeArrayView<CommandBuffer*>(apiCommandBuffers.Buffer(), apiCommandBuffers.Count()),
 			barriers);
 	}

@@ -216,9 +216,7 @@ namespace DummyRenderer
 	public:
 		CommandBuffer() {}
 	public:
-		virtual void BeginRecording() override {}
 		virtual void BeginRecording(GameEngine::FrameBuffer* /*frameBuffer*/) override {}
-		virtual void BeginRecording(GameEngine::RenderTargetLayout* /*renderTargetLayout*/) override {}
 		virtual void EndRecording() override {}
 		virtual void SetViewport(int /*x*/, int /*y*/, int /*width*/, int /*height*/) override {}
 		virtual void BindVertexBuffer(GameEngine::Buffer* /*vertexBuffer*/, int /*byteOffset*/) override {}
@@ -230,7 +228,6 @@ namespace DummyRenderer
 		virtual void DrawIndexed(int /*firstIndex*/, int /*indexCount*/) override {}
 		virtual void DrawIndexedInstanced(int /*numInstances*/, int /*firstIndex*/, int /*indexCount*/) override {}
 		virtual void DispatchCompute(int /*groupCountX*/, int /*groupCountY*/, int /*groupCountZ*/) override {}
-		virtual void ClearAttachments(GameEngine::FrameBuffer * /*frameBuffer*/) override {}
 	};
 
     class WindowSurface : public GameEngine::WindowSurface
@@ -252,9 +249,9 @@ namespace DummyRenderer
             writer = new CoreLib::IO::StreamWriter("rendercommands.txt");
         }
         virtual void ThreadInit(int /*threadId*/) override {}
-		virtual void ClearTexture(GameEngine::Texture2D* /*texture*/) override {}
         virtual void BeginJobSubmission() override {}
-		virtual void QueueRenderPass(GameEngine::FrameBuffer* /*frameBuffer*/, CoreLib::ArrayView<GameEngine::CommandBuffer*> /*commands*/,
+        virtual void QueueRenderPass(GameEngine::FrameBuffer * /*frameBuffer*/, bool /*clearFrameBuffer*/,
+            CoreLib::ArrayView<GameEngine::CommandBuffer *> /*commands*/,
             PipelineBarriers /*barriers*/) override
         {
             writer->Write("Execute RenderPass\n");
@@ -384,10 +381,6 @@ namespace DummyRenderer
         {
             writer->Write("Create DescriptorSet\n");
             return new DescriptorSet();
-        }
-		virtual int GetDescriptorPoolCount() override
-        {
-            return 1;
         }
 		virtual GameEngine::CommandBuffer* CreateCommandBuffer() override
         {
