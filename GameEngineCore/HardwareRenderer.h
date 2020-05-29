@@ -178,6 +178,26 @@ namespace GameEngine
 		return x == TextureUsage::Unused;
 	}
 
+	struct Viewport
+    {
+        float x = 0.0f, y = 0.0f, w = 0.0f, h = 0.0f, minZ = 0.0f, maxZ = 1.0F;
+        Viewport() = default;
+        Viewport(int _x, int _y, int _w, int _h) : x((float)_x), y((float)_y), w((float)_w), h((float)_h)
+        {
+        }
+        Viewport(float _x, float _y, float _w, float _h) : x(_x), y(_y), w(_w), h(_h)
+        {
+        }
+        bool operator==(const Viewport &vp)
+        {
+            return x == vp.x && y == vp.y && w == vp.w && h == vp.h && minZ == vp.minZ && maxZ == vp.maxZ;
+        }
+        bool operator!=(const Viewport &vp)
+        {
+            return !this->operator==(vp);
+        }
+    };
+
 	struct BufferStructureInfo
 	{
 		int StructureStride = 0;
@@ -807,7 +827,7 @@ namespace GameEngine
 	public:
 		virtual void BeginRecording(FrameBuffer* frameBuffer) = 0;
 		virtual void EndRecording() = 0;
-		virtual void SetViewport(int x, int y, int width, int height) = 0;
+        virtual void SetViewport(Viewport viewport) = 0;
 		virtual void BindVertexBuffer(Buffer* vertexBuffer, int byteOffset) = 0;
 		virtual void BindIndexBuffer(Buffer* indexBuffer, int byteOffset) = 0;
 		virtual void BindPipeline(Pipeline* pipeline) = 0;

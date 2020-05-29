@@ -68,7 +68,7 @@ namespace GameEngine
 		DescriptorSetBindings descBindings;
 		UpdateDescriptorSetBinding(sharedModules, descBindings);
 
-		cmdBuf->SetViewport(0, 0, viewRes->GetWidth(), viewRes->GetHeight());
+        cmdBuf->SetViewport(Viewport(0, 0, viewRes->GetWidth(), viewRes->GetHeight()));
 		cmdBuf->BindPipeline(pipeline.Ptr());
 		cmdBuf->BindVertexBuffer(sharedRes->fullScreenQuadVertBuffer.Ptr(), 0);
 		for (auto & binding : descBindings.bindings)

@@ -216,9 +216,9 @@ namespace DummyRenderer
 	public:
 		CommandBuffer() {}
 	public:
-		virtual void BeginRecording(GameEngine::FrameBuffer* /*frameBuffer*/) override {}
+        virtual void BeginRecording(GameEngine::FrameBuffer * /*frameBuffer*/) override {}
 		virtual void EndRecording() override {}
-		virtual void SetViewport(int /*x*/, int /*y*/, int /*width*/, int /*height*/) override {}
+        virtual void SetViewport(Viewport /*viewport*/) override {}
 		virtual void BindVertexBuffer(GameEngine::Buffer* /*vertexBuffer*/, int /*byteOffset*/) override {}
 		virtual void BindIndexBuffer(GameEngine::Buffer* /*indexBuffer*/, int /*byteOffset*/) override {}
 		virtual void BindPipeline(GameEngine::Pipeline* /*pipeline*/) override {}

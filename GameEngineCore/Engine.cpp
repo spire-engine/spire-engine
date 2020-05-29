@@ -157,8 +157,6 @@ namespace GameEngine
                 engineMode = EngineMode::Editor;
 		
             RegisterEngineActorClasses(this);
-            
-            this->shaderCompiler = CreateShaderCompiler();
 
             if (args.LaunchParams.Directory.ToLower().EndsWith("mp4"))
             {
@@ -174,6 +172,7 @@ namespace GameEngine
 			// initialize renderer
 			renderer = CreateRenderer(args.API);
 			renderer->Resize(args.Width, args.Height);
+
 			currentViewport.x = currentViewport.y = 0;
 			currentViewport.width = args.Width;
 			currentViewport.height = args.Height;

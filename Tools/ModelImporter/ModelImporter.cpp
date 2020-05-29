@@ -80,6 +80,7 @@ public:
     String IgnorePattern;
     Quaternion RootTransform = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
     Quaternion RootFixTransform = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+    bool ForceRecomputeNormal = false;
     bool ExportSkeleton = true;
     bool ExportMesh = true;
     bool ExportAnimation = true;
@@ -334,8 +335,8 @@ Mesh ExportMesh(
         vertPtr += meshNumVerts;
         auto srcIndices = mesh->GetPolygonVertices();
         auto srcVerts = mesh->GetControlPoints();
-        mesh->GenerateNormals();
-        mesh->GenerateTangentsData(0, false, false);
+        mesh->GenerateNormals(args.ForceRecomputeNormal, true);
+        mesh->GenerateTangentsData(0, true, false);
         int mvptr = startVertId;
         int vertexId = 0;
         List<int> vertexIdToControlPointIndex;
@@ -710,7 +711,7 @@ Mesh ExportMesh(
                                 auto vertPos = Vec3::Create((float)srcVert[0], (float)srcVert[1], (float)srcVert[2]);
                                 vertPos = transformMat.TransformHomogeneous(vertPos);
                                 VectorMath::Vec3 vertNormal = originalNormals[bsVertId];
-                                #if 0 // Normals in blend shapes are wrong, for now we don't morph normals.
+
                                 if (leNormal)
                                 {
                                     if (leNormal->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
@@ -745,7 +746,7 @@ Mesh ExportMesh(
                                     }
                                     vertNormal = normMat.TransformNormal(vertNormal);
                                 }
-                                #endif
+
                                 int quantizedNormal[3] = {
                                     Math::Clamp((int)((vertNormal.x + 1.0f) * 511.5f), 0, 1023),
                                     Math::Clamp((int)((vertNormal.y + 1.0f) * 511.5f), 0, 1023),
@@ -1339,7 +1340,7 @@ class ModelImporterForm : public Form
 {
 private:
     RefPtr<Button> btnSelectFiles;
-    RefPtr<CheckBox> chkExportLevel, chkFlipYZ, chkFlipUV, chkFlipWinding, chkCreateSkeletonMesh, chkRemoveNamespace;
+    RefPtr<CheckBox> chkExportLevel, chkFlipYZ, chkFlipUV, chkFlipWinding, chkCreateSkeletonMesh, chkRemoveNamespace, chkForceRecomputeNormal;
     RefPtr<TextBox> txtRootTransform, txtRootFixTransform, txtRootBoneName, txtSuffix, txtMeshPathPrefix, txtIgnoreNamePattern;
     RefPtr<Label> lblRootTransform, lblRootFixTransform, lblRootBoneName, lblSuffix, lblMeshPathPrefix, lblIgnoreNamePattern;
     Quaternion ParseRootTransform(String txt)
@@ -1394,6 +1395,11 @@ public:
         chkExportLevel->SetPosition(200, 20, 180, 25);
         chkExportLevel->SetText("Export Level");
         chkExportLevel->SetChecked(ExportArguments().ExportScene);
+
+        chkForceRecomputeNormal = new CheckBox(this);
+        chkForceRecomputeNormal->SetPosition(200, 50, 180, 25);
+        chkForceRecomputeNormal->SetText("Force recomputed normal");
+        chkForceRecomputeNormal->SetChecked(ExportArguments().ForceRecomputeNormal);
 
         chkFlipYZ = new CheckBox(this);
         chkFlipYZ->SetPosition(90, 20, 80, 25);
@@ -1474,6 +1480,7 @@ public:
                     args.FlipUV = chkFlipUV->GetChecked();
                     args.FlipYZ = chkFlipYZ->GetChecked();
                     args.FlipWindingOrder = chkFlipWinding->GetChecked();
+                    args.ForceRecomputeNormal = chkForceRecomputeNormal->GetChecked();
                     args.FileName = file;
                     args.RootNodeName = txtRootBoneName->GetText();
                     args.RootTransform = ParseRootTransform(txtRootTransform->GetText());

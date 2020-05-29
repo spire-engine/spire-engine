@@ -126,7 +126,9 @@ namespace GameEngine
         hwRenderer->Wait();
         surface->Resize(w, h);
         uiEntry->Posit(0, 0, w, h);
-        uiOverlayTexture = hwRenderer->CreateTexture2D("uiOverlayTexture", TextureUsage::SampledColorAttachment, w, h, 1, StorageFormat::RGBA_8);
+        uiOverlayTexture = hwRenderer->CreateTexture2D("uiOverlayTexture",
+            (TextureUsage)((int)TextureUsage::SampledColorAttachment | (int)TextureUsage::Storage), w, h, 1,
+            StorageFormat::RGBA_8);
         frameBuffer = sysInterface->CreateFrameBuffer(uiOverlayTexture.Ptr());
         screenWidth = w;
         screenHeight = h;
@@ -275,7 +277,7 @@ namespace GameEngine
             cmdBuf->BindVertexBuffer(wndCtx->vertexBuffer.Ptr(), frameId * wndCtx->vertexBufferSize);
             cmdBuf->BindIndexBuffer(wndCtx->indexBuffer.Ptr(), frameId * wndCtx->indexBufferSize);
             cmdBuf->BindDescriptorSet(0, wndCtx->descSets[frameId].Ptr());
-            cmdBuf->SetViewport(0, 0, wndCtx->screenWidth, wndCtx->screenHeight);
+            cmdBuf->SetViewport(Viewport(0, 0, wndCtx->screenWidth, wndCtx->screenHeight));
             cmdBuf->DrawIndexed(0, indexCount);
             cmdBuf->EndRecording();
         }
@@ -289,7 +291,8 @@ namespace GameEngine
             }
 
             rendererApi->QueueRenderPass(
-                wndCtx->frameBuffer.Ptr(), (baseTexture == nullptr), MakeArrayView(wndCtx->cmdBuffer->GetBuffer()));
+                wndCtx->frameBuffer.Ptr(), (baseTexture == nullptr),
+                MakeArrayView(wndCtx->cmdBuffer->GetBuffer()));
         }
         bool IsBufferFull()
         {
@@ -414,7 +417,7 @@ namespace GameEngine
                 vertexStream.Add(vtx);
             };
             addPoint(points[0]);
-            for (int i = 1; i < points.Count() / 2; i++)
+            for (int i = 1; i <= points.Count() / 2; i++)
             {
                 addPoint(points[i]);
                 if (points.Count() - i > i)

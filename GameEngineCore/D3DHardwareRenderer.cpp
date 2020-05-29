@@ -24,6 +24,8 @@ typedef HRESULT(__stdcall *PFN_CREATE_DXGI_FACTORY1)(REFIID, _COM_Outptr_ void *
 
 thread_local int renderThreadId = 0;
 static constexpr int MaxRenderThreads = 8;
+// Max number of command lists that can be in recording state per render thread.
+static constexpr int MaxParallelCommandLists = 16;
 static constexpr int D3DConstantBufferAlignment = 256;
 static constexpr int D3DStorageBufferAlignment = 256;
 // 64MB staging buffer per frame version
@@ -51,10 +53,15 @@ struct DescriptorAddress
 class DescriptorHeap
 {
 public:
-    D3D12_DESCRIPTOR_HEAP_DESC desc;
+    D3D12_DESCRIPTOR_HEAP_DESC desc = {};
     ID3D12DescriptorHeap *heap;
     D3D12_CPU_DESCRIPTOR_HANDLE cpuHeapStart = {};
     D3D12_GPU_DESCRIPTOR_HANDLE gpuHeapStart = {};
+
+    List<int> tempAllocationStartIndices;
+    List<int> tempAllocationPtrs;
+    int maxTempDescriptors;
+
     UINT handleIncrementSize;
     VariableSizeAllocator allocator;
     DescriptorAddress GetAddress(int offsetInDescSlots)
@@ -68,7 +75,8 @@ public:
     }
 
 public:
-    void Create(ID3D12Device *pDevice, D3D12_DESCRIPTOR_HEAP_TYPE Type, UINT numDescriptors, bool shaderVisible = false)
+    void Create(ID3D12Device *pDevice, D3D12_DESCRIPTOR_HEAP_TYPE Type, UINT numDescriptors, int tempDescriptorCount,
+        int tempVersionCount, bool shaderVisible = false)
     {
         desc.Type = Type;
         desc.NumDescriptors = numDescriptors;
@@ -82,13 +90,24 @@ public:
 
         handleIncrementSize = pDevice->GetDescriptorHandleIncrementSize(desc.Type);
 
-        allocator.InitPool(numDescriptors);
+        allocator.InitPool(numDescriptors - tempDescriptorCount * tempVersionCount);
+
+        maxTempDescriptors = tempDescriptorCount;
+        tempAllocationStartIndices.SetSize(tempVersionCount);
+        tempAllocationPtrs.SetSize(tempVersionCount);
+        for (int i = 0; i < tempVersionCount; i++)
+        {
+            tempAllocationPtrs[i] = tempAllocationStartIndices[i] =
+                numDescriptors - tempDescriptorCount * (tempVersionCount - i);
+        }
     }
 
     void Destroy()
     {
         heap->Release();
         allocator.Destroy();
+        tempAllocationPtrs = decltype(tempAllocationPtrs)();
+        tempAllocationStartIndices = decltype(tempAllocationStartIndices)();
     }
 
     DescriptorAddress Alloc(int numDescs)
@@ -99,6 +118,20 @@ public:
         int offset = allocator.Alloc(numDescs);
         CORELIB_ASSERT(offset != -1 && "Descriptor allocation failed.");
         return GetAddress(offset);
+    }
+
+    void ResetTemp(int version)
+    {
+        tempAllocationPtrs[version] = tempAllocationStartIndices[version];
+    }
+
+    DescriptorAddress AllocTemp(int version, int numDescs)
+    {
+        CORELIB_ASSERT(
+            tempAllocationPtrs[version] + numDescs - tempAllocationStartIndices[version] <= maxTempDescriptors);
+        int slot = tempAllocationPtrs[version];
+        tempAllocationPtrs[version] += numDescs;
+        return GetAddress(slot);
     }
 
     void FreeAll()
@@ -250,6 +283,84 @@ typedef HRESULT(__stdcall *PFN_D3DCOMPILE)(LPCVOID pSrcData,
   ID3DBlob **ppCode,
   ID3DBlob **ppErrorMsgs);
 
+struct CommandAllocator
+{
+    ID3D12CommandAllocator *allocator = nullptr;
+    bool inUse = false;
+};
+
+class CommandAllocatorManager
+{
+public:
+    CoreLib::List<CoreLib::Array<CoreLib::Array<CommandAllocator, MaxParallelCommandLists>, MaxRenderThreads>>
+        commandAllocators;
+    D3D12_COMMAND_LIST_TYPE commandListType;
+    void Init(int versionCount, D3D12_COMMAND_LIST_TYPE type)
+    {
+        commandListType = type;
+        commandAllocators.SetSize(versionCount);
+        for (int i = 0; i < versionCount; i++)
+            commandAllocators[i].SetSize(MaxRenderThreads);
+    }
+    CommandAllocator *GetAvailableAllocator(ID3D12Device *device, int version)
+    {
+        auto &list = commandAllocators[version][renderThreadId];
+        for (int i = 0; i < list.Count(); i++)
+        {
+            if (!list[i].inUse)
+                return &list[i];
+        }
+        if (list.Count() == list.GetCapacity())
+        {
+            CORELIB_ABORT("Exceeded maximum number of command lists allowed to be in recording state"
+                          "at the same time.");
+        }
+        list.Add(CommandAllocator());
+        auto &lastAllocator = list[list.Count() - 1];
+        CHECK_DX(device->CreateCommandAllocator(commandListType, IID_PPV_ARGS(&lastAllocator.allocator)));
+        return &lastAllocator;
+    }
+    void Free()
+    {
+        for (auto &list : commandAllocators)
+        {
+            for (auto &threadList : list)
+            {
+                for (auto &allocator : threadList)
+                    allocator.allocator->Release();
+                threadList.Clear();
+            }
+        }
+        commandAllocators = decltype(commandAllocators)();
+    }
+    void Reset(int version)
+    {
+        for (auto &list : commandAllocators[version])
+        {
+            for (auto &allocator : list)
+            {
+                CORELIB_DEBUG_ASSERT(!allocator.inUse);
+                CHECK_DX(allocator.allocator->Reset());
+            }
+        }
+    }
+};
+
+struct D3DCommandList
+{
+    ID3D12GraphicsCommandList *list;
+    CommandAllocator *allocator;
+    HRESULT Close()
+    {
+        allocator->inUse = false;
+        return list->Close();
+    }
+    ID3D12GraphicsCommandList *operator->()
+    {
+        return list;
+    }
+};
+
 class RendererState
 {
 public:
@@ -264,10 +375,9 @@ public:
     std::mutex stagingBufferMutex;
     CoreLib::List<CoreLib::List<ID3D12GraphicsCommandList *>> tempCommandLists;
     CoreLib::List<long> tempCommandListAllocPtr;
-    CoreLib::List<ID3D12CommandAllocator *> commandAllocators;
-    std::mutex tempCommandListMutex;
+    CommandAllocatorManager tempCommandAllocatorManager;
     ID3D12CommandAllocator *largeCopyCmdListAllocator;
-    std::mutex largeCopyCmdListMutex;
+    std::mutex tempCommandListMutex, largeCopyCmdListMutex;
 
     CoreLib::String deviceName;
     CoreLib::String cacheLocation;
@@ -279,16 +389,17 @@ public:
     PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE serializeVersionedRootSignature = nullptr;
     PFN_D3DCOMPILE d3dCompile = nullptr;
 
-    ID3D12GraphicsCommandList *GetTempCommandList()
+    D3DCommandList GetCommandList(CommandAllocatorManager *commandAllocatorManager)
     {
         long cmdListId = 0;
+        auto cmdAllocator = commandAllocatorManager->GetAvailableAllocator(device, version);
         {
             std::lock_guard<std::mutex> lock(tempCommandListMutex);
             auto &allocPtr = tempCommandListAllocPtr[version];
             if (allocPtr == tempCommandLists[version].Count())
             {
                 ID3D12GraphicsCommandList *commandList;
-                CHECK_DX(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocators[version],
+                CHECK_DX(device->CreateCommandList(0, commandAllocatorManager->commandListType, cmdAllocator->allocator,
                     nullptr, IID_PPV_ARGS(&commandList)));
                 commandList->Close();
                 tempCommandLists[version].Add(commandList);
@@ -297,9 +408,16 @@ public:
             allocPtr++;
         }
         auto cmdList = tempCommandLists[version][cmdListId];
-        cmdList->Reset(commandAllocators[version], nullptr);
-        return cmdList;
+        cmdList->Reset(cmdAllocator->allocator, nullptr);
+        cmdAllocator->inUse = true;
+        return D3DCommandList{cmdList, cmdAllocator};
     }
+
+    D3DCommandList GetTempCommandList()
+    {
+        return GetCommandList(&tempCommandAllocatorManager);
+    }
+
     ID3D12Resource *CreateBufferResource(size_t sizeInBytes, D3D12_HEAP_TYPE heapType,
         D3D12_CPU_PAGE_PROPERTY cpuPageProperty, bool allowUnorderedAccess)
     {
@@ -366,8 +484,7 @@ public:
         for (auto &cmdLists : state.tempCommandLists)
             for (auto cmdList : cmdLists)
                 cmdList->Release();
-        for (auto cmdAllocator : state.commandAllocators)
-            cmdAllocator->Release();
+        state.tempCommandAllocatorManager.Free();
         state.largeCopyCmdListAllocator->Release();
         for (auto stagingBuffer : state.stagingBuffers)
             stagingBuffer->Release();
@@ -378,7 +495,6 @@ public:
         if (state.device)
             state.device->Release();
         state.tempCommandListAllocPtr = decltype(state.tempCommandListAllocPtr)();
-        state.commandAllocators = decltype(state.commandAllocators)();
         state.stagingBuffers = decltype(state.stagingBuffers)();
         state.stagingBufferAllocPtr = decltype(state.stagingBufferAllocPtr)();
         state.tempCommandLists = decltype(state.tempCommandLists)();
@@ -435,7 +551,7 @@ public:
         {
             D3D12_RANGE range;
             range.Begin = (SIZE_T)offset;
-            range.End = (SIZE_T)size;
+            range.End = (SIZE_T)(size + offset);
             void *mappedPtr = nullptr;
             CHECK_DX(resource->Map(0, &range, &mappedPtr));
             memcpy(mappedPtr, data, size);
@@ -448,22 +564,33 @@ public:
             // Use shared staging buffer for async upload
             std::lock_guard<std::mutex> lockGuard(state.stagingBufferMutex);
             auto stagingOffset = InterlockedAdd(&(state.stagingBufferAllocPtr[state.version]), size);
-            if (stagingOffset + size <= StagingBufferSize)
+            if (stagingOffset <= StagingBufferSize)
             {
+                stagingOffset -= size;
                 // Map and copy to staging buffer.
                 D3D12_RANGE range;
                 range.Begin = (SIZE_T)stagingOffset;
-                range.End = (SIZE_T)size;
+                range.End = (SIZE_T)(size + stagingOffset);
                 void *mappedStagingPtr = nullptr;
                 CHECK_DX(state.stagingBuffers[state.version]->Map(0, &range, &mappedStagingPtr));
                 memcpy(mappedStagingPtr, data, size);
                 state.stagingBuffers[state.version]->Unmap(0, &range);
                 // Submit a copy command to GPU.
                 auto copyCommandList = state.GetTempCommandList();
+                D3D12_RESOURCE_BARRIER barrier = {};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Transition.pResource = resource;
+                barrier.Transition.Subresource = 0;
+                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+                copyCommandList->ResourceBarrier(1, &barrier);
                 copyCommandList->CopyBufferRegion(
                     resource, offset, state.stagingBuffers[state.version], stagingOffset, size);
-                CHECK_DX(copyCommandList->Close());
-                ID3D12CommandList *cmdList = copyCommandList;
+                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
+                copyCommandList->ResourceBarrier(1, &barrier);
+                CHECK_DX(copyCommandList.Close());
+                ID3D12CommandList *cmdList = copyCommandList.list;
                 state.queue->ExecuteCommandLists(1, &cmdList);
                 return true;
             }
@@ -484,9 +611,19 @@ public:
         ID3D12GraphicsCommandList *copyCmdList;
         CHECK_DX(state.device->CreateCommandList(
             0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.largeCopyCmdListAllocator, nullptr, IID_PPV_ARGS(&copyCmdList)));
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = resource;
+        barrier.Transition.Subresource = 0;
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+        copyCmdList->ResourceBarrier(1, &barrier);
         copyCmdList->CopyBufferRegion(resource, offset, stagingResource, 0, size);
-        CHECK_DX(copyCmdList->Close());
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
+        copyCmdList->ResourceBarrier(1, &barrier);
         ID3D12CommandList *cmdList = copyCmdList;
+        CHECK_DX(copyCmdList->Close());
         state.queue->ExecuteCommandLists(1, &cmdList);
         state.Wait();
         copyCmdList->Release();
@@ -775,7 +912,8 @@ public:
 
 public:
     static ID3D12Resource *CreateTextureResource(D3D12_HEAP_TYPE heapType, int width, int height, int arraySize,
-        int mipLevel, DXGI_FORMAT format, D3D12_RESOURCE_DIMENSION resourceDimension, D3D12_RESOURCE_STATES resState)
+        int mipLevel, DXGI_FORMAT format, D3D12_RESOURCE_DIMENSION resourceDimension, D3D12_RESOURCE_STATES resState,
+        D3D12_RESOURCE_FLAGS flags)
     {
         auto &state = RendererState::Get();
         D3D12_HEAP_PROPERTIES heapProperties = {};
@@ -792,6 +930,7 @@ public:
         resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
         resourceDesc.SampleDesc.Count = 1;
         resourceDesc.SampleDesc.Quality = 0;
+        resourceDesc.Flags = flags;
         ID3D12Resource *resultResource;
         CHECK_DX(state.device->CreateCommittedResource(
             &heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, resState, nullptr, IID_PPV_ARGS(&resultResource)));
@@ -879,10 +1018,10 @@ public:
 
         auto packedResourceSize = GetResourceSize(properties.format, width, height);
         // Half float translation
+        CoreLib::List<unsigned short> translatedBuffer;
         if (data)
         {
             int dataTypeSize = DataTypeSize(inputType);
-            CoreLib::List<unsigned short> translatedBuffer;
             if ((properties.format == StorageFormat::R_F16 || properties.format == StorageFormat::RG_F16 ||
                     properties.format == StorageFormat::RGBA_F16) &&
                 (GetDataTypeElementType(inputType) != DataType::Half))
@@ -980,7 +1119,8 @@ public:
             ID3D12CommandList *cmdList = copyCmdList;
             state.queue->ExecuteCommandLists(1, &cmdList);
             state.Wait();
-            copyCmdList->Reset(state.commandAllocators[state.version], nullptr);
+            state.largeCopyCmdListAllocator->Reset();
+            copyCmdList->Reset(state.largeCopyCmdListAllocator, nullptr);
         }
         copyCmdList->Release();
         stagingResource->Release();
@@ -1054,6 +1194,28 @@ public:
         state.largeCopyCmdListAllocator->Reset();
     }
 
+    D3D12_RESOURCE_FLAGS GetResourceFlags(TextureUsage usage)
+    {
+        D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
+        if ((int)usage & (int)TextureUsage::Storage)
+        {
+            flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        }
+        if ((int)usage & (int)TextureUsage::ColorAttachment)
+        {
+            flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        }
+        if ((int)usage & (int)TextureUsage::DepthAttachment)
+        {
+            flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        }
+        if ((int)usage & (int)TextureUsage::StencilAttachment)
+        {
+            flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        }
+        return flags;
+    }
+
     void InitTexture(int width, int height, int layers, int depth, int mipLevels, StorageFormat format,
         TextureUsage usage, D3D12_RESOURCE_DIMENSION dimension, D3D12_SRV_DIMENSION defaultViewDimension,
         D3D12_RESOURCE_STATES initialState)
@@ -1070,7 +1232,7 @@ public:
         properties.d3dformat = TranslateStorageFormat(format);
         int arraySizeOrDepth = dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ? layers : depth;
         resource = CreateTextureResource(D3D12_HEAP_TYPE_DEFAULT, width, height, arraySizeOrDepth, properties.mipLevels,
-            properties.d3dformat, dimension, initialState);
+            properties.d3dformat, dimension, initialState, GetResourceFlags(usage));
         subresourceStates.SetSize(properties.mipLevels * properties.arraySize);
         for (auto &s : subresourceStates)
             s = initialState;
@@ -1079,6 +1241,7 @@ public:
         int width, int height, TextureUsage usage, StorageFormat format, DataType inputType, void *data)
     {
         auto mipLevels = CoreLib::Math::Log2Ceil(CoreLib::Math::Max(width, height)) + 1;
+
         InitTexture(width, height, 1, 1, mipLevels, format, usage, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
             D3D12_SRV_DIMENSION_TEXTURE2D, D3D12_RESOURCE_STATE_COPY_DEST);
 
@@ -1539,6 +1702,7 @@ public:
                     d3dtexture = static_cast<D3DTexture *>(attachment.handle.texCubeArray->GetInternalPtr());
                 }
                 framebuffer->rtvHandles[rtvCount] = state.rtvDescHeap.Alloc(1).cpuHandle;
+                framebuffer->renderTargetTextures[rtvCount] = d3dtexture;
                 state.device->CreateRenderTargetView(d3dtexture->resource, &rtv, framebuffer->rtvHandles[rtvCount]);
                 rtvCount++;
             }
@@ -1581,6 +1745,7 @@ public:
                     d3dtexture = static_cast<D3DTexture *>(attachment.handle.texCubeArray->GetInternalPtr());
                 }
                 framebuffer->dsvHandle = state.dsvDescHeap.Alloc(1).cpuHandle;
+                framebuffer->depthStencilTexture = d3dtexture;
                 state.device->CreateDepthStencilView(d3dtexture->resource, &dsv,
                     framebuffer->dsvHandle);
             }
@@ -1743,12 +1908,14 @@ public:
         resourceUse.targetState =
             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         resourceUse.texture = static_cast<D3DTexture *>(texture->GetInternalPtr());
+        resourceUses[location].Clear();
         resourceUses[location].Add(resourceUse);
         CreateDescriptorFromTexture(texture, aspect, descriptors[location].address.cpuHandle);
     }
     virtual void Update(int location, CoreLib::ArrayView<GameEngine::Texture *> textures, TextureAspect aspect) override
     {
         auto &state = RendererState::Get();
+        resourceUses[location].Clear();
         for (int i = 0; i < textures.Count(); i++)
         {
             auto descAddr = descriptors[location].address.cpuHandle;
@@ -1766,6 +1933,7 @@ public:
         int location, CoreLib::ArrayView<GameEngine::Texture *> textures, TextureAspect aspect) override
     {
         auto &state = RendererState::Get();
+        resourceUses[location].Clear();
         for (int i = 0; i < textures.Count(); i++)
         {
             auto d3dTexture = static_cast<D3DTexture *>(textures[i]->GetInternalPtr());
@@ -2245,19 +2413,26 @@ public:
 
 public:
     ID3D12GraphicsCommandList *commandList;
-    CommandBuffer()
+    ID3D12CommandAllocator *commandAllocator;
+    CommandBuffer(D3D12_COMMAND_LIST_TYPE type)
     {
         auto &state = RendererState::Get();
-        CHECK_DX(state.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.commandAllocators[state.version],
+        CHECK_DX(state.device->CreateCommandAllocator(type, IID_PPV_ARGS(&commandAllocator)));
+        CHECK_DX(state.device->CreateCommandList(0, type, commandAllocator,
             nullptr, IID_PPV_ARGS(&commandList)));
         commandList->Close();
+    }
+    ~CommandBuffer()
+    {
+        commandList->Release();
+        commandAllocator->Release();
     }
     void MaybeUpdatePipelineBindings()
     {
         if (pipelineChanged)
         {
-            commandList->SetPipelineState(currentPipeline->pipelineState);
             commandList->SetGraphicsRootSignature(currentPipeline->rootSignature);
+            commandList->SetPipelineState(currentPipeline->pipelineState);
             commandList->OMSetStencilRef(currentPipeline->FixedFunctionStates.StencilReference);
             Array<D3D12_VERTEX_BUFFER_VIEW, 16> vbView;
             vbView.SetSize(currentPipeline->vertexFormat.Attributes.Count());
@@ -2265,19 +2440,23 @@ public:
             for (int i = 0; i < currentPipeline->vertexFormat.Attributes.Count(); i++)
             {
                 vbView[i].StrideInBytes = vertexSize;
-                vbView[i].SizeInBytes = vertexBuffer->bufferSize - vertexBufferOffset;
+                vbView[i].SizeInBytes = vertexBuffer->bufferSize - vertexBufferOffset -
+                                        currentPipeline->vertexFormat.Attributes[i].StartOffset;
                 vbView[i].BufferLocation = vertexBuffer->resource->GetGPUVirtualAddress() + vertexBufferOffset +
                                            currentPipeline->vertexFormat.Attributes[i].StartOffset;
             }
             commandList->IASetVertexBuffers(0, vbView.Count(), vbView.Buffer());
             commandList->IASetPrimitiveTopology(TranslatePrimitiveTopology(currentPipeline->FixedFunctionStates.PrimitiveTopology));
             descBindingChanged = true;
+            pipelineChanged = false;
         }
         if (descBindingChanged)
         {
             int rootIndex = 0;
             for (int i = 0; i < descSetBindings.Count(); i++)
             {
+                if (!descSetBindings[i])
+                    continue;
                 if (descSetBindings[i]->resourceCount)
                 {
                     commandList->SetGraphicsRootDescriptorTable(rootIndex, descSetBindings[i]->resourceAddr.gpuHandle);
@@ -2289,33 +2468,40 @@ public:
                     rootIndex++;
                 }
             }
+            descBindingChanged = false;
         }
     }
 public:
+    Viewport viewport;
+    ID3D12DescriptorHeap *descHeaps[2];
     virtual void BeginRecording(GameEngine::FrameBuffer * /*frameBuffer*/) override
     {
         auto &state = RendererState::Get();
-        commandList->Reset(state.commandAllocators[state.version], nullptr);
+        CHECK_DX(commandAllocator->Reset());
+        commandList->Reset(commandAllocator, nullptr);
         pipelineChanged = false;
         descBindingChanged = false;
+        currentPipeline = nullptr;
+        for (auto & descSet : descSetBindings)
+            descSet = nullptr;
         descSets.Clear();
+        vertexBuffer = nullptr;
+        vertexBufferOffset = 0;
+        descHeaps[0] = state.resourceDescHeap.heap;
+        descHeaps[1] = state.samplerDescHeap.heap;
+        commandList->SetDescriptorHeaps(2, descHeaps);
     }
 
     virtual void EndRecording() override
     {
         commandList->Close();
     }
-    virtual void SetViewport(int x, int y, int width, int height) override
+
+    virtual void SetViewport(Viewport _viewport) override
     {
-        D3D12_VIEWPORT viewport = {};
-        viewport.TopLeftX = (float)x;
-        viewport.TopLeftY = (float)y;
-        viewport.Height = (float)height;
-        viewport.Width = (float)width;
-        viewport.MinDepth = 0.0f;
-        viewport.MaxDepth = 1.0f;
-        commandList->RSSetViewports(1, &viewport);
+        viewport = _viewport;
     }
+
     virtual void BindVertexBuffer(GameEngine::Buffer * buffer, int byteOffset) override
     {
         vertexBuffer = reinterpret_cast<Buffer*>(buffer);
@@ -2402,6 +2588,7 @@ public:
         CHECK_DX(state.dxgiFactory->CreateSwapChainForHwnd(
             state.queue, (HWND)windowHandle, &desc, nullptr, nullptr, &swapchain1));
         CHECK_DX(swapchain1->QueryInterface(IID_PPV_ARGS(&swapchain)));
+        swapchain1->Release();
     }
 
 public:
@@ -2437,15 +2624,15 @@ public:
 class HardwareRenderer : public GameEngine::HardwareRenderer
 {
 private:
-    ID3D12GraphicsCommandList *pendingCommands[MaxRenderThreads] = {};
+    D3DCommandList pendingCommands[MaxRenderThreads] = {};
     List<D3D12_RESOURCE_BARRIER> pendingBarriers[MaxRenderThreads];
-
     ID3D12PipelineState *blitPipeline;
     ID3D12RootSignature *blitRootSignature;
-    Array<DescriptorHeap, 4> internalDescriptorHeap;
+    List<RefPtr<Fence>> presentFences;
+    List<RefPtr<CommandBuffer>> presentCommandBuffers;
     const char *blitShaderSrc = R"(
     Texture2D inputTexture : register(t0);
-    RWTexture2D outputTexture : register(u0);
+    RWTexture2D<float4> outputTexture : register(u0);
     cbuffer Params : register(b0)
     {
         uint originX;
@@ -2468,13 +2655,12 @@ private:
     {
         auto &state = RendererState::Get();
         ID3DBlob *code = nullptr, *errMsg = nullptr;
-        CHECK_DX(state.d3dCompile(blitShaderSrc, strlen(blitShaderSrc), "blitShader", nullptr, nullptr, "CSMain", "cs_5_0", 0, 0,
-            &code, &errMsg));
+        state.d3dCompile(blitShaderSrc, strlen(blitShaderSrc), "blitShader", nullptr, nullptr, "CSMain", "cs_5_0", 0, 0,
+            &code, &errMsg);
         if (errMsg)
         {
             throw HardwareRendererException((const char *)errMsg->GetBufferPointer());
         }
-        ID3D12RootSignature *rootSignature = nullptr;
         ID3DBlob *rootSignatureBlob = nullptr;
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
         rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
@@ -2499,13 +2685,18 @@ private:
         D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineDesc = {};
         pipelineDesc.CS.BytecodeLength = code->GetBufferSize();
         pipelineDesc.CS.pShaderBytecode = code->GetBufferPointer();
-        pipelineDesc.pRootSignature = rootSignature;
+        pipelineDesc.pRootSignature = blitRootSignature;
         CHECK_DX(state.device->CreateComputePipelineState(&pipelineDesc, IID_PPV_ARGS(&blitPipeline)));
+        if (code)
+            code->Release();
+        if (errMsg)
+            errMsg->Release();
     }
 
 public:
     HardwareRenderer(int gpuId, bool useSoftwareDevice, CoreLib::String cacheLocation)
     {
+        //useSoftwareDevice = true;
         auto &state = RendererState::Get();
         state.cacheLocation = cacheLocation;
         if (state.rendererCount == 0)
@@ -2537,15 +2728,15 @@ public:
             {
                 throw HardwareRendererException("cannot load dxgi.dll");
             }
-            HMODULE d3dCompilerModule = LoadLibrary(L"d3dcompiler.dll");
+            HMODULE d3dCompilerModule = LoadLibrary(L"d3dcompiler_47.dll");
             if (!d3dCompilerModule)
             {
-                throw HardwareRendererException("cannot load d3dcompiler.dll");
+                throw HardwareRendererException("cannot load d3dcompiler_47.dll");
             }
             state.d3dCompile = (PFN_D3DCOMPILE)GetProcAddress(d3dCompilerModule, "D3DCompile");
             if (!state.d3dCompile)
             {
-                throw HardwareRendererException("cannot load d3dcompiler.dll");
+                throw HardwareRendererException("cannot load d3dcompiler_47.dll");
             }
             // Initialize D3D Context
 
@@ -2597,6 +2788,16 @@ public:
 #endif
             CHECK_DX(createDevice(adapters[gpuId], D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&state.device)));
 
+#if defined(_DEBUG)
+            ID3D12InfoQueue *d3dInfoQueue = nullptr;
+            state.device->QueryInterface(IID_PPV_ARGS(&d3dInfoQueue));
+            if (d3dInfoQueue)
+            {
+                d3dInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+                d3dInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+            }
+            d3dInfoQueue->Release();
+#endif
             // Read adapter info.
             DXGI_ADAPTER_DESC adapterDesc;
             adapters[gpuId]->GetDesc(&adapterDesc);
@@ -2616,14 +2817,8 @@ public:
             CHECK_DX(state.device->CreateCommandAllocator(
                 D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&state.largeCopyCmdListAllocator)));
 
-            state.resourceDescHeap.Create(
-                state.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, ResourceDescriptorHeapSize, true);
-            state.samplerDescHeap.Create(
-                state.device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, SamplerDescriptorHeapSize, true);
-            state.rtvDescHeap.Create(
-                state.device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RtvDescriptorHeapSize, true);
-            state.dsvDescHeap.Create(
-                state.device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, DsvDescriptorHeapSize, true);
+            state.rtvDescHeap.Create(state.device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RtvDescriptorHeapSize, 0, 0, false);
+            state.dsvDescHeap.Create(state.device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, DsvDescriptorHeapSize, 0, 0, false);
 
             InitBlitPipeline();
         }
@@ -2635,6 +2830,8 @@ public:
         state.rendererCount--;
         blitPipeline->Release();
         blitRootSignature->Release();
+        presentCommandBuffers = decltype(presentCommandBuffers)();
+        presentFences = decltype(presentFences)();
         if (state.rendererCount == 0)
         {
             RendererState::Free();
@@ -2650,8 +2847,10 @@ public:
     {
         auto &state = RendererState::Get();
         pendingCommands[renderThreadId] = state.GetTempCommandList();
+        ID3D12DescriptorHeap *descHeaps[2] = {state.resourceDescHeap.heap, state.samplerDescHeap.heap};
+        pendingCommands[renderThreadId]->SetDescriptorHeaps(2, descHeaps);
     }
-    virtual void QueueRenderPass(GameEngine::FrameBuffer * frameBuffer, bool clearFrameBuffer,
+    virtual void QueueRenderPass(GameEngine::FrameBuffer *frameBuffer, bool clearFrameBuffer,
         CoreLib::ArrayView<GameEngine::CommandBuffer *> commands, PipelineBarriers barriers) override
     {
         auto cmdList = pendingCommands[renderThreadId];
@@ -2718,7 +2917,7 @@ public:
             }
             cmdList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
         }
-
+        
         cmdList->OMSetRenderTargets(d3dframeBuffer->rtvCount, d3dframeBuffer->rtvHandles, false,
             d3dframeBuffer->dsvCount ? &d3dframeBuffer->dsvHandle : nullptr);
         if (clearFrameBuffer)
@@ -2737,13 +2936,34 @@ public:
             }
             for (int i = 0; i < d3dframeBuffer->rtvCount; i++)
             {
-                float zero[4] = {0.0f};
+                float zero[4] = {0.3f, 0.7f, 0.0f, 1.0f};
                 cmdList->ClearRenderTargetView(d3dframeBuffer->rtvHandles[i], zero, 0, nullptr);
             }
         }
-
+        Viewport currentViewport;
         for (auto cmd : commands)
+        {
+            Viewport viewport = reinterpret_cast<CommandBuffer *>(cmd)->viewport;
+            if (viewport != currentViewport)
+            {
+                D3D12_VIEWPORT d3dviewport = {};
+                d3dviewport.TopLeftX = viewport.x;
+                d3dviewport.TopLeftY = viewport.y;
+                d3dviewport.Height = viewport.h;
+                d3dviewport.Width = viewport.w;
+                d3dviewport.MinDepth = viewport.minZ;
+                d3dviewport.MaxDepth = viewport.maxZ;
+                cmdList->RSSetViewports(1, &d3dviewport);
+
+                D3D12_RECT scissorRect = {};
+                scissorRect.left = (int)viewport.x;
+                scissorRect.right = (int)(viewport.x + viewport.w);
+                scissorRect.top = (int)(viewport.y);
+                scissorRect.bottom = (int)(viewport.y + viewport.h);
+                cmdList->RSSetScissorRects(1, &scissorRect);
+            }
             cmdList->ExecuteBundle(reinterpret_cast<CommandBuffer *>(cmd)->commandList);
+        }
     }
 
     virtual void QueueComputeTask(GameEngine::Pipeline * computePipeline,
@@ -2788,8 +3008,9 @@ public:
     virtual void EndJobSubmission(GameEngine::Fence *fence) override
     {
         auto &state = RendererState::Get();
-        CHECK_DX(pendingCommands[renderThreadId]->Close());
-        state.queue->ExecuteCommandLists(1, (ID3D12CommandList**)&pendingCommands[renderThreadId]);
+        CHECK_DX(pendingCommands[renderThreadId].Close());
+        ID3D12CommandList *cmdList = pendingCommands[renderThreadId].list;
+        state.queue->ExecuteCommandLists(1, &cmdList);
         if (fence)
         {
             auto d3dfence = dynamic_cast<D3DRenderer::Fence *>(fence);
@@ -2803,17 +3024,48 @@ public:
     {
         auto &state = RendererState::Get();
         auto d3dsurface = reinterpret_cast<WindowSurface *>(surface);
+        auto srcTexture = reinterpret_cast<D3DTexture *>(srcImage->GetInternalPtr());
         auto bufferIndex = d3dsurface->swapchain->GetCurrentBackBufferIndex();
         ID3D12Resource *backBuffer = nullptr;
         d3dsurface->swapchain->GetBuffer(bufferIndex, IID_PPV_ARGS(&backBuffer));
         Texture2DProxy proxyTexture(backBuffer, D3D12_RESOURCE_STATE_PRESENT);
-        auto cmdList = state.GetTempCommandList();
-        BlitImpl(cmdList, &proxyTexture, srcImage, VectorMath::Vec2i::Create(0, 0), false);
+        auto cmdList = presentCommandBuffers[state.version];
+        presentFences[state.version]->Wait();
+        presentFences[state.version]->Reset();
+        cmdList->commandList->Reset(cmdList->commandAllocator, nullptr);
+        CORELIB_ASSERT(srcTexture->properties.d3dformat == DXGI_FORMAT_R8G8B8A8_UNORM);
+
+        D3D12_TEXTURE_COPY_LOCATION copyDestLocation = {}, copySrcLocation = {};
+        copyDestLocation.pResource = backBuffer;
+        copyDestLocation.SubresourceIndex = 0;
+        copyDestLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        copySrcLocation = copyDestLocation;
+        copySrcLocation.pResource = srcTexture->resource;
+        int surfaceW, surfaceH;
+        surface->GetSize(surfaceW, surfaceH);
+        D3D12_BOX srcBox;
+        srcBox.left = 0;
+        srcBox.top = 0;
+        srcBox.front = 0;srcBox.back = 1;
+        srcBox.right = Math::Min(surfaceW, srcTexture->properties.width);
+        srcBox.bottom = Math::Min(surfaceH, srcTexture->properties.height);
         auto &pendingBarrierList = pendingBarriers[state.version];
         pendingBarrierList.Clear();
+        proxyTexture.texture.TransferState(0, D3D12_RESOURCE_STATE_COPY_DEST, pendingBarrierList);
+        srcTexture->TransferState(0, D3D12_RESOURCE_STATE_COPY_SOURCE, pendingBarrierList);
+        cmdList->commandList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
+        cmdList->commandList->CopyTextureRegion(&copyDestLocation, 0, 0, 0, &copySrcLocation, &srcBox);
+        pendingBarrierList.Clear();
         proxyTexture.texture.TransferState(0, D3D12_RESOURCE_STATE_PRESENT, pendingBarrierList);
-        cmdList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
-        state.queue->ExecuteCommandLists(1, (ID3D12CommandList **)&cmdList);
+        cmdList->commandList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
+        cmdList->commandList->Close();
+        state.queue->ExecuteCommandLists(1, (ID3D12CommandList **)&cmdList->commandList);
+    
+        auto d3dfence = presentFences[state.version].Ptr();
+        auto value = InterlockedIncrement(&state.waitFenceValue);
+        state.queue->Signal(d3dfence->fence, value);
+        d3dfence->fence->SetEventOnCompletion(value, d3dfence->waitEvent);
+
         CHECK_DX(d3dsurface->swapchain->Present(0, 0));
     }
 
@@ -2827,15 +3079,16 @@ public:
         cmdList->SetComputeRootSignature(blitRootSignature);
         uint32_t arguments[3] = {(uint32_t)destOffset.x, (uint32_t)destOffset.y, flipSrc ? 1u : 0u};
         cmdList->SetComputeRoot32BitConstants(0, 3, arguments, 0);
-        auto descriptorTable = internalDescriptorHeap[state.version].Alloc(2);
+        auto descriptorTable = state.resourceDescHeap.AllocTemp(state.version, 2);
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = 0xFFFFFFFF;
         state.device->CreateShaderResourceView(srcTexture->resource, &srvDesc, descriptorTable.cpuHandle);
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
         auto uavDescHandle = descriptorTable.cpuHandle;
-        uavDescHandle.ptr += internalDescriptorHeap[state.version].handleIncrementSize;
+        uavDescHandle.ptr += state.resourceDescHeap.handleIncrementSize;
         state.device->CreateUnorderedAccessView(dstTexture->resource, nullptr, &uavDesc, uavDescHandle);
         cmdList->SetComputeRootDescriptorTable(1, descriptorTable.gpuHandle);
         int width = 0, height = 0;
@@ -2851,10 +3104,8 @@ public:
     virtual void Blit(GameEngine::Texture2D * dstImage, GameEngine::Texture2D * srcImage,
         VectorMath::Vec2i destOffset, bool flipSrc) override
     {
-        auto &state = RendererState::Get();
-        auto cmdList = state.GetTempCommandList();
-        BlitImpl(cmdList, dstImage, srcImage, destOffset, flipSrc);
-        state.queue->ExecuteCommandLists(1, (ID3D12CommandList **)&cmdList);
+        auto cmdList = pendingCommands[renderThreadId];
+        BlitImpl(cmdList.list, dstImage, srcImage, destOffset, flipSrc);
     }
 
     virtual void Wait() override
@@ -2865,20 +3116,27 @@ public:
     virtual void SetMaxTempBufferVersions(int versionCount) override
     {
         auto &state = RendererState::Get();
+        
         CORELIB_ASSERT(state.stagingBuffers.Count() == 0);
-        internalDescriptorHeap.SetSize(versionCount);
+        presentFences.SetSize(versionCount);
+        presentCommandBuffers.SetSize(versionCount);
         for (int i = 0; i < versionCount; i++)
-            internalDescriptorHeap[i].Create(state.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
-
+        {
+            presentFences[i] = new Fence();
+            SetEvent(presentFences[i]->waitEvent);
+            presentCommandBuffers[i] = new CommandBuffer(D3D12_COMMAND_LIST_TYPE_DIRECT);
+        }
+        state.resourceDescHeap.Create(
+            state.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, ResourceDescriptorHeapSize, 512, versionCount, true);
+        state.samplerDescHeap.Create(state.device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, SamplerDescriptorHeapSize, 8, versionCount, true);
+        
         state.stagingBuffers.SetSize(versionCount);
         state.stagingBufferAllocPtr.SetSize(versionCount);
-        state.commandAllocators.SetSize(versionCount);
+        state.tempCommandAllocatorManager.Init(versionCount, D3D12_COMMAND_LIST_TYPE_DIRECT);
         for (int i = 0; i < versionCount; i++)
         {
             state.stagingBuffers[i] = state.CreateBufferResource(
                 StagingBufferSize, D3D12_HEAP_TYPE_UPLOAD, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, false);
-            CHECK_DX(state.device->CreateCommandAllocator(
-                D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&state.commandAllocators[i])));
         }
         state.tempCommandLists.SetSize(versionCount);
         state.tempCommandListAllocPtr.SetSize(versionCount);
@@ -2894,8 +3152,9 @@ public:
         state.version = version;
         state.stagingBufferAllocPtr[state.version] = 0;
         state.tempCommandListAllocPtr[state.version] = 0;
-        internalDescriptorHeap[version].FreeAll();
-        CHECK_DX(state.commandAllocators[state.version]->Reset());
+        state.tempCommandAllocatorManager.Reset(version);
+        state.resourceDescHeap.ResetTemp(version);
+        state.samplerDescHeap.ResetTemp(version);
     }
     virtual GameEngine::Fence *CreateFence() override
     {
@@ -3020,7 +3279,7 @@ public:
 
     virtual GameEngine::CommandBuffer *CreateCommandBuffer() override
     {
-        return new CommandBuffer();
+        return new CommandBuffer(D3D12_COMMAND_LIST_TYPE_BUNDLE);
     }
 
     virtual TargetShadingLanguage GetShadingLanguage() override

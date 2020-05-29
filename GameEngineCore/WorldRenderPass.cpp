@@ -19,7 +19,6 @@ namespace GameEngine
 #endif
 
 		auto &rs = *result;
-		rs.viewport.X = rs.viewport.Y = 0;
 		rs.pass = this;
 		rs.renderPassId = renderPassId;
 		rs.renderOutput = output;

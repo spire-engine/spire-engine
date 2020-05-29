@@ -3695,6 +3695,7 @@ namespace VK
 		Pipeline* curPipeline = nullptr;
 		CoreLib::Array<vk::DescriptorSet, 32> pendingDescSets;
 		CoreLib::List<VK::DescriptorSet*> descSets;
+
 		CommandBuffer(const vk::CommandPool& commandPool) : pool(commandPool)
 		{
 			pendingDescSets.SetSize(32);
@@ -3722,7 +3723,7 @@ namespace VK
 			descSets.Clear();
 		}
 
-		virtual void BeginRecording(GameEngine::FrameBuffer* frameBuffer) override
+		virtual void BeginRecording(GameEngine::FrameBuffer *frameBuffer) override
 		{
             vk::RenderPass renderPass;
             if (frameBuffer)
@@ -3798,6 +3799,21 @@ namespace VK
 			}
 		}
 
+		virtual void SetViewport(Viewport viewport) override
+        {
+            vk::Viewport vkViewport;
+            vkViewport.x = viewport.x;
+            vkViewport.y = viewport.y;
+            vkViewport.width = viewport.w;
+            vkViewport.height = viewport.h;
+            vkViewport.minDepth = viewport.minZ;
+            vkViewport.maxDepth = viewport.maxZ;
+            buffer.setViewport(0, 1, &vkViewport);
+            vk::Rect2D scissorRect = vk::Rect2D(
+                vk::Offset2D((int)viewport.x, (int)viewport.y), vk::Extent2D((int)viewport.w, (int)viewport.h));
+            buffer.setScissor(0, 1, &scissorRect);
+        }
+
 		virtual void DispatchCompute(int groupCountX, int groupCountY, int groupCountZ) override
 		{
             buffer.bindDescriptorSets(
@@ -3853,12 +3869,6 @@ namespace VK
 				pendingDescSets.Buffer(),
 				0, nullptr);
 			buffer.drawIndexed(indexCount, numInstances, firstIndex, 0, 0);
-		}
-
-		virtual void SetViewport(int x, int y, int width, int height) override
-		{
-			buffer.setViewport(0, vk::Viewport((float)x, (float)y, (float)width, (float)height, 0.0f, 1.0f));
-			buffer.setScissor(0, vk::Rect2D(vk::Offset2D(x, y), vk::Extent2D(width, height)));
 		}
 	};
 
@@ -4315,7 +4325,6 @@ namespace VK
         CoreLib::Array<vk::CommandBuffer, MaxRenderThreads> jobSubmissionBuffers;
 		List<vk::ImageMemoryBarrier> imageMemoryBarriers;
 
-		int pendingGraphicsQueueBarrierId = -1;
 		uint32_t taskId = 0;
 		std::mutex queueMutex;
 	public:
@@ -4357,18 +4366,6 @@ namespace VK
             return rs;
 		}
 
-		vk::Semaphore GetWaitSemaphore()
-		{
-			if (pendingGraphicsQueueBarrierId != -1)
-			{
-				auto rs = transferSemaphores[pendingGraphicsQueueBarrierId];
-				pendingGraphicsQueueBarrierId = -1;
-				return rs;
-			}
-			return vk::Semaphore();
-		}
-
-
         virtual void BeginJobSubmission() override
         {
             // Create command buffer begin info
@@ -4391,13 +4388,6 @@ namespace VK
                 .setPCommandBuffers(&primaryBuffer)
                 .setSignalSemaphoreCount(0)
                 .setPSignalSemaphores(nullptr);
-            vk::Semaphore waitSemaphore = GetWaitSemaphore();
-            if (waitSemaphore)
-            {
-                vk::PipelineStageFlags waitDstStageMask = vk::PipelineStageFlags(vk::PipelineStageFlagBits::eTopOfPipe);
-                submitInfo.setWaitSemaphoreCount(1).setPWaitSemaphores(&waitSemaphore).setPWaitDstStageMask(
-                    &waitDstStageMask);
-            }
             RendererState::RenderQueue().submit(submitInfo, fence ? ((VK::Fence*)fence)->assocFence : nullptr);
         }
 
@@ -4408,12 +4398,14 @@ namespace VK
 				auto memBarrier = vk::MemoryBarrier()
 					.setSrcAccessMask(vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eHostWrite)
 					.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
-				cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllGraphics,
+                cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
+                    vk::PipelineStageFlagBits::eAllCommands,
 					vk::DependencyFlags(), 1, &memBarrier, 0, nullptr, imageMemoryBarriers.Count(), imageMemoryBarriers.Buffer());
 			}
 			else if (barriers == PipelineBarriers::ExecutionOnly)
 			{
-				cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllGraphics,
+                cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
+                    vk::PipelineStageFlagBits::eAllCommands,
 					vk::DependencyFlags(), 0, nullptr, 0, nullptr, 0, nullptr);
 			}
 		}
@@ -4527,11 +4519,7 @@ namespace VK
 		}
 		virtual void Blit(GameEngine::Texture2D* dstImage, GameEngine::Texture2D* srcImage, VectorMath::Vec2i dstOffset, bool flipSrc) override
 		{
-			vk::CommandBuffer transferCommandBuffer = RendererState::GetTempTransferCommandBuffer();
-
-			vk::CommandBufferBeginInfo commandBufferBeginInfo = vk::CommandBufferBeginInfo()
-				.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
-				.setPInheritanceInfo(nullptr);
+            auto primaryBuffer = jobSubmissionBuffers[renderThreadId];
 
 			vk::ImageSubresourceRange imageSubresourceRange = vk::ImageSubresourceRange()
 				.setAspectMask(vk::ImageAspectFlagBits::eColor)
@@ -4553,9 +4541,7 @@ namespace VK
 				.setSubresourceRange(imageSubresourceRange);
 
 			dstTexture->currentSubresourceLayouts[0] = vk::ImageLayout::eTransferDstOptimal;
-
-			transferCommandBuffer.begin(commandBufferBeginInfo); // start recording
-			
+						
 			auto srcTexture = dynamic_cast<Texture2D*>(srcImage);
 
 			vk::ImageMemoryBarrier textureTransferBarrier = vk::ImageMemoryBarrier()
@@ -4568,7 +4554,7 @@ namespace VK
 				.setImage(srcTexture->image)
 				.setSubresourceRange(imageSubresourceRange);
 
-			transferCommandBuffer.pipelineBarrier(
+			primaryBuffer.pipelineBarrier(
 				vk::PipelineStageFlagBits::eAllCommands,
 				vk::PipelineStageFlagBits::eTransfer,
 				vk::DependencyFlags(),
@@ -4617,7 +4603,7 @@ namespace VK
 				.setDstSubresource(subresourceLayers)
 				.setDstOffsets(dstOffsets);
 
-			transferCommandBuffer.blitImage(
+			primaryBuffer.blitImage(
 				srcTexture->image,
 				vk::ImageLayout::eTransferSrcOptimal,
 				dstTexture->image,
@@ -4626,21 +4612,7 @@ namespace VK
 				vk::Filter::eNearest
 			);
 
-			transferCommandBuffer.end();
-
 			srcTexture->currentSubresourceLayouts[0] = vk::ImageLayout::eTransferSrcOptimal;
-
-			// Submit job
-			vk::SubmitInfo transferSubmitInfo = vk::SubmitInfo()
-				.setWaitSemaphoreCount(0)
-				.setPWaitSemaphores(nullptr)
-				.setPWaitDstStageMask(nullptr)
-				.setCommandBufferCount(1)
-				.setPCommandBuffers(&transferCommandBuffer)
-				.setSignalSemaphoreCount(0)
-				.setPSignalSemaphores(nullptr);
-
-			RendererState::RenderQueue().submit(transferSubmitInfo, vk::Fence());
 		}
 		virtual void Present(GameEngine::WindowSurface *surface, GameEngine::Texture2D* srcImage) override
 		{

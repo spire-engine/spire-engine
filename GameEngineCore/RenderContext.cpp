@@ -272,13 +272,14 @@ namespace GameEngine
 			{
 				CoreLib::Imaging::Bitmap bmp(actualFilename);
 				List<unsigned int> pixelsInversed;
-				int * sourcePixels = (int*)bmp.GetPixels();
-				pixelsInversed.SetSize(bmp.GetWidth() * bmp.GetHeight());
-				for (int i = 0; i < bmp.GetHeight(); i++)
-				{
-					for (int j = 0; j < bmp.GetWidth(); j++)
-						pixelsInversed[i*bmp.GetWidth() + j] = sourcePixels[(bmp.GetHeight() - 1 - i)*bmp.GetWidth() + j];
-				}
+                int *sourcePixels = (int *)bmp.GetPixels();
+                pixelsInversed.SetSize(bmp.GetWidth() * bmp.GetHeight());
+                for (int i = 0; i < bmp.GetHeight(); i++)
+                {
+                    for (int j = 0; j < bmp.GetWidth(); j++)
+                        pixelsInversed[i * bmp.GetWidth() + j] =
+                            sourcePixels[(bmp.GetHeight() - 1 - i) * bmp.GetWidth() + j];
+                }
 				CoreLib::Graphics::TextureFile texFile;
 				TextureCompressor::CompressRGBA_BC1(texFile, MakeArrayView((unsigned char*)pixelsInversed.Buffer(), pixelsInversed.Count() * 4), bmp.GetWidth(), bmp.GetHeight());
 				texFile.SaveToFile(Path::ReplaceExt(actualFilename, "texture"));
@@ -734,12 +735,15 @@ namespace GameEngine
 		// to play safe, we create multiple secondary command buffers, each holds 128 draw calls.
 		commandBuffers.Clear();
 		apiCommandBuffers.Clear();
-		renderOutput->GetSize(viewport.Width, viewport.Height);
+        int outputWidth, outputHeight;
+        renderOutput->GetSize(outputWidth, outputHeight);
+		viewport.w = (float)outputWidth;
+        viewport.h = (float)outputHeight;
 		auto cmd0 = pass->AllocCommandBuffer();
 		commandBuffers.Add(cmd0);
 		auto cmdBuf = cmd0->BeginRecording(renderOutput->GetFrameBuffer());
 		apiCommandBuffers.Add(cmdBuf);
-		cmdBuf->SetViewport(viewport.X, viewport.Y, viewport.Width, viewport.Height);
+        cmdBuf->SetViewport(viewport);
 		DescriptorSetBindingArray bindings;
 		pipelineManager.GetBindings(bindings);
 		for (int i = 0; i < bindings.Count(); i++)
@@ -771,7 +775,7 @@ namespace GameEngine
 					auto cmd = pass->AllocCommandBuffer();
 					commandBuffers.Add(cmd);
 					cmdBuf = cmd->BeginRecording(renderOutput->GetFrameBuffer());
-					cmdBuf->SetViewport(viewport.X, viewport.Y, viewport.Width, viewport.Height);
+                    cmdBuf->SetViewport(viewport);
 					apiCommandBuffers.Add(cmdBuf);
 					for (int i = 0; i < boundSets.Count(); i++)
 						boundSets[i] = (DescriptorSet*)-1;

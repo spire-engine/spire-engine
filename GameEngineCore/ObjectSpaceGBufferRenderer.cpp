@@ -23,7 +23,7 @@ namespace GameEngine
         ShaderEntryPoint* vsEntryPoint, *psEntryPoint;
         PipelineContext pipeContext[3];
         RenderStat renderStats;
-        RefPtr<CommandBuffer> cmdBuffer, layoutTransferCmdBuffer1, layoutTransferCmdBuffer2;
+        RefPtr<CommandBuffer> cmdBuffer;
         ModuleInstance viewParams, globalMemoryParams;
         DeviceMemory uniformMemory;
         DeviceMemory globalMemory;
@@ -46,8 +46,6 @@ namespace GameEngine
             for (auto &pctx : pipeContext)
                 pctx.Init(hwRenderer, &renderStats);
             cmdBuffer = hwRenderer->CreateCommandBuffer();
-            layoutTransferCmdBuffer1 = hwRenderer->CreateCommandBuffer();
-            layoutTransferCmdBuffer2 = hwRenderer->CreateCommandBuffer();
 
             viewUniform.CameraPos.SetZero();
             VectorMath::Matrix4::CreateIdentityMatrix(viewUniform.InvViewProjTransform);
@@ -116,8 +114,8 @@ namespace GameEngine
 
             hwRenderer->BeginJobSubmission();
             cmdBuffer->BeginRecording(frameBuffer.Ptr());
-            cmdBuffer->SetViewport(0, 0, width, height);
-            
+            cmdBuffer->SetViewport(Viewport(0, 0, width, height));
+
             for (int k = 0; k < 3; k++)
             {
                 FixedFunctionPipelineStates fixStates;
@@ -170,7 +168,8 @@ namespace GameEngine
             }
             cmdBuffer->EndRecording();
 
-            hwRenderer->QueueRenderPass(frameBuffer.Ptr(), true, MakeArrayView(cmdBuffer.Ptr()));
+            hwRenderer->QueueRenderPass(
+                frameBuffer.Ptr(), true, MakeArrayView(cmdBuffer.Ptr()));
             hwRenderer->EndJobSubmission(fence.Ptr());
             fence->Wait();
             fence->Reset();

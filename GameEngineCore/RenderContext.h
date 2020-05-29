@@ -63,26 +63,6 @@ namespace GameEngine
 		VectorMath::Matrix4 TransformMatrix;
 		VectorMath::Vec4 NormalMatrix[3];
 	};
-	
-	struct Viewport
-	{
-		int X, Y, Width, Height;
-		Viewport() = default;
-		Viewport(int x, int y, int w, int h)
-		{
-			X = x;
-			Y = y;
-			Width = w;
-			Height = h;
-		}
-		Viewport(int w, int h)
-		{
-			X = 0;
-			Y = 0;
-			Width = w;
-			Height = h;
-		}
-	};
 
 	class SharedModuleInstances
 	{
