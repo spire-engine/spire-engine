@@ -287,7 +287,8 @@ namespace GameEngine
 
             if (baseTexture)
             {
-                rendererApi->Blit(wndCtx->uiOverlayTexture.Ptr(), baseTexture, VectorMath::Vec2i::Create(viewport.x, viewport.y), true);
+                rendererApi->Blit(wndCtx->uiOverlayTexture.Ptr(), baseTexture,
+                    VectorMath::Vec2i::Create(viewport.x, viewport.y), SourceFlipMode::ForPresent);
             }
 
             rendererApi->QueueRenderPass(

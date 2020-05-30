@@ -44,7 +44,19 @@ namespace GameEngine
         }
         String GetBindingLayoutFileName(int shaderIndex)
         {
-            return Path::Combine(path, String("shader_") + String(shaderIndex) + ".binding");
+            String postfix;
+            switch (language)
+            {
+            case TargetShadingLanguage::HLSL:
+                postfix = ".hlsl";
+                break;
+            case TargetShadingLanguage::SPIRV:
+                postfix = ".spv";
+                break;
+            default:
+                break;
+            }
+            return Path::Combine(path, String("shader_") + String(shaderIndex) + postfix + ".binding");
         }
 
         void ReadBindingLayout(List<DescriptorSetInfo> & layout, String fileName)
@@ -445,11 +457,17 @@ namespace GameEngine
             if (dumpShaderSource)
             {
                 if (GetSlangTarget() == SLANG_DXBC)
+                {
                     spAddCodeGenTarget(compileRequest, SLANG_HLSL);
+                    spAddPreprocessorDefine(compileRequest, "__D3D__", "1");
+                }
                 else
+                {
                     spAddCodeGenTarget(compileRequest, SLANG_GLSL);
+                    spAddPreprocessorDefine(compileRequest, "__VK__", "1");
+                }
             }
-
+            spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
             #if 0
                 spSetLineDirectiveMode(compileRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
                 spSetDumpIntermediates(compileRequest, 1);

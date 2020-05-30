@@ -59,7 +59,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
     vin.vertPos = vertexIn.getPos();
     vin.tangentFrame = vertexIn.getTangentFrame();
     VertexPositionInfo worldPos = gWorldTransform.getWorldSpacePos(vin, vattribs);
-    rs.projPos = mul(gView.viewProjectionTransform, float4(worldPos.vertPos, 1.0));
+    rs.projPos = PlatformNDC(mul(gView.viewProjectionTransform, float4(worldPos.vertPos, 1.0)));
     return rs;
 }
 

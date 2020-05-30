@@ -217,6 +217,7 @@ namespace DummyRenderer
 		CommandBuffer() {}
 	public:
         virtual void BeginRecording(GameEngine::FrameBuffer * /*frameBuffer*/) override {}
+        virtual void SetEventMarker(const char * /*name*/, uint32_t /*color*/) override {}
 		virtual void EndRecording() override {}
         virtual void SetViewport(Viewport /*viewport*/) override {}
 		virtual void BindVertexBuffer(GameEngine::Buffer* /*vertexBuffer*/, int /*byteOffset*/) override {}
@@ -266,9 +267,9 @@ namespace DummyRenderer
         {
             writer->Write("Present\n");
         }
-        virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, VectorMath::Vec2i /*destOffset*/, bool /*flipSrc*/) override {}
+        virtual void Blit(GameEngine::Texture2D* /*dstImage*/, GameEngine::Texture2D* /*srcImage*/, VectorMath::Vec2i /*destOffset*/, SourceFlipMode /*flipSrc*/) override {}
 		virtual void Wait() override {}
-		virtual void SetMaxTempBufferVersions(int /*versionCount*/) override {}
+        virtual void Init(int /*versionCount*/) override {}
 		virtual void ResetTempBufferVersion(int /*version*/) override {}
 		virtual GameEngine::Fence* CreateFence() override
         {

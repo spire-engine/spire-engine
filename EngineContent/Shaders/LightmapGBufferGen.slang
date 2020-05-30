@@ -91,7 +91,7 @@ VSOutput vs_main(TVertex vertexIn, int vertexId : SV_VertexID)
     
     float3 displacement = gMaterial.getDisplacement(worldPos, vattribs, gView);
     rs.worldPos = worldPos.vertPos + displacement;
-    rs.projPos = float4(vertexIn.getUVSet().getUV(1) * 2.0 - 1.0, 0.0, 1.0);
+    rs.projPos = PlatformNDC(float4(vertexIn.getUVSet().getUV(1) * 2.0 - 1.0, 0.0, 1.0));
     gGlobalMem.vertices[vertexId] = rs.worldPos;
     DeviceMemoryBarrier();
     return rs;
@@ -135,6 +135,8 @@ PsOut ps_main(VSOutput vsOut, int primId : SV_PrimitiveID)
 
     float size = max(max(fwidth(vsOut.worldPos.x), fwidth(vsOut.worldPos.y)), fwidth(vsOut.worldPos.z));
     rs.position = float4(vsOut.worldPos, size);
-
+#ifdef __D3D__
+    rs.position.y = -rs.position.y;
+#endif
     return rs;
 }

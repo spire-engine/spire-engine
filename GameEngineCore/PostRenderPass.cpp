@@ -27,6 +27,7 @@ namespace GameEngine
 
 		pipelineBuilder->SetShaders(From(shaders).Select([](auto x) { return x.Ptr(); }).ToList().GetArrayView());
         pipelineBuilder->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleStrips;
+        pipelineBuilder->FixedFunctionStates.cullMode = CullMode::Disabled;
 		descLayouts.SetSize(rs.BindingLayouts.Count());
 		for (auto & desc : rs.BindingLayouts)
 		{

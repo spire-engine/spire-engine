@@ -56,6 +56,7 @@ namespace GameEngine
 		auto sharedRes = renderer->GetSharedResource();
 		RefPtr<PipelineBuilder> pb = hw->CreatePipelineBuilder();
 		VertexFormat quadVert;
+        pb->FixedFunctionStates.cullMode = CullMode::Disabled;
 		pb->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleStrips;
 		quadVert.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 0, 0, "POSITION", 0));
 		quadVert.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 8, 1, "TEXCOORD", 0));
@@ -186,6 +187,7 @@ namespace GameEngine
 		// prefilter
 		RefPtr<PipelineBuilder> pb2 = hw->CreatePipelineBuilder();
 		pb2->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleStrips;
+        pb2->FixedFunctionStates.cullMode = CullMode::Disabled;
 		pb2->SetVertexLayout(quadVert);
 		RefPtr<DescriptorSetLayout> prefilterPassLayout = hw->CreateDescriptorSetLayout(MakeArray(
 			DescriptorLayout(StageFlags::sfGraphics, 0, BindingType::UniformBuffer),
@@ -260,6 +262,7 @@ namespace GameEngine
 				frameBuffers.Add(fb);
 				auto cmdBuffer = hw->CreateCommandBuffer();
 				cmdBuffer->BeginRecording(fb.Ptr());
+                cmdBuffer->SetEventMarker((String("Prefilter Light Probe Level ") + String(l)).Buffer(), 0);
                 cmdBuffer->SetViewport(Viewport(0, 0, resolution >> l, resolution >> l));
 				cmdBuffer->BindPipeline(prefilterPipeline.Ptr());
 				cmdBuffer->BindDescriptorSet(0, prefilterDescSet.Ptr());

@@ -340,7 +340,7 @@ namespace GameEngine
 
 		if (stats.Divisor == 0)
 			stats.StartTime = thisRenderingTime;
-
+        
 		for (auto & f : syncFences[frameCounter % DynamicBufferLengthMultiplier])
 		{
 			f->Wait();

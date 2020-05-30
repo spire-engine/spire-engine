@@ -69,7 +69,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn, uint vertexIndex : SV_VertexID)
     
     float3 displacement = gMaterial.getDisplacement(worldPos, vattribs, gView);
     rs.worldPos_binormalSign = float4(worldPos.vertPos + displacement, worldPos.tangentFrame.binormalSign);
-    rs.projPos = mul(gView.viewProjectionTransform, float4(rs.worldPos_binormalSign.xyz, 1.0));
+    rs.projPos = PlatformNDC(mul(gView.viewProjectionTransform, float4(rs.worldPos_binormalSign.xyz, 1.0)));
     return rs;
 }
 

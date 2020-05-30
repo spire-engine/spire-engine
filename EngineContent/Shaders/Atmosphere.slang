@@ -471,7 +471,7 @@ VertexOut vs_main(VertexIn vin)
 {
     VertexOut rs;
     rs.vertPos = float4(vin.vertPos, 0.0, 1.0);
-    rs.vertUV = vin.vertUV;
+    rs.vertUV = ProjCoordToUV(vin.vertUV);
     return rs;
 }
 
@@ -480,8 +480,9 @@ float4 ps_main(VertexOut vin) : SV_Target0
     float atmosphericFogScale = atmosphere.atmosphereParams.x;
     float4 result;
     float z = atmosphere.depthTex.Sample(atmosphere.nearestSampler, vin.vertUV).r;
-    float x = vin.vertUV.x * 2 - 1;
-    float y = vin.vertUV.y * 2 - 1;
+    float2 viewspaceVert = ProjCoordToUV(vin.vertUV);
+    float x = viewspaceVert.x * 2 - 1;
+    float y = viewspaceVert.y * 2 - 1;
     float4 position = mul(viewParams.invViewProjTransform, float4(x, y, z, 1.0f));
 
     float3 pos = position.xyz / position.w;

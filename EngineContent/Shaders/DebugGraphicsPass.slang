@@ -47,7 +47,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
 {
 	VSOutput rs;
     rs.color = vertexIn.getColorSet().getColor(0);
-    rs.projPos = mul(gView.viewProjectionTransform, float4(vertexIn.getPos(), 1.0));
+    rs.projPos = PlatformNDC(mul(gView.viewProjectionTransform, float4(vertexIn.getPos(), 1.0)));
     return rs;
 }
 

@@ -827,6 +827,7 @@ namespace GameEngine
 	public:
 		virtual void BeginRecording(FrameBuffer* frameBuffer) = 0;
 		virtual void EndRecording() = 0;
+        virtual void SetEventMarker(const char* name, uint32_t colorARGB) = 0;
         virtual void SetViewport(Viewport viewport) = 0;
 		virtual void BindVertexBuffer(Buffer* vertexBuffer, int byteOffset) = 0;
 		virtual void BindIndexBuffer(Buffer* indexBuffer, int byteOffset) = 0;
@@ -866,6 +867,13 @@ namespace GameEngine
 		MemoryAndImage
 	};
 
+	enum class SourceFlipMode
+    {
+		None,
+		Flip,
+		ForPresent
+    };
+
 	class HardwareRenderer : public CoreLib::RefObject
 	{
 	public:
@@ -878,9 +886,9 @@ namespace GameEngine
         virtual void QueueComputeTask(Pipeline* computePipeline, DescriptorSet* descriptorSet, int x, int y, int z, PipelineBarriers barriers = PipelineBarriers::MemoryAndImage) = 0;
         virtual void EndJobSubmission(GameEngine::Fence* fence) = 0;
 		virtual void Present(WindowSurface * surface, Texture2D* srcImage) = 0;
-		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, VectorMath::Vec2i destOffset, bool flipSrc) = 0;
+		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, VectorMath::Vec2i destOffset, SourceFlipMode flipSrc) = 0;
 		virtual void Wait() = 0;
-		virtual void SetMaxTempBufferVersions(int versionCount) = 0;
+		virtual void Init(int versionCount) = 0;
 		virtual void ResetTempBufferVersion(int version) = 0;
 		virtual Fence* CreateFence() = 0;
 		virtual Buffer* CreateBuffer(BufferUsage usage, int sizeInBytes, const BufferStructureInfo* structInfo = nullptr) = 0;

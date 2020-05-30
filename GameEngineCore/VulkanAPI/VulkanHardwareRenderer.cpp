@@ -586,7 +586,7 @@ namespace VK
 			return State().device;
 		}
 
-		static void SetMaxTempBufferVersions(int versionCount)
+		static void Init(int versionCount)
 		{
 			auto & state = State();
             for (int i = 0; i < MaxThreadCount; i++)
@@ -3723,6 +3723,10 @@ namespace VK
 			descSets.Clear();
 		}
 
+		virtual void SetEventMarker(const char * /*name*/, uint32_t /*color*/) override
+        {
+        }
+
 		virtual void BeginRecording(GameEngine::FrameBuffer *frameBuffer) override
 		{
             vk::RenderPass renderPass;
@@ -4351,9 +4355,9 @@ namespace VK
         {
             renderThreadId = threadId;
         }
-		virtual void SetMaxTempBufferVersions(int versionCount) override
+		virtual void Init(int versionCount) override
 		{
-			RendererState::SetMaxTempBufferVersions(versionCount);
+			RendererState::Init(versionCount);
 		}
 		virtual void ResetTempBufferVersion(int version) override
 		{
@@ -4517,7 +4521,8 @@ namespace VK
 		{
 			RendererState::Device().waitIdle();
 		}
-		virtual void Blit(GameEngine::Texture2D* dstImage, GameEngine::Texture2D* srcImage, VectorMath::Vec2i dstOffset, bool flipSrc) override
+        virtual void Blit(GameEngine::Texture2D *dstImage, GameEngine::Texture2D *srcImage, VectorMath::Vec2i dstOffset,
+            SourceFlipMode flipSrc) override
 		{
             auto primaryBuffer = jobSubmissionBuffers[renderThreadId];
 
@@ -4574,7 +4579,7 @@ namespace VK
 			dynamic_cast<VK::Texture2D*>(dstImage)->GetSize(destWidth, destHeight);
 
 			std::array<vk::Offset3D, 2> srcOffsets;
-			if (flipSrc)
+			if (flipSrc != SourceFlipMode::None)
 			{
 				srcOffsets[0] = vk::Offset3D(0, srcHeight, 0);
 				srcOffsets[1] = vk::Offset3D(srcWidth, 0, 1);
