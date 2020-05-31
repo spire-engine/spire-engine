@@ -19,6 +19,7 @@
 
 #ifdef __linux__
 #undef Always
+#undef None
 #endif
 
 using namespace GameEngine;

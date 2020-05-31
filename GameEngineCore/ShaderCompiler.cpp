@@ -385,24 +385,23 @@ namespace GameEngine
                         set.BindingPoint = src.BindingLayouts.Count();
                         set.Name = paramName;
                         auto resType = layout->getElementVarLayout()->getTypeLayout();
-                        auto reslayout = layout->getElementVarLayout();
-                        int slotOffset = (int)reslayout->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
-                        bool hasUniform = false;
+                        bool hasUniform = resType->getSize(slang::Uniform) != 0;
+                        int slotOffset = hasUniform ? 1 : 0;
+                        if (hasUniform)
+                        {
+                            DescriptorLayout desc;
+                            desc.Location = 0;
+                            desc.Type = BindingType::UniformBuffer;
+                            desc.Stages = stageFlags;
+                            desc.Name = set.Name + "_uniforms";
+                            set.Descriptors.Add(desc);
+                            CORELIB_ASSERT(slotOffset != 0);
+                        }
                         for (auto f = 0u; f < resType->getFieldCount(); f++)
                         {
                             auto field = resType->getFieldByIndex(f);
                             if (field->getCategory() == slang::Uniform || field->getType()->getKind() == slang::TypeReflection::Kind::Struct)
                             {
-                                if (!hasUniform)
-                                {
-                                    DescriptorLayout desc;
-                                    desc.Location = 0;
-                                    desc.Type = BindingType::UniformBuffer;
-                                    desc.Stages = stageFlags;
-                                    desc.Name = field->getName();
-                                    set.Descriptors.Add(desc);
-                                    hasUniform = true;
-                                }
                                 continue;
                             }
                             DescriptorLayout desc;
@@ -519,7 +518,14 @@ namespace GameEngine
             }
             auto paramBlockLayout = shaderReflection->getTypeLayout(typeReflection)->getElementVarLayout();
             auto typeLayout = paramBlockLayout->getTypeLayout();
-            int offset = (int)paramBlockLayout->getOffset(slang::DescriptorTableSlot);
+            int descriptorSlotStart = 0;
+            sym->UniformBufferSize = (int)typeLayout->getSize();
+
+            // If we have any uniform (plain data) fields, all resources will start from descriptor slot 1.
+            if (sym->UniformBufferSize)
+            {
+                descriptorSlotStart = 1;
+            }
             for (uint32_t i = 0u; i < typeLayout->getFieldCount(); i++)
             {
                 ShaderVariableLayout varLayout;
@@ -533,6 +539,7 @@ namespace GameEngine
                     varLayout.BindingOffset = (int)field->getOffset();
                     varLayout.BindingLength = (int)field->getTypeLayout()->getSize();
                     varLayout.BindingSpace = 0;
+                    CORELIB_ASSERT(descriptorSlotStart != 0);
                 }
                 else
                 {
@@ -567,12 +574,11 @@ namespace GameEngine
                     default:
                         throw InvalidProgramException("Unknown binding type.");
                     }
-                    varLayout.BindingOffset = field->getBindingIndex() + offset;
+                    varLayout.BindingOffset = field->getBindingIndex() + descriptorSlotStart;
                     varLayout.BindingSpace = field->getBindingSpace();
                 }
                 sym->VarLayouts.Add(varLayout.Name, varLayout);
             }
-            sym->UniformBufferSize = (int)typeLayout->getSize();
             unsigned int attribCount = typeLayout->getType()->getUserAttributeCount();
             for (unsigned int i = 0; i < attribCount; i++)
             {

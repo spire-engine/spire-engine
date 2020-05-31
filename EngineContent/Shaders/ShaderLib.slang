@@ -35,9 +35,11 @@ float4 QuaternionConjugate(float4 q)
     return float4(-q.x, -q.y, -q.z, q.w);    
 }
 
-float3 QuaternionRotate(float4 q, float3 pos)
+float3 QuaternionRotate(float4 q, float3 v)
 {
-    return QuaternionMul(QuaternionMul(q, float4(pos, 0.0)), QuaternionConjugate(q)).xyz;
+    float3 u = q.xyz;
+    float s = q.w;
+    return 2.0 * dot(u, v) * u + (s*s - dot(u, u)) * v + 2.0 * s * cross(u, v);
 }
 
 float ComputeLuminance(float3 color)
@@ -664,7 +666,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
                     {
                         float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
                         float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler,
-                            float3(lightSpacePos.xy, shadowMapId), lightSpacePos.z);
+                            float3(ProjCoordToUV(lightSpacePos.xy), shadowMapId), lightSpacePos.z);
                         shadow *= val;
                     }
                     else

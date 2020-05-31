@@ -44,7 +44,7 @@ ParameterBlock<SPECIALIZATION_TYPE_2> gWorldTransform;
 struct VSOutput
 {
 	float4 projPos : SV_POSITION;
-    float2 uv;
+    float2 uv : TEXCOORD;
 };
 
 VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
@@ -63,7 +63,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
     return rs;
 }
 
-float4 ps_main(VSOutput vsOut)
+float4 ps_main(VSOutput vsOut) : SV_Target
 {
     uint lightmapId = gWorldTransform.getLightmapId();
     if (lightmapId == 0xFFFFFFFF)

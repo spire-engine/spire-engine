@@ -407,6 +407,8 @@ class RendererState
 public:
     ID3D12Device *device = nullptr;
     ID3D12CommandQueue *queue = nullptr;
+    ID3D12CommandQueue *transferQueue = nullptr;
+
     DescriptorHeap resourceDescHeap, rtvDescHeap, dsvDescHeap, samplerDescHeap;
     IDXGIFactory4 *dxgiFactory = nullptr;
     LibPIX pix;
@@ -417,7 +419,9 @@ public:
     std::mutex stagingBufferMutex;
     CoreLib::List<CoreLib::List<ID3D12GraphicsCommandList *>> tempCommandLists;
     CoreLib::List<long> tempCommandListAllocPtr;
-    CommandAllocatorManager tempCommandAllocatorManager;
+    CoreLib::List<CoreLib::List<ID3D12GraphicsCommandList *>> copyCommandLists;
+    CoreLib::List<long> copyCommandListAllocPtr;
+    CommandAllocatorManager tempCommandAllocatorManager, copyCommandAllocatorManager;
     ID3D12CommandAllocator *largeCopyCmdListAllocator;
     std::mutex tempCommandListMutex, largeCopyCmdListMutex;
 
@@ -431,33 +435,40 @@ public:
     PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE serializeVersionedRootSignature = nullptr;
     PFN_D3DCOMPILE d3dCompile = nullptr;
 
-    D3DCommandList GetCommandList(CommandAllocatorManager *commandAllocatorManager)
+    D3DCommandList GetCommandList(CommandAllocatorManager *commandAllocatorManager,
+        CoreLib::List<CoreLib::List<ID3D12GraphicsCommandList *>> &commandLists,
+        CoreLib::List<long> &commandListAllocPtrs)
     {
         long cmdListId = 0;
         auto cmdAllocator = commandAllocatorManager->GetAvailableAllocator(device, version);
         {
             std::lock_guard<std::mutex> lock(tempCommandListMutex);
-            auto &allocPtr = tempCommandListAllocPtr[version];
-            if (allocPtr == tempCommandLists[version].Count())
+            auto &allocPtr = commandListAllocPtrs[version];
+            if (allocPtr == commandLists[version].Count())
             {
                 ID3D12GraphicsCommandList *commandList;
                 CHECK_DX(device->CreateCommandList(0, commandAllocatorManager->commandListType, cmdAllocator->allocator,
                     nullptr, IID_PPV_ARGS(&commandList)));
                 commandList->Close();
-                tempCommandLists[version].Add(commandList);
+                commandLists[version].Add(commandList);
             }
             cmdListId = allocPtr;
             allocPtr++;
         }
-        auto cmdList = tempCommandLists[version][cmdListId];
+        auto cmdList = commandLists[version][cmdListId];
         cmdList->Reset(cmdAllocator->allocator, nullptr);
         cmdAllocator->inUse = true;
         return D3DCommandList{cmdList, cmdAllocator};
     }
 
+    D3DCommandList GetCopyCommandList()
+    {
+        return GetCommandList(&copyCommandAllocatorManager, copyCommandLists, copyCommandListAllocPtr);
+    }
+
     D3DCommandList GetTempCommandList()
     {
-        return GetCommandList(&tempCommandAllocatorManager);
+        return GetCommandList(&tempCommandAllocatorManager, tempCommandLists, tempCommandListAllocPtr);
     }
 
     ID3D12Resource *CreateBufferResource(size_t sizeInBytes, D3D12_HEAP_TYPE heapType,
@@ -507,6 +518,10 @@ public:
         CHECK_DX(queue->Signal(waitFences[renderThreadId], value));
         CHECK_DX(waitFences[renderThreadId]->SetEventOnCompletion(value, waitEvents[renderThreadId]));
         WaitForSingleObject(waitEvents[renderThreadId], INFINITE);
+        value = InterlockedIncrement(&waitFenceValue);
+        CHECK_DX(transferQueue->Signal(waitFences[renderThreadId], value));
+        CHECK_DX(waitFences[renderThreadId]->SetEventOnCompletion(value, waitEvents[renderThreadId]));
+        WaitForSingleObject(waitEvents[renderThreadId], INFINITE);
     }
     static void Free()
     {
@@ -526,20 +541,30 @@ public:
         for (auto &cmdLists : state.tempCommandLists)
             for (auto cmdList : cmdLists)
                 cmdList->Release();
+        for (auto &cmdLists : state.copyCommandLists)
+            for (auto cmdList : cmdLists)
+                cmdList->Release();
         state.tempCommandAllocatorManager.Free();
+        state.copyCommandAllocatorManager.Free();
         state.largeCopyCmdListAllocator->Release();
         for (auto stagingBuffer : state.stagingBuffers)
             stagingBuffer->Release();
         if (state.queue)
             state.queue->Release();
+        if (state.transferQueue)
+            state.transferQueue->Release();
         if (state.dxgiFactory)
             state.dxgiFactory->Release();
         if (state.device)
             state.device->Release();
         state.tempCommandListAllocPtr = decltype(state.tempCommandListAllocPtr)();
+        state.copyCommandListAllocPtr = decltype(state.copyCommandListAllocPtr)();
+        state.copyCommandAllocatorManager = decltype(state.copyCommandAllocatorManager)();
+        state.tempCommandAllocatorManager = decltype(state.tempCommandAllocatorManager)();
         state.stagingBuffers = decltype(state.stagingBuffers)();
         state.stagingBufferAllocPtr = decltype(state.stagingBufferAllocPtr)();
         state.tempCommandLists = decltype(state.tempCommandLists)();
+        state.copyCommandLists = decltype(state.copyCommandLists)();
         state.cacheLocation = CoreLib::String();
         state.deviceName = CoreLib::String();
     }
@@ -550,16 +575,82 @@ public:
     }
 };
 
+class D3DResource
+{
+public:
+    List<D3D12_RESOURCE_STATES> subresourceStates;
+    ID3D12Resource *resource = nullptr;
+
+    void TransferState(int subresourceId, D3D12_RESOURCE_STATES targetState, List<D3D12_RESOURCE_BARRIER> &barriers)
+    {
+        if (subresourceId == -1)
+        {
+            bool subresourceStatesConsistent = true;
+            for (int i = 1; i < subresourceStates.Count(); i++)
+            {
+                if (subresourceStates[i] != subresourceStates[0])
+                {
+                    subresourceStatesConsistent = false;
+                    break;
+                }
+            }
+            if (subresourceStatesConsistent && subresourceStates[0] != targetState)
+            {
+                D3D12_RESOURCE_BARRIER barrier = {};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Transition.pResource = resource;
+                barrier.Transition.StateBefore = subresourceStates[0];
+                barrier.Transition.StateAfter = targetState;
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                barriers.Add(barrier);
+                for (int i = 0; i < subresourceStates.Count(); i++)
+                    subresourceStates[i] = targetState;
+            }
+            else
+            {
+                for (int i = 0; i < subresourceStates.Count(); i++)
+                {
+                    if (subresourceStates[i] != targetState)
+                    {
+                        D3D12_RESOURCE_BARRIER barrier = {};
+                        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                        barrier.Transition.pResource = resource;
+                        barrier.Transition.StateBefore = subresourceStates[i];
+                        barrier.Transition.StateAfter = targetState;
+                        barrier.Transition.Subresource = i;
+                        barriers.Add(barrier);
+                        subresourceStates[i] = targetState;
+                    }
+                }
+            }
+            return;
+        }
+        if (subresourceStates[subresourceId] != targetState)
+        {
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = resource;
+            barrier.Transition.StateBefore = subresourceStates[subresourceId];
+            barrier.Transition.StateAfter = targetState;
+            barrier.Transition.Subresource = subresourceId;
+            barriers.Add(barrier);
+            subresourceStates[subresourceId] = targetState;
+        }
+    }
+};
+
+
 class Buffer : public GameEngine::Buffer
 {
 public:
+    D3DResource buffer;
     BufferStructureInfo structInfo = {};
     int bufferSize;
-    ID3D12Resource *resource;
     bool isMappable = false;
     int mappedStart = -1;
     int mappedEnd = -1;
     BufferUsage usage;
+    List<D3D12_RESOURCE_BARRIER> resourceBarriers;
 
 public:
     Buffer(BufferUsage usage, int sizeInBytes, bool mappable, const BufferStructureInfo *pStructInfo)
@@ -568,9 +659,12 @@ public:
         this->usage = usage;
         this->isMappable = mappable;
         bufferSize = Align(sizeInBytes, D3DConstantBufferAlignment);
-        resource = state.CreateBufferResource(bufferSize, mappable ? D3D12_HEAP_TYPE_CUSTOM : D3D12_HEAP_TYPE_DEFAULT,
+        buffer.resource =
+            state.CreateBufferResource(bufferSize, mappable ? D3D12_HEAP_TYPE_CUSTOM : D3D12_HEAP_TYPE_DEFAULT,
             mappable ? D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE : D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
             usage == BufferUsage::StorageBuffer);
+        buffer.subresourceStates.SetSize(1);
+        buffer.subresourceStates[0] = D3D12_RESOURCE_STATE_COMMON;
 
         CORELIB_ASSERT(usage != BufferUsage::StorageBuffer || pStructInfo != nullptr);
         if (pStructInfo != nullptr)
@@ -580,7 +674,7 @@ public:
     }
     ~Buffer()
     {
-        resource->Release();
+        buffer.resource->Release();
     }
 
     // SetDataImpl: returns true if succeeded without GPU synchronization.
@@ -589,18 +683,19 @@ public:
         auto &state = RendererState::Get();
         if (size == 0)
             return true;
-        #if 0
         if (isMappable)
         {
             D3D12_RANGE range;
             range.Begin = (SIZE_T)offset;
             range.End = (SIZE_T)(size + offset);
             void *mappedPtr = nullptr;
-            CHECK_DX(resource->Map(0, &range, &mappedPtr));
-            memcpy(mappedPtr, data, size);
-            resource->Unmap(0, &range);
+            CHECK_DX(buffer.resource->Map(0, &range, &mappedPtr));
+            memcpy((char*)mappedPtr + offset, data, size);
+            buffer.resource->Unmap(0, &range);
+            buffer.subresourceStates[0] = D3D12_RESOURCE_STATE_COPY_DEST;
             return true;
         }
+        
         if (size < SharedStagingBufferDataSizeThreshold)
         {
             // Use shared staging buffer for async upload
@@ -615,29 +710,22 @@ public:
                 range.End = (SIZE_T)(size + stagingOffset);
                 void *mappedStagingPtr = nullptr;
                 CHECK_DX(state.stagingBuffers[state.version]->Map(0, &range, &mappedStagingPtr));
-                memcpy(mappedStagingPtr, data, size);
+                memcpy((char*)mappedStagingPtr + stagingOffset, data, size);
                 state.stagingBuffers[state.version]->Unmap(0, &range);
                 // Submit a copy command to GPU.
-                auto copyCommandList = state.GetTempCommandList();
-                D3D12_RESOURCE_BARRIER barrier = {};
-                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = resource;
-                barrier.Transition.Subresource = 0;
-                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-                copyCommandList->ResourceBarrier(1, &barrier);
+                auto copyCommandList = state.GetCopyCommandList();
+                resourceBarriers.Clear();
+                buffer.TransferState(0, D3D12_RESOURCE_STATE_COPY_DEST, resourceBarriers);
+                if (resourceBarriers.Count())
+                    copyCommandList->ResourceBarrier(resourceBarriers.Count(), resourceBarriers.Buffer());
                 copyCommandList->CopyBufferRegion(
-                    resource, offset, state.stagingBuffers[state.version], stagingOffset, size);
-                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
-                copyCommandList->ResourceBarrier(1, &barrier);
+                    buffer.resource, offset, state.stagingBuffers[state.version], stagingOffset, size);
                 CHECK_DX(copyCommandList.Close());
                 ID3D12CommandList *cmdList = copyCommandList.list;
-                state.queue->ExecuteCommandLists(1, &cmdList);
+                state.transferQueue->ExecuteCommandLists(1, &cmdList);
                 return true;
             }
         }
-        #endif
         // Data is too large to use the shared staging buffer, or the staging buffer
         // is already full.
         // Create a dedicated staging buffer and perform uploading right here.
@@ -657,15 +745,13 @@ public:
             0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.largeCopyCmdListAllocator, nullptr, IID_PPV_ARGS(&copyCmdList)));
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = resource;
+        barrier.Transition.pResource = buffer.resource;
         barrier.Transition.Subresource = 0;
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
         copyCmdList->ResourceBarrier(1, &barrier);
-        copyCmdList->CopyBufferRegion(resource, offset, stagingResource, 0, size);
-        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
-        copyCmdList->ResourceBarrier(1, &barrier);
+        copyCmdList->CopyBufferRegion(buffer.resource, offset, stagingResource, 0, size);
+        buffer.subresourceStates[0] = D3D12_RESOURCE_STATE_COPY_DEST;
         ID3D12CommandList *cmdList = copyCmdList;
         CHECK_DX(copyCmdList->Close());
         state.queue->ExecuteCommandLists(1, &cmdList);
@@ -688,7 +774,7 @@ public:
     {
         SetData(0, data, size);
     }
-    virtual void GetData(void *buffer, int offset, int size) override
+    virtual void GetData(void *resultBuffer, int offset, int size) override
     {
         auto &state = RendererState::Get();
         if (size == 0)
@@ -699,7 +785,7 @@ public:
         ID3D12GraphicsCommandList *copyCmdList;
         CHECK_DX(state.device->CreateCommandList(
             0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.largeCopyCmdListAllocator, nullptr, IID_PPV_ARGS(&copyCmdList)));
-        copyCmdList->CopyBufferRegion(stagingResource, 0, resource, offset, size);
+        copyCmdList->CopyBufferRegion(stagingResource, 0, buffer.resource, offset, size);
         CHECK_DX(copyCmdList->Close());
         ID3D12CommandList *cmdList = copyCmdList;
         state.queue->ExecuteCommandLists(1, &cmdList);
@@ -711,7 +797,7 @@ public:
         mapRange.End = size;
         void *stagingBufferPtr;
         CHECK_DX(stagingResource->Map(0, &mapRange, &stagingBufferPtr));
-        memcpy(buffer, stagingBufferPtr, size);
+        memcpy(resultBuffer, stagingBufferPtr, size);
         mapRange.End = 0;
         stagingResource->Unmap(0, &mapRange);
         stagingResource->Release();
@@ -728,7 +814,7 @@ public:
         range.Begin = (SIZE_T)offset;
         range.End = (SIZE_T)size;
         void *mappedPtr = nullptr;
-        CHECK_DX(resource->Map(0, &range, &mappedPtr));
+        CHECK_DX(buffer.resource->Map(0, &range, &mappedPtr));
         mappedStart = offset;
         mappedEnd = offset + size;
         return mappedPtr;
@@ -745,8 +831,8 @@ public:
         range.Begin = (SIZE_T)offset;
         range.End = (SIZE_T)size;
         void *mappedPtr = nullptr;
-        CHECK_DX(resource->Map(0, &range, &mappedPtr));
-        resource->Unmap(0, &range);
+        CHECK_DX(buffer.resource->Map(0, &range, &mappedPtr));
+        buffer.resource->Unmap(0, &range);
     }
     virtual void Flush() override
     {
@@ -758,7 +844,7 @@ public:
         D3D12_RANGE range;
         range.Begin = (SIZE_T)mappedStart;
         range.End = (SIZE_T)mappedEnd;
-        resource->Unmap(0, &range);
+        buffer.resource->Unmap(0, &range);
     }
 };
 
@@ -934,7 +1020,7 @@ public:
     }
 };
 
-class D3DTexture
+class D3DTexture : public D3DResource
 {
 public:
     struct TextureProperties
@@ -950,9 +1036,8 @@ public:
         int mipLevels = 0;
         int arraySize = 0;
     };
-    List<D3D12_RESOURCE_STATES> subresourceStates;
+    
     TextureProperties properties;
-    ID3D12Resource *resource = nullptr;
 
     D3DTexture()
     {
@@ -1020,63 +1105,6 @@ public:
         default:
             return D3D12_RESOURCE_STATE_GENERIC_READ;
             break;
-        }
-    }
-
-    void TransferState(int subresourceId, D3D12_RESOURCE_STATES targetState, List<D3D12_RESOURCE_BARRIER> &barriers)
-    {
-        if (subresourceId == -1)
-        {
-            bool subresourceStatesConsistent = true;
-            for (int i = 1; i < subresourceStates.Count(); i++)
-            {
-                if (subresourceStates[i] != subresourceStates[0])
-                {
-                    subresourceStatesConsistent = false;
-                    break;
-                }
-            }
-            if (subresourceStatesConsistent && subresourceStates[0] != targetState)
-            {
-                D3D12_RESOURCE_BARRIER barrier = {};
-                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = resource;
-                barrier.Transition.StateBefore = subresourceStates[0];
-                barrier.Transition.StateAfter = targetState;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                barriers.Add(barrier);
-                for (int i = 0; i < subresourceStates.Count(); i++)
-                    subresourceStates[i] = targetState;
-            }
-            else
-            {
-                for (int i = 0; i < subresourceStates.Count(); i++)
-                {
-                    if (subresourceStates[i] != targetState)
-                    {
-                        D3D12_RESOURCE_BARRIER barrier = {};
-                        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                        barrier.Transition.pResource = resource;
-                        barrier.Transition.StateBefore = subresourceStates[i];
-                        barrier.Transition.StateAfter = targetState;
-                        barrier.Transition.Subresource = i;
-                        barriers.Add(barrier);
-                        subresourceStates[i] = targetState;
-                    }
-                }
-            }
-            return;
-        }
-        if (subresourceStates[subresourceId] != targetState)
-        {
-            D3D12_RESOURCE_BARRIER barrier = {};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = resource;
-            barrier.Transition.StateBefore = subresourceStates[subresourceId];
-            barrier.Transition.StateAfter = targetState;
-            barrier.Transition.Subresource = subresourceId;
-            barriers.Add(barrier);
-            subresourceStates[subresourceId] = targetState;
         }
     }
 
@@ -1292,6 +1320,11 @@ public:
         D3D12_RESOURCE_STATES initialState)
     {
         bool isDepth = ((int)usage & (int)TextureUsage::DepthAttachment) != 0;
+        if ((int)format >= (int)StorageFormat::RGBA_Compressed)
+        {
+            width = ((width + 3) >> 2) << 2;
+            height = ((height + 3) >> 2) << 2;
+        }
         properties.width = width;
         properties.height = height;
         properties.depth = depth;
@@ -1319,7 +1352,7 @@ public:
             D3D12_SRV_DIMENSION_TEXTURE2D, D3D12_RESOURCE_STATE_COPY_DEST);
 
         // Copy data
-        SetData(0, 0, 0, 0, 0, width, height, 1, inputType, data, TextureUsageToInitialState(usage));
+        SetData(0, 0, 0, 0, 0, properties.width, properties.height, 1, inputType, data, TextureUsageToInitialState(usage));
 
         // Build mipmaps
         BuildMipmaps();
@@ -1562,13 +1595,13 @@ class TextureSampler : public GameEngine::TextureSampler
 {
 public:
     TextureFilter textureFilter = TextureFilter::Linear;
-    WrapMode wrapMode = WrapMode::Clamp;
+    WrapMode wrapMode = WrapMode::Repeat;
     CompareFunc compareFunc = CompareFunc::Disabled;
     D3D12_SAMPLER_DESC desc = {};
     TextureSampler()
     {
         desc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-        desc.AddressU = desc.AddressV = desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        desc.AddressU = desc.AddressV = desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         desc.MipLODBias = 0.0f;
         desc.MinLOD = 0;
         desc.MaxLOD = 25;
@@ -1722,30 +1755,44 @@ public:
     }
 };
 
-class Fence : public GameEngine::Fence
+struct SingleQueueFence
 {
-public:
     ID3D12Fence *fence = nullptr;
     HANDLE waitEvent;
-    Fence()
+    SingleQueueFence()
     {
         CHECK_DX(RendererState::Get().device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
         waitEvent = CreateEventW(nullptr, 1, 0, nullptr);
     }
-    ~Fence()
+    ~SingleQueueFence()
     {
         fence->Release();
         CloseHandle(waitEvent);
     }
-
-public:
-    virtual void Reset() override
+    void Reset()
     {
         ResetEvent(waitEvent);
     }
-    virtual void Wait() override
+    void Wait()
     {
         WaitForSingleObject(waitEvent, INFINITE);
+    }
+};
+
+class Fence : public GameEngine::Fence
+{
+public:
+    SingleQueueFence direct, copy;
+public:
+    virtual void Reset() override
+    {
+        direct.Reset();
+        copy.Reset();
+    }
+    virtual void Wait() override
+    {
+        HANDLE events[2] = {direct.waitEvent, copy.waitEvent};
+        WaitForMultipleObjects(2, events, TRUE, INFINITE);
     }
 };
 
@@ -1883,7 +1930,7 @@ struct DescriptorNode
 
 struct ResourceUse
 {
-    D3DTexture *texture;
+    D3DResource *resource;
     int subresourceId;
     D3D12_RESOURCE_STATES targetState;
 };
@@ -2017,14 +2064,19 @@ public:
     }
     virtual void Update(int location, GameEngine::Texture *texture, TextureAspect aspect) override
     {
-        ResourceUse resourceUse;
-        resourceUse.subresourceId = -1;
-        resourceUse.targetState =
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        resourceUse.texture = static_cast<D3DTexture *>(texture->GetInternalPtr());
-        resourceUses[location].Clear();
-        resourceUses[location].Add(resourceUse);
         CreateDescriptorFromTexture(texture, aspect, descriptors[location].address.cpuHandle);
+        resourceUses[location].Clear();
+
+        auto d3dtexture = static_cast<D3DTexture *>(texture->GetInternalPtr());
+        if (d3dtexture->properties.usage != TextureUsage::Sampled)
+        {
+            ResourceUse resourceUse;
+            resourceUse.subresourceId = -1;
+            resourceUse.resource = d3dtexture;
+            resourceUse.targetState =
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            resourceUses[location].Add(resourceUse);
+        }
     }
     virtual void Update(int location, CoreLib::ArrayView<GameEngine::Texture *> textures, TextureAspect aspect) override
     {
@@ -2034,12 +2086,16 @@ public:
         {
             auto descAddr = descriptors[location].address.cpuHandle;
             descAddr.ptr += state.resourceDescHeap.handleIncrementSize * i;
-            ResourceUse resourceUse;
-            resourceUse.subresourceId = -1;
-            resourceUse.targetState =
-                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            resourceUse.texture = static_cast<D3DTexture *>(textures[i]->GetInternalPtr());
-            resourceUses[location].Add(resourceUse);
+            auto d3dtexture = static_cast<D3DTexture *>(textures[i]->GetInternalPtr());
+            if (d3dtexture->properties.usage != TextureUsage::Sampled)
+            {
+                ResourceUse resourceUse;
+                resourceUse.subresourceId = -1;
+                resourceUse.targetState =
+                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+                resourceUse.resource = d3dtexture;
+                resourceUses[location].Add(resourceUse);
+            }
             CreateDescriptorFromTexture(textures[i], aspect, descAddr);
         }
     }
@@ -2055,7 +2111,7 @@ public:
             ResourceUse resourceUse;
             resourceUse.subresourceId = -1;
             resourceUse.targetState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            resourceUse.texture = static_cast<D3DTexture *>(textures[i]->GetInternalPtr());
+            resourceUse.resource = static_cast<D3DTexture *>(textures[i]->GetInternalPtr());
             resourceUses[location].Add(resourceUse);
             UINT planeSlice = 0;
             if (aspect == TextureAspect::Stencil && d3dTexture->properties.format == StorageFormat::Depth24Stencil8)
@@ -2083,6 +2139,7 @@ public:
         if (length == -1)
             length = d3dbuffer->bufferSize;
         auto bindingType = descriptors[location].layout.Type;
+        resourceUses[location].Clear();
         if (bindingType == BindingType::RWStorageBuffer)
         {
             CORELIB_ASSERT(
@@ -2096,14 +2153,23 @@ public:
             desc.Buffer.NumElements = d3dbuffer->structInfo.NumElements;
             desc.Buffer.CounterOffsetInBytes = 0;
             state.device->CreateUnorderedAccessView(
-                d3dbuffer->resource, nullptr, &desc, descriptors[location].address.cpuHandle);
+                d3dbuffer->buffer.resource, nullptr, &desc, descriptors[location].address.cpuHandle);
+            ResourceUse resourceUse;
+            resourceUse.resource = &d3dbuffer->buffer;
+            resourceUse.subresourceId = 0;
+            resourceUse.targetState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            resourceUses[location].Add(resourceUse);
         }
         else if (bindingType == BindingType::UniformBuffer)
         {
             D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-            desc.BufferLocation = d3dbuffer->resource->GetGPUVirtualAddress() + offset;
+            desc.BufferLocation = d3dbuffer->buffer.resource->GetGPUVirtualAddress() + offset;
             desc.SizeInBytes = Align(length, D3DConstantBufferAlignment);
             state.device->CreateConstantBufferView(&desc, descriptors[location].address.cpuHandle);
+            ResourceUse resourceUse;
+            resourceUse.resource = &d3dbuffer->buffer;
+            resourceUse.subresourceId = 0;
+            resourceUse.targetState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
         }
         else if (bindingType == BindingType::StorageBuffer)
         {
@@ -2115,7 +2181,12 @@ public:
             desc.Buffer.FirstElement = offset / d3dbuffer->structInfo.StructureStride;
             desc.Buffer.StructureByteStride = d3dbuffer->structInfo.StructureStride;
             desc.Buffer.NumElements = d3dbuffer->structInfo.NumElements;
-            state.device->CreateShaderResourceView(d3dbuffer->resource, &desc, descriptors[location].address.cpuHandle);
+            state.device->CreateShaderResourceView(d3dbuffer->buffer.resource, &desc, descriptors[location].address.cpuHandle);
+            ResourceUse resourceUse;
+            resourceUse.resource = &d3dbuffer->buffer;
+            resourceUse.subresourceId = 0;
+            resourceUse.targetState =
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         }
         else
         {
@@ -2438,8 +2509,9 @@ public:
         desc.RasterizerState.FrontCounterClockwise = 1;
         desc.RasterizerState.CullMode = TranslateCullMode(FixedFunctionStates.cullMode);
         desc.RasterizerState.FillMode = TranslateFillMode(FixedFunctionStates.PolygonFillMode);
-        desc.RasterizerState.SlopeScaledDepthBias = FixedFunctionStates.PolygonOffsetFactor;
-        desc.RasterizerState.DepthBias = 0; //(int)FixedFunctionStates.PolygonOffsetUnits;
+        desc.RasterizerState.SlopeScaledDepthBias =
+            FixedFunctionStates.EnablePolygonOffset ? FixedFunctionStates.PolygonOffsetFactor : 0.0f;
+        desc.RasterizerState.DepthBias = FixedFunctionStates.EnablePolygonOffset ? (int)FixedFunctionStates.PolygonOffsetUnits : 0;
         desc.RasterizerState.DepthClipEnable = 0;
 
         desc.BlendState.AlphaToCoverageEnable = 0;
@@ -2527,6 +2599,10 @@ public:
 
     Pipeline* currentPipeline = nullptr;
     bool pipelineChanged = false, descBindingChanged = false;
+    bool vertexBufferChanged = false;
+
+    bool isEmpty = true;
+    List<ResourceUse> resourceUses;
 
 public:
     ID3D12GraphicsCommandList *commandList;
@@ -2551,19 +2627,7 @@ public:
             commandList->SetGraphicsRootSignature(currentPipeline->rootSignature);
             commandList->SetPipelineState(currentPipeline->pipelineState);
             commandList->OMSetStencilRef(currentPipeline->FixedFunctionStates.StencilReference);
-            Array<D3D12_VERTEX_BUFFER_VIEW, 16> vbView;
-            vbView.SetSize(currentPipeline->vertexFormat.Attributes.Count());
-            int vertexSize = currentPipeline->vertexFormat.Size();
-            for (int i = 0; i < currentPipeline->vertexFormat.Attributes.Count(); i++)
-            {
-                vbView[i].StrideInBytes = vertexSize;
-                vbView[i].SizeInBytes = vertexBuffer->bufferSize - vertexBufferOffset -
-                                        currentPipeline->vertexFormat.Attributes[i].StartOffset;
-                vbView[i].BufferLocation = vertexBuffer->resource->GetGPUVirtualAddress() + vertexBufferOffset +
-                                           currentPipeline->vertexFormat.Attributes[i].StartOffset;
-            }
-            commandList->IASetVertexBuffers(0, vbView.Count(), vbView.Buffer());
-            commandList->IASetPrimitiveTopology(TranslatePrimitiveTopology(currentPipeline->FixedFunctionStates.PrimitiveTopology));
+            vertexBufferChanged = true;
             descBindingChanged = true;
             pipelineChanged = false;
         }
@@ -2589,6 +2653,24 @@ public:
             }
             descBindingChanged = false;
         }
+        if (vertexBufferChanged)
+        {
+            vertexBufferChanged = false;
+            Array<D3D12_VERTEX_BUFFER_VIEW, 16> vbView;
+            vbView.SetSize(currentPipeline->vertexFormat.Attributes.Count());
+            int vertexSize = currentPipeline->vertexFormat.Size();
+            for (int i = 0; i < currentPipeline->vertexFormat.Attributes.Count(); i++)
+            {
+                vbView[i].StrideInBytes = vertexSize;
+                vbView[i].SizeInBytes = vertexBuffer->bufferSize - vertexBufferOffset -
+                                        currentPipeline->vertexFormat.Attributes[i].StartOffset;
+                vbView[i].BufferLocation = vertexBuffer->buffer.resource->GetGPUVirtualAddress() + vertexBufferOffset +
+                                           currentPipeline->vertexFormat.Attributes[i].StartOffset;
+            }
+            commandList->IASetVertexBuffers(0, vbView.Count(), vbView.Buffer());
+            commandList->IASetPrimitiveTopology(
+                TranslatePrimitiveTopology(currentPipeline->FixedFunctionStates.PrimitiveTopology));
+        }
     }
 public:
     Viewport viewport;
@@ -2606,9 +2688,12 @@ public:
         descSets.Clear();
         vertexBuffer = nullptr;
         vertexBufferOffset = 0;
+        vertexBufferChanged = false;
         descHeaps[0] = state.resourceDescHeap.heap;
         descHeaps[1] = state.samplerDescHeap.heap;
         commandList->SetDescriptorHeaps(2, descHeaps);
+        isEmpty = true;
+        resourceUses.Clear();
     }
 
     virtual void EndRecording() override
@@ -2631,15 +2716,26 @@ public:
     {
         vertexBuffer = reinterpret_cast<Buffer*>(buffer);
         vertexBufferOffset = byteOffset;
+        vertexBufferChanged = true;
+        ResourceUse resourceUse;
+        resourceUse.resource = &vertexBuffer->buffer;
+        resourceUse.subresourceId = 0;
+        resourceUse.targetState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+        resourceUses.Add(resourceUse);
     }
     virtual void BindIndexBuffer(GameEngine::Buffer * indexBuffer, int byteOffset) override
     {
         auto d3dbuffer = reinterpret_cast<Buffer *>(indexBuffer);
         D3D12_INDEX_BUFFER_VIEW view = {};
-        view.BufferLocation = d3dbuffer->resource->GetGPUVirtualAddress() + byteOffset;
+        view.BufferLocation = d3dbuffer->buffer.resource->GetGPUVirtualAddress() + byteOffset;
         view.Format = DXGI_FORMAT_R32_UINT;
         view.SizeInBytes = d3dbuffer->bufferSize - byteOffset;
         commandList->IASetIndexBuffer(&view);
+        ResourceUse resourceUse;
+        resourceUse.resource = &d3dbuffer->buffer;
+        resourceUse.subresourceId = 0;
+        resourceUse.targetState = D3D12_RESOURCE_STATE_INDEX_BUFFER;
+        resourceUses.Add(resourceUse);
     }
     virtual void BindPipeline(GameEngine::Pipeline * pipeline) override
     {
@@ -2657,28 +2753,45 @@ public:
     }
     virtual void Draw(int firstVertex, int vertexCount) override
     {
-        MaybeUpdatePipelineBindings();
-        commandList->DrawInstanced(vertexCount, 1, firstVertex, 0);
+        if (vertexCount)
+        {
+            MaybeUpdatePipelineBindings();
+            isEmpty = false;
+            commandList->DrawInstanced(vertexCount, 1, firstVertex, 0);
+        }
     }
     virtual void DrawInstanced(int numInstances, int firstVertex, int vertexCount) override
     {
-        MaybeUpdatePipelineBindings();
-        commandList->DrawInstanced(vertexCount, numInstances, firstVertex, 0);
+        if (vertexCount)
+        {
+            MaybeUpdatePipelineBindings();
+            commandList->DrawInstanced(vertexCount, numInstances, firstVertex, 0);
+            isEmpty = false;
+        }
     }
     virtual void DrawIndexed(int firstIndex, int indexCount) override
     {
-        MaybeUpdatePipelineBindings();
-        commandList->DrawIndexedInstanced(indexCount, 1, firstIndex, 0, 0);
+        if (indexCount)
+        {
+            MaybeUpdatePipelineBindings();
+            commandList->DrawIndexedInstanced(indexCount, 1, firstIndex, 0, 0);
+            isEmpty = false;
+        }
     }
     virtual void DrawIndexedInstanced(int numInstances, int firstIndex, int indexCount) override
     {
-        MaybeUpdatePipelineBindings();
-        commandList->DrawIndexedInstanced(indexCount, numInstances, firstIndex, 0, 0);
+        if (indexCount)
+        {
+            MaybeUpdatePipelineBindings();
+            commandList->DrawIndexedInstanced(indexCount, numInstances, firstIndex, 0, 0);
+            isEmpty = false;
+        }
     }
     virtual void DispatchCompute(int groupCountX, int groupCountY, int groupCountZ) override
     {
         MaybeUpdatePipelineBindings();
         commandList->Dispatch(groupCountX, groupCountY, groupCountZ);
+        isEmpty = false;
     }
 };
 
@@ -2753,7 +2866,7 @@ private:
     List<D3D12_RESOURCE_BARRIER> pendingBarriers[MaxRenderThreads];
     ID3D12PipelineState *blitPipeline;
     ID3D12RootSignature *blitRootSignature;
-    List<RefPtr<Fence>> presentFences;
+    List<RefPtr<SingleQueueFence>> presentFences;
     List<RefPtr<CommandBuffer>> presentCommandBuffers;
     const char *blitShaderSrc = R"(
     Texture2D inputTexture : register(t0);
@@ -2937,6 +3050,8 @@ public:
             D3D12_COMMAND_QUEUE_DESC queueDesc = {};
             queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
             CHECK_DX(state.device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&state.queue)));
+            queueDesc.Type = D3D12_COMMAND_LIST_TYPE_COPY;
+            CHECK_DX(state.device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&state.transferQueue)));
 
             // Create Copy command list allocator
             CHECK_DX(state.device->CreateCommandAllocator(
@@ -2973,6 +3088,7 @@ public:
         ID3D12DescriptorHeap *descHeaps[2] = {state.resourceDescHeap.heap, state.samplerDescHeap.heap};
         pendingCommands[renderThreadId]->SetDescriptorHeaps(2, descHeaps);
     }
+
     virtual void QueueRenderPass(GameEngine::FrameBuffer *frameBuffer, bool clearFrameBuffer,
         CoreLib::ArrayView<GameEngine::CommandBuffer *> commands, PipelineBarriers barriers) override
     {
@@ -2994,7 +3110,7 @@ public:
                     {
                         for (auto &resUse : useList)
                         {
-                            resUse.texture->TransferState(resUse.subresourceId, resUse.targetState, pendingBarrierList);
+                            resUse.resource->TransferState(resUse.subresourceId, resUse.targetState, pendingBarrierList);
                         }
                     }
                 }
@@ -3067,6 +3183,9 @@ public:
         Viewport currentViewport;
         for (auto cmd : commands)
         {
+            auto d3dcmd = reinterpret_cast<CommandBuffer *>(cmd);
+            if (d3dcmd->isEmpty)
+                continue;
             Viewport viewport = reinterpret_cast<CommandBuffer *>(cmd)->viewport;
             if (viewport != currentViewport)
             {
@@ -3086,7 +3205,7 @@ public:
                 scissorRect.bottom = (int)(viewport.y + viewport.h);
                 cmdList->RSSetScissorRects(1, &scissorRect);
             }
-            cmdList->ExecuteBundle(reinterpret_cast<CommandBuffer *>(cmd)->commandList);
+            cmdList->ExecuteBundle(d3dcmd->commandList);
         }
     }
 
@@ -3121,7 +3240,7 @@ public:
             {
                 for (auto &resUse : useList)
                 {
-                    resUse.texture->TransferState(resUse.subresourceId, resUse.targetState, pendingBarrierList);
+                    resUse.resource->TransferState(resUse.subresourceId, resUse.targetState, pendingBarrierList);
                 }
             }
             if (pendingBarrierList.Count())
@@ -3130,6 +3249,7 @@ public:
 
         cmdList->Dispatch(x, y, z);
     }
+
     virtual void EndJobSubmission(GameEngine::Fence *fence) override
     {
         auto &state = RendererState::Get();
@@ -3140,8 +3260,10 @@ public:
         {
             auto d3dfence = dynamic_cast<D3DRenderer::Fence *>(fence);
             auto value = InterlockedIncrement(&state.waitFenceValue);
-            state.queue->Signal(d3dfence->fence, value);
-            d3dfence->fence->SetEventOnCompletion(value, d3dfence->waitEvent);
+            state.queue->Signal(d3dfence->direct.fence, value);
+            d3dfence->direct.fence->SetEventOnCompletion(value, d3dfence->direct.waitEvent);
+            state.transferQueue->Signal(d3dfence->copy.fence, value);
+            d3dfence->copy.fence->SetEventOnCompletion(value, d3dfence->copy.waitEvent);
         }
     }
     
@@ -3156,7 +3278,6 @@ public:
         Texture2DProxy proxyTexture(backBuffer, D3D12_RESOURCE_STATE_PRESENT);
         auto cmdList = presentCommandBuffers[state.version];
         presentFences[state.version]->Wait();
-        presentFences[state.version]->Reset();
         cmdList->commandAllocator->Reset();
         cmdList->commandList->Reset(cmdList->commandAllocator, nullptr);
         CORELIB_ASSERT(srcTexture->properties.d3dformat == DXGI_FORMAT_R8G8B8A8_UNORM);
@@ -3251,7 +3372,7 @@ public:
         presentCommandBuffers.SetSize(versionCount);
         for (int i = 0; i < versionCount; i++)
         {
-            presentFences[i] = new Fence();
+            presentFences[i] = new SingleQueueFence();
             SetEvent(presentFences[i]->waitEvent);
             presentCommandBuffers[i] = new CommandBuffer(D3D12_COMMAND_LIST_TYPE_DIRECT);
         }
@@ -3262,6 +3383,7 @@ public:
         state.stagingBuffers.SetSize(versionCount);
         state.stagingBufferAllocPtr.SetSize(versionCount);
         state.tempCommandAllocatorManager.Init(versionCount, D3D12_COMMAND_LIST_TYPE_DIRECT);
+        state.copyCommandAllocatorManager.Init(versionCount, D3D12_COMMAND_LIST_TYPE_COPY);
         for (int i = 0; i < versionCount; i++)
         {
             state.stagingBuffers[i] = state.CreateBufferResource(
@@ -3274,6 +3396,12 @@ public:
             state.tempCommandListAllocPtr[i] = 0;
             state.stagingBufferAllocPtr[i] = 0;
         }
+        state.copyCommandLists.SetSize(versionCount);
+        state.copyCommandListAllocPtr.SetSize(versionCount);
+        for (int i = 0; i < versionCount; i++)
+        {
+            state.copyCommandListAllocPtr[i] = 0;
+        }
 
         InitBlitPipeline();
     }
@@ -3285,6 +3413,7 @@ public:
         state.stagingBufferAllocPtr[state.version] = 0;
         state.tempCommandListAllocPtr[state.version] = 0;
         state.tempCommandAllocatorManager.Reset(version);
+        state.copyCommandAllocatorManager.Reset(version);
         state.resourceDescHeap.ResetTemp(version);
         state.samplerDescHeap.ResetTemp(version);
     }
