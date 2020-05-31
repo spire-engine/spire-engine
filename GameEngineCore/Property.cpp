@@ -193,9 +193,9 @@ namespace GameEngine
 
 	PropertyTable* PropertyContainer::GetPropertyTable()
 	{
-		auto fetchTable = [this]()
+		auto className = typeid(*this).name();
+		auto fetchTable = [this, className]()
 		{
-			auto className = typeid(*this).name();
 			if (auto table = propertyTables.TryGetValue(className))
 				return table->Ptr();
 			else
