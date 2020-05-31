@@ -2174,7 +2174,7 @@ public:
             desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
             desc.Buffer.FirstElement = offset / d3dbuffer->structInfo.StructureStride;
             desc.Buffer.StructureByteStride = d3dbuffer->structInfo.StructureStride;
-            desc.Buffer.NumElements = d3dbuffer->structInfo.NumElements;
+            desc.Buffer.NumElements = static_cast<UINT>(d3dbuffer->structInfo.NumElements - desc.Buffer.FirstElement);
             state.device->CreateShaderResourceView(
                 d3dbuffer->buffer.resource, &desc, descriptors[location].address.cpuHandle);
             ResourceUse resourceUse;

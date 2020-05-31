@@ -79,7 +79,7 @@ VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn, uint vertexIndex : SV_VertexID)
     return rs;
 }
 
-float4 ps_main(VSOutput vsOut) : SV_Target
+float4 ps_main(VSOutput vsOut, float4 pixelLocation : SV_Position) : SV_Target
 {
     VertexPositionInfo vin;
     vin.vertPos = vsOut.worldPos_binormalSign.xyz;
@@ -95,5 +95,5 @@ float4 ps_main(VSOutput vsOut) : SV_Target
     if (!pattern.alphaTest())
         discard;
     return pattern.computeForwardLighting<0>(gLighting, vin, gView, gWorldTransform.getLightmapId(), vattribs.uvSet.getUV(1),
-        vsOut.projPos);
+        float4(pixelLocation.xy, vsOut.projPos.zw));
 }

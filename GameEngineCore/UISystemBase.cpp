@@ -801,8 +801,8 @@ namespace GameEngine
         rs->primitiveBufferSize = 1 << log2BufferSize;
         rs->vertexBufferSize = rs->primitiveBufferSize / sizeof(UniformField) * sizeof(UberVertex) * 16;
         rs->indexBufferSize = rs->vertexBufferSize >> 2;
-        auto primitiveBufferStructInfo =
-            BufferStructureInfo(sizeof(uint32_t) * 4, rs->primitiveBufferSize / (sizeof(uint32_t) * 4));
+        auto primitiveBufferStructInfo = BufferStructureInfo(
+            sizeof(uint32_t) * 4, rs->primitiveBufferSize / (sizeof(uint32_t) * 4) * DynamicBufferLengthMultiplier);
         rs->primitiveBuffer = rendererApi->CreateMappedBuffer(BufferUsage::StorageBuffer,
             rs->primitiveBufferSize * DynamicBufferLengthMultiplier, &primitiveBufferStructInfo);
         rs->vertexBuffer = rendererApi->CreateMappedBuffer(BufferUsage::ArrayBuffer, rs->vertexBufferSize * DynamicBufferLengthMultiplier);

@@ -466,8 +466,9 @@ namespace GameEngine
                     spAddPreprocessorDefine(compileRequest, "__VK__", "1");
                 }
             }
-            spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
             #if 0
+                spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
+                spSetOptimizationLevel(compileRequest, SLANG_OPTIMIZATION_LEVEL_NONE);
                 spSetLineDirectiveMode(compileRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
                 spSetDumpIntermediates(compileRequest, 1);
             #endif

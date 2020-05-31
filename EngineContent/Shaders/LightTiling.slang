@@ -45,10 +45,10 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
     uint tx1 = TILE_RES_X * (groupId.x + 1);
     uint ty1 = TILE_RES_Y * (groupId.y + 1);
 
-	float4 corner0 = mul(params.invProjMatrix, float4(float2(tx0/(float)params.width, ty0/(float)params.height) * 2.0f - 1.0f, 1.0f, 1.0f));
-	float4 corner1 = mul(params.invProjMatrix, float4(float2(tx1/(float)params.width, ty0/(float)params.height) * 2.0f - 1.0f, 1.0f, 1.0f));
-	float4 corner2 = mul(params.invProjMatrix, float4(float2(tx1/(float)params.width, ty1/(float)params.height) * 2.0f - 1.0f, 1.0f, 1.0f));
-	float4 corner3 = mul(params.invProjMatrix, float4(float2(tx0/(float)params.width, ty1/(float)params.height) * 2.0f - 1.0f, 1.0f, 1.0f));
+	float4 corner0 = mul(params.invProjMatrix, float4(UVToProjCoord(float2(tx0/(float)params.width, ty0/(float)params.height)) * 2.0f - 1.0f, 1.0f, 1.0f));
+	float4 corner1 = mul(params.invProjMatrix, float4(UVToProjCoord(float2(tx1/(float)params.width, ty0/(float)params.height)) * 2.0f - 1.0f, 1.0f, 1.0f));
+	float4 corner2 = mul(params.invProjMatrix, float4(UVToProjCoord(float2(tx1/(float)params.width, ty1/(float)params.height)) * 2.0f - 1.0f, 1.0f, 1.0f));
+	float4 corner3 = mul(params.invProjMatrix, float4(UVToProjCoord(float2(tx0/(float)params.width, ty1/(float)params.height)) * 2.0f - 1.0f, 1.0f, 1.0f));
 
 	corner0 = float4(corner0.xyz/corner0.w, 1.0);
 	corner1 = float4(corner1.xyz/corner1.w, 1.0);

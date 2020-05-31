@@ -107,6 +107,10 @@ namespace GameEngine
 	class BlendShape
     {
     public:
+		// The offset of a vertex's blendshape vertex in the blendshape buffer is
+		// computed by VertexIndex + BlendShapeVetexStartIndex in the shader.
+		// Therefore, BlendShapeVertexStartIndex of mesh element i should include
+		// -sum(i=0:i-1, Elements[i].VertexCount).
         int BlendShapeVertexStartIndex = 0;
         float FullWeightPercentage;
     };

@@ -693,7 +693,7 @@ Mesh ExportMesh(
                     for (int j = 0; j < fbxBlendShapeChannel->GetTargetShapeCount(); j++)
                     {
                         auto &blendShapeOut = blendShapeChannelOut.BlendShapes[j];
-                        blendShapeOut.BlendShapeVertexStartIndex = meshOut->BlendShapeVertices.Count();
+                        blendShapeOut.BlendShapeVertexStartIndex = meshOut->BlendShapeVertices.Count() - startVertId;
                         blendShapeOut.FullWeightPercentage = (float)fbxBlendShapeChannel->GetTargetShapeFullWeights()[j];
                         auto fbxTargetShape = fbxBlendShapeChannel->GetTargetShape(j);
                         int bsVertId = 0;
@@ -719,10 +719,11 @@ Mesh ExportMesh(
                                         switch (leNormal->GetReferenceMode())
                                         {
                                         case FbxGeometryElement::eDirect:
-                                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(vertexId));
+                                            vertNormal =
+                                                GetVec3(leNormal->GetDirectArray().GetAt(bsVertId));
                                             break;
                                         case FbxGeometryElement::eIndexToDirect: {
-                                            int id = leNormal->GetIndexArray().GetAt(vertexId);
+                                            int id = leNormal->GetIndexArray().GetAt(bsVertId);
                                             vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(id));
                                         }
                                         break;
@@ -746,11 +747,10 @@ Mesh ExportMesh(
                                     }
                                     vertNormal = normMat.TransformNormal(vertNormal);
                                 }
-
-                                int quantizedNormal[3] = {
-                                    Math::Clamp((int)((vertNormal.x + 1.0f) * 511.5f), 0, 1023),
-                                    Math::Clamp((int)((vertNormal.y + 1.0f) * 511.5f), 0, 1023),
-                                    Math::Clamp((int)((vertNormal.z + 1.0f) * 511.5f), 0, 1023)};
+                                auto deltaNormal = vertNormal - originalNormals[bsVertId];
+                                int quantizedNormal[3] = {Math::Clamp((int)((deltaNormal.x + 1.0f) * 511.5f), 0, 1023),
+                                    Math::Clamp((int)((deltaNormal.y + 1.0f) * 511.5f), 0, 1023),
+                                    Math::Clamp((int)((deltaNormal.z + 1.0f) * 511.5f), 0, 1023)};
                                 BlendShapeVertex bsVert;
                                 bsVert.DeltaPosition = vertPos - originalVerts[bsVertId];
                                 bsVert.Normal =
