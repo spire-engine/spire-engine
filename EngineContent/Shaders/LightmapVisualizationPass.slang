@@ -44,7 +44,7 @@ ParameterBlock<SPECIALIZATION_TYPE_2> gWorldTransform;
 struct VSOutput
 {
 	float4 projPos : SV_POSITION;
-    float2 uv;
+    float2 uv : TEXCOORD;
 };
 
 VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
@@ -59,11 +59,11 @@ VSOutput vs_main(SPECIALIZATION_TYPE_3 vertexIn)
     vin.vertPos = vertexIn.getPos();
     vin.tangentFrame = vertexIn.getTangentFrame();
     VertexPositionInfo worldPos = gWorldTransform.getWorldSpacePos(vin, vattribs);
-    rs.projPos = mul(gView.viewProjectionTransform, float4(worldPos.vertPos, 1.0));
+    rs.projPos = PlatformNDC(mul(gView.viewProjectionTransform, float4(worldPos.vertPos, 1.0)));
     return rs;
 }
 
-float4 ps_main(VSOutput vsOut)
+float4 ps_main(VSOutput vsOut) : SV_Target
 {
     uint lightmapId = gWorldTransform.getLightmapId();
     if (lightmapId == 0xFFFFFFFF)

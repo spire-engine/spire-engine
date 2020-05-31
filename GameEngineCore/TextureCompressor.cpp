@@ -56,13 +56,13 @@ namespace GameEngine
         while (w >= 1 || h >= 1)
         {
             auto buffer = result.GetBuffer(level);
-            int ptr = 0;
+            int blocksPerRow = (w + 3) / 4;
             #pragma omp parallel for
             for (int i = 0; i < h; i += 4)
             {
                 for (int j = 0; j < w; j += 4)
                 {
-                    unsigned char block[64], outBlock[8];
+                    unsigned char block[64], outBlock[16];
                     for (int ki = 0; ki < 4; ki++)
                     {
                         int ni = Math::Clamp(i + ki, 0, h - 1);
@@ -70,12 +70,12 @@ namespace GameEngine
                         {
                             int nj = Math::Clamp(j + kj, 0, w - 1);
                             for (int c = 0; c < 4; c++)
-                                block[(ki * 4 + kj) * 4 + c] = input[(ni * h + nj) * 4 + c];
+                                block[(ki * 4 + kj) * 4 + c] = input[(ni * w + nj) * 4 + c];
                         }
                     }
                     compressFunc(outBlock, block);
-                    memcpy(buffer.Buffer() + ptr, outBlock, 8);
-                    ptr += blockSize;
+                    int ptr = (i/4) * blocksPerRow + (j/4);
+                    memcpy(buffer.Buffer() + ptr * blockSize, outBlock, 8);
                 }
             }
 
@@ -90,7 +90,11 @@ namespace GameEngine
 
 	void TextureCompressor::CompressRGBA_BC1(TextureFile & result, const CoreLib::ArrayView<unsigned char> & rgbaPixels, int width, int height)
 	{
-        CompressTexture(result, TextureStorageFormat::BC1, [](unsigned char* output, unsigned char* input) {stb_compress_dxt_block(output, input, 0, STB_DXT_HIGHQUAL); },
+        CompressTexture(
+            result, TextureStorageFormat::BC1,
+            [](unsigned char *output, unsigned char *input) {
+                stb_compress_dxt_block(output, input, 0, STB_DXT_HIGHQUAL);
+            },
             rgbaPixels, width, height);
 	}
 

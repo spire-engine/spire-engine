@@ -237,6 +237,8 @@ namespace GameEngine
         }
         static IShaderCompiler* GetShaderCompiler()
         {
+            if (!Instance()->shaderCompiler)
+                Instance()->shaderCompiler = CreateShaderCompiler();
             return Instance()->shaderCompiler.Ptr();
         }
 		template<typename ...Args>

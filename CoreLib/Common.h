@@ -22,7 +22,11 @@ template <typename... Args> inline void corelib_unused_f(Args&&...) {}
 #define CORELIB_ASSERT(x) assert(x)
 #else
 #define CORELIB_DEBUG_ASSERT(x)
-#define CORELIB_ASSERT(x) (x)
+#define CORELIB_ASSERT(x)                                                                                              \
+    {                                                                                                                  \
+        bool _corelib_assert_result_ = (bool)(x);                                                                      \
+        corelib_unused_f(_corelib_assert_result_);                                                                     \
+    }
 #endif
 namespace CoreLib
 {

@@ -11,6 +11,15 @@ struct ViewParams
     SamplerState textureSampler;  
 };
 
+float2 ProjCoordToUV(float2 coord)
+{
+#ifdef __D3D__
+    return float2(coord.x, 1.0-coord.y);
+#else
+    return coord;
+#endif
+}
+
 float4 QuaternionMul(float4 q1, float4 q2)
 {
     float4 rs;
@@ -26,9 +35,11 @@ float4 QuaternionConjugate(float4 q)
     return float4(-q.x, -q.y, -q.z, q.w);    
 }
 
-float3 QuaternionRotate(float4 q, float3 pos)
+float3 QuaternionRotate(float4 q, float3 v)
 {
-    return QuaternionMul(QuaternionMul(q, float4(pos, 0.0)), QuaternionConjugate(q)).xyz;
+    float3 u = q.xyz;
+    float s = q.w;
+    return 2.0 * dot(u, v) * u + (s*s - dot(u, u)) * v + 2.0 * s * cross(u, v);
 }
 
 float ComputeLuminance(float3 color)
@@ -573,7 +584,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 					{ \
 						float4 lightSpacePosT = mul(lightEnv.lightMatrix[i], float4(shadingPoint.vertPos, 1.0));\
 						shadow = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler,  \
-						    float3(lightSpacePosT.xy / lightSpacePosT.w, i+lightEnv.shadowMapId), lightSpacePosT.z / lightSpacePosT.w);\
+						    float3(ProjCoordToUV(lightSpacePosT.xy / lightSpacePosT.w), i+lightEnv.shadowMapId), lightSpacePosT.z / lightSpacePosT.w);\
                         terminated = true;\
 					} \
                     terminated = terminated || i >= lightEnv.numCascades; 
@@ -593,7 +604,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
                     {
                         float4 lightSpacePosT = mul(lightEnv.lightMatrix[i], float4(shadingPoint.vertPos, 1.0));
                         shadow *= lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler,
-                            float3(lightSpacePosT.xy / lightSpacePosT.w, i + lightEnv.shadowMapId), lightSpacePosT.z / lightSpacePosT.w);
+                            float3(ProjCoordToUV(lightSpacePosT.xy / lightSpacePosT.w), i + lightEnv.shadowMapId), lightSpacePosT.z / lightSpacePosT.w);
                         break;
                     }
                 }
@@ -655,7 +666,7 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
                     {
                         float3 lightSpacePos = lightSpacePosT.xyz / lightSpacePosT.w;
                         float val = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler,
-                            float3(lightSpacePos.xy, shadowMapId), lightSpacePos.z);
+                            float3(ProjCoordToUV(lightSpacePos.xy), shadowMapId), lightSpacePos.z);
                         shadow *= val;
                     }
                     else
@@ -1013,3 +1024,8 @@ struct TransparentAttribute
 struct DoubleSidedAttribute
 {
 };
+
+float4 PlatformNDC(float4 projCoord)
+{
+    return projCoord;
+}

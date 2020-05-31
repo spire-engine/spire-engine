@@ -19,6 +19,7 @@
 
 #ifdef __linux__
 #undef Always
+#undef None
 #endif
 
 using namespace GameEngine;
@@ -586,7 +587,7 @@ namespace VK
 			return State().device;
 		}
 
-		static void SetMaxTempBufferVersions(int versionCount)
+		static void Init(int versionCount)
 		{
 			auto & state = State();
             for (int i = 0; i < MaxThreadCount; i++)
@@ -1030,7 +1031,6 @@ namespace VK
 		switch (ptype)
 		{
 		case PrimitiveType::Triangles: return vk::PrimitiveTopology::eTriangleList;
-		case PrimitiveType::TriangleFans: return vk::PrimitiveTopology::eTriangleFan;
 		case PrimitiveType::Points: return vk::PrimitiveTopology::ePointList;
 		case PrimitiveType::Lines: return vk::PrimitiveTopology::eLineList;
 		case PrimitiveType::TriangleStrips: return vk::PrimitiveTopology::eTriangleStrip;
@@ -2675,21 +2675,21 @@ namespace VK
 	class RenderTargetLayout : public GameEngine::RenderTargetLayout
 	{
 	public:
-		CoreLib::List<vk::AttachmentDescription> descriptions;
 		CoreLib::List<vk::AttachmentReference> colorReferences;
 		vk::AttachmentReference depthReference;
-		vk::RenderPass renderPass;
+		vk::RenderPass renderPass, renderPassClear;
 	private:
-		void Resize(int size)
+        void Resize(CoreLib::List<vk::AttachmentDescription> &descriptions, int size)
 		{
 			if (descriptions.Count() < size)
 				descriptions.SetSize(size);
 		}
 
-		void SetColorAttachment(int binding, StorageFormat format, bool ignoreInitialContent, LoadOp loadOp = LoadOp::Load, StoreOp storeOp = StoreOp::Store)
+		void SetColorAttachment(CoreLib::List<vk::AttachmentDescription> & descriptions, int binding, StorageFormat format,
+            bool ignoreInitialContent, LoadOp loadOp = LoadOp::Load, StoreOp storeOp = StoreOp::Store)
 		{
-			Resize(binding + 1);
-            if (ignoreInitialContent)
+            Resize(descriptions, binding + 1);
+            if (ignoreInitialContent && loadOp == LoadOp::Load)
                 loadOp = LoadOp::DontCare;
 			descriptions[binding] = vk::AttachmentDescription()
 				.setFlags(vk::AttachmentDescriptionFlags())
@@ -2708,12 +2708,13 @@ namespace VK
 				//}
 		}
 
-		void SetDepthAttachment(int binding, StorageFormat format, bool ignoreInitialContent, LoadOp loadOp = LoadOp::Load, StoreOp storeOp = StoreOp::Store)
+		void SetDepthAttachment(CoreLib::List<vk::AttachmentDescription> &descriptions, int binding, StorageFormat format,
+            bool ignoreInitialContent, LoadOp loadOp = LoadOp::Load, StoreOp storeOp = StoreOp::Store)
 		{
 			CORELIB_ASSERT(depthReference.layout == vk::ImageLayout::eUndefined && "Only 1 depth/stencil attachment allowed.");
 
-			Resize(binding + 1);
-            if (ignoreInitialContent)
+			Resize(descriptions, binding + 1);
+            if (ignoreInitialContent && loadOp == LoadOp::Load)
                 loadOp = LoadOp::DontCare;
 
 			descriptions[binding] = vk::AttachmentDescription()
@@ -2732,7 +2733,7 @@ namespace VK
 		RenderTargetLayout(CoreLib::ArrayView<AttachmentLayout> bindings, bool ignoreInitialContent)
 		{
 			depthReference.attachment = VK_ATTACHMENT_UNUSED;
-
+            List<vk::AttachmentDescription> descriptions, descriptionsClear;
 			int location = 0;
 			for (auto binding : bindings)
 			{
@@ -2740,11 +2741,15 @@ namespace VK
 				{
 				case TextureUsage::ColorAttachment:
 				case TextureUsage::SampledColorAttachment:
-					SetColorAttachment(location, binding.ImageFormat, ignoreInitialContent);
+                    SetColorAttachment(descriptions, location, binding.ImageFormat, ignoreInitialContent);
+                    SetColorAttachment(descriptionsClear, location, binding.ImageFormat, ignoreInitialContent, LoadOp::Clear);
+
 					break;
 				case TextureUsage::DepthAttachment:
 				case TextureUsage::SampledDepthAttachment:
-					SetDepthAttachment(location, binding.ImageFormat, ignoreInitialContent);
+                    SetDepthAttachment(descriptions, location, binding.ImageFormat, ignoreInitialContent);
+                    SetDepthAttachment(
+                        descriptionsClear, location, binding.ImageFormat, ignoreInitialContent, LoadOp::Clear);
 					break;
 				case TextureUsage::Unused:
 					break;
@@ -2793,10 +2798,15 @@ namespace VK
 				.setPDependencies(nullptr);
 
 			this->renderPass = RendererState::Device().createRenderPass(renderPassCreateInfo);
+            renderPassCreateInfo.setPAttachments(descriptionsClear.Buffer());
+			this->renderPassClear = RendererState::Device().createRenderPass(renderPassCreateInfo);
+
 		}
 		~RenderTargetLayout()
 		{
 			if (renderPass) RendererState::Device().destroyRenderPass(renderPass);
+            if (renderPassClear)
+                RendererState::Device().destroyRenderPass(renderPassClear);
 		}
 
 		virtual GameEngine::FrameBuffer* CreateFrameBuffer(const RenderAttachments& renderAttachments) override;
@@ -2808,14 +2818,18 @@ namespace VK
 	public:
 		int width;
 		int height;
-		vk::Framebuffer framebuffer;
+		vk::Framebuffer framebuffer, framebufferClear;
 		CoreLib::RefPtr<RenderTargetLayout> renderTargetLayout;
 		RenderAttachments renderAttachments;
+		CoreLib::Array<vk::ClearValue, 10> clearValues;
 		CoreLib::List<vk::ImageView> attachmentImageViews;
 		FrameBuffer() {};
 		~FrameBuffer()
 		{
 			if (framebuffer) RendererState::Device().destroyFramebuffer(framebuffer);
+            if (framebufferClear)
+                RendererState::Device().destroyFramebuffer(framebufferClear);
+
 			for (auto view : attachmentImageViews)
 				RendererState::Device().destroyImageView(view);
 		}
@@ -2858,11 +2872,11 @@ namespace VK
 		result->attachmentImageViews.Clear();
 		for (auto attachment : renderAttachments.attachments)
 		{
+			vk::ImageAspectFlags aspectFlags;
 			if (attachment.handle.tex2D)
 			{
 				auto tex = dynamic_cast<Texture2D*>(attachment.handle.tex2D);
 				
-				vk::ImageAspectFlags aspectFlags;
 				if (isDepthFormat(tex->format))
 				{
 					aspectFlags = vk::ImageAspectFlagBits::eDepth;
@@ -2893,7 +2907,6 @@ namespace VK
 			{
 				auto tex = dynamic_cast<Texture2DArray*>(attachment.handle.tex2DArray);
 
-				vk::ImageAspectFlags aspectFlags;
 				if (isDepthFormat(tex->format))
 				{
 					aspectFlags = vk::ImageAspectFlagBits::eDepth;
@@ -2924,7 +2937,6 @@ namespace VK
 			{
 				auto tex = dynamic_cast<TextureCube*>(attachment.handle.texCube);
 
-				vk::ImageAspectFlags aspectFlags;
 				if (isDepthFormat(tex->format))
 				{
 					aspectFlags = vk::ImageAspectFlagBits::eDepth;
@@ -2955,7 +2967,6 @@ namespace VK
 			{
 				auto tex = dynamic_cast<TextureCubeArray*>(attachment.handle.texCubeArray);
 
-				vk::ImageAspectFlags aspectFlags;
 				if (isDepthFormat(tex->format))
 				{
 					aspectFlags = vk::ImageAspectFlagBits::eDepth;
@@ -2982,6 +2993,14 @@ namespace VK
 
 				result->attachmentImageViews.Add(RendererState::Device().createImageView(imageViewCreateInfo));
 			}
+            if (aspectFlags == vk::ImageAspectFlagBits::eColor)
+            {
+                result->clearValues.Add(vk::ClearValue(vk::ClearColorValue()));
+            }
+            else
+            {
+                result->clearValues.Add(vk::ClearDepthStencilValue(1.0f, 0U));
+            }
 		}
 
 		vk::FramebufferCreateInfo framebufferCreateInfo = vk::FramebufferCreateInfo()
@@ -2994,6 +3013,9 @@ namespace VK
 			.setLayers(1);
 
 		result->framebuffer = RendererState::Device().createFramebuffer(framebufferCreateInfo);
+        framebufferCreateInfo.setRenderPass(renderPassClear);
+        result->framebufferClear = RendererState::Device().createFramebuffer(framebufferCreateInfo);
+		
 		result->width = renderAttachments.width;
 		result->height = renderAttachments.height;
 		return result;
@@ -3669,12 +3691,12 @@ namespace VK
 	class CommandBuffer : public GameEngine::CommandBuffer
 	{
 	public:
-		bool inRenderPass = false;
 		const vk::CommandPool& pool;
 		vk::CommandBuffer buffer;
 		Pipeline* curPipeline = nullptr;
 		CoreLib::Array<vk::DescriptorSet, 32> pendingDescSets;
 		CoreLib::List<VK::DescriptorSet*> descSets;
+
 		CommandBuffer(const vk::CommandPool& commandPool) : pool(commandPool)
 		{
 			pendingDescSets.SetSize(32);
@@ -3701,62 +3723,39 @@ namespace VK
 			lastIndexBufferOffset = 0;
 			descSets.Clear();
 		}
-		void BeginRecording() override
+
+		virtual void SetEventMarker(const char * /*name*/, uint32_t /*color*/) override
+        {
+        }
+
+		virtual void BeginRecording(GameEngine::FrameBuffer *frameBuffer) override
 		{
-			inRenderPass = false;
+            vk::RenderPass renderPass;
+            if (frameBuffer)
+            {
+                renderPass = reinterpret_cast<VK::FrameBuffer *>(frameBuffer)->renderTargetLayout->renderPass;
+            }
 
-			ResetInternalState();
+            ResetInternalState();
 
-			for (int k = 0; k < 32; k++)
-				pendingDescSets[k] = vk::DescriptorSet();
+            for (int k = 0; k < pendingDescSets.Count(); k++)
+                pendingDescSets[k] = vk::DescriptorSet();
 
-			vk::CommandBufferInheritanceInfo inheritanceInfo = vk::CommandBufferInheritanceInfo()
-				.setRenderPass(vk::RenderPass())
-				.setSubpass(0)
-				.setFramebuffer(vk::Framebuffer())
-				.setOcclusionQueryEnable(VK_TRUE)
-				.setQueryFlags(vk::QueryControlFlags())//
-				.setPipelineStatistics(vk::QueryPipelineStatisticFlags());//
+            vk::CommandBufferInheritanceInfo inheritanceInfo =
+                vk::CommandBufferInheritanceInfo()
+                    .setRenderPass(renderPass)
+                    .setSubpass(0)
+                    .setOcclusionQueryEnable(VK_FALSE)
+                    .setQueryFlags(vk::QueryControlFlags())
+                    .setPipelineStatistics(vk::QueryPipelineStatisticFlags());
 
-			vk::CommandBufferBeginInfo commandBufferBeginInfo = vk::CommandBufferBeginInfo()
-				.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
-				.setPInheritanceInfo(&inheritanceInfo);
+            vk::CommandBufferBeginInfo commandBufferBeginInfo =
+                vk::CommandBufferBeginInfo()
+                    .setFlags(vk::CommandBufferUsageFlagBits::eSimultaneousUse |
+                              vk::CommandBufferUsageFlagBits::eRenderPassContinue)
+                    .setPInheritanceInfo(&inheritanceInfo);
 
-			buffer.begin(commandBufferBeginInfo);
-		}
-
-		inline void BeginRecording(GameEngine::RenderTargetLayout* renderTargetLayout, vk::Framebuffer framebuffer)
-		{
-			inRenderPass = true;
-
-			ResetInternalState();
-
-			for (int k = 0; k < pendingDescSets.Count(); k++)
-				pendingDescSets[k] = vk::DescriptorSet();
-
-			vk::CommandBufferInheritanceInfo inheritanceInfo = vk::CommandBufferInheritanceInfo()
-				.setRenderPass(reinterpret_cast<VK::RenderTargetLayout*>(renderTargetLayout)->renderPass)
-				.setSubpass(0)//
-				.setFramebuffer(framebuffer)
-				.setOcclusionQueryEnable(VK_FALSE)//
-				.setQueryFlags(vk::QueryControlFlags())//
-				.setPipelineStatistics(vk::QueryPipelineStatisticFlags());//
-
-			vk::CommandBufferBeginInfo commandBufferBeginInfo = vk::CommandBufferBeginInfo()
-				.setFlags(vk::CommandBufferUsageFlagBits::eSimultaneousUse | vk::CommandBufferUsageFlagBits::eRenderPassContinue)
-				.setPInheritanceInfo(&inheritanceInfo);
-
-			buffer.begin(commandBufferBeginInfo);
-		}
-
-		virtual void BeginRecording(GameEngine::FrameBuffer* frameBuffer) override
-		{
-			BeginRecording(((VK::FrameBuffer*)frameBuffer)->renderTargetLayout.Ptr(), ((VK::FrameBuffer*)frameBuffer)->framebuffer);
-		}
-
-		virtual void BeginRecording(GameEngine::RenderTargetLayout* renderTargetLayout) override
-		{
-			BeginRecording(renderTargetLayout, vk::Framebuffer());
+            buffer.begin(commandBufferBeginInfo);
 		}
 
 		virtual void EndRecording() override
@@ -3773,17 +3772,18 @@ namespace VK
 				lastVertBufferOffset = byteOffset;
 			}
 		}
+
 		virtual void BindIndexBuffer(Buffer* indexBuffer, int byteOffset) override
 		{
 			if (byteOffset != lastIndexBufferOffset || indexBuffer != lastIndexBuffer)
 			{
-				//TODO: Can make index buffer use 16 bit ints if possible?
 				buffer.bindIndexBuffer(reinterpret_cast<VK::BufferObject*>(indexBuffer)->buffer,
 					(vk::DeviceSize)byteOffset, vk::IndexType::eUint32);
 				lastIndexBuffer = indexBuffer;
 				lastIndexBufferOffset = byteOffset;
 			}
 		}
+
 		virtual void BindDescriptorSet(int binding, GameEngine::DescriptorSet* descSet) override
 		{
 			VK::DescriptorSet* internalDescriptorSet = reinterpret_cast<VK::DescriptorSet*>(descSet);
@@ -3792,34 +3792,10 @@ namespace VK
 				pendingDescSets[binding] = RendererState::GetEmptyDescriptorSet();
 			else
 				pendingDescSets[binding] = (internalDescriptorSet->descriptorSet);
-			if (curPipeline)
-			{
-				//buffer.bindDescriptorSets(curPipeline->pipelineBindPoint, curPipeline->pipelineLayout, binding, internalDescriptorSet->descriptorSet, nullptr);
-			}
-			
 		}
+
 		virtual void BindPipeline(GameEngine::Pipeline* pipeline) override
 		{
-#if _DEBUG
-			if (inRenderPass == false && ((VK::Pipeline*)pipeline)->isGraphics)
-				throw HardwareRendererException("RenderTargetLayout and FrameBuffer must be specified at BeginRecording for BindPipeline");
-			//TODO:
-			// So there are a few things to check here
-			// First off, make sure that the layouts of any descriptor sets that have had
-			//    their bindings deferred are compatible with the layouts given at pipeline
-			//    creation time.
-			// Secondly, either allow deferred descriptor set binding in the vulkan backend,
-			//    or if we disallow it, throw an exception in BindDescriptorSet when current
-			//    bound pipeline is nullptr.
-			//
-			// Why?
-			//   If you have a prior descriptor set to bind, and then you want to preemptively
-			//   bind it to the renderer, you need to defer the actual binding until we know 
-			//   the pipeline it is being bound to. However if the descriptor set layout is
-			//   invalid, and the engine has missed this fact due to something like a material
-			//   being skipped in frustum culling, then we will crash trying to bind a descriptor
-			//   that is incompatible with the currently bound pipeline.
-#endif
 			auto newPipeline = reinterpret_cast<VK::Pipeline*>(pipeline);
 			if (curPipeline != newPipeline)
 			{
@@ -3827,6 +3803,21 @@ namespace VK
 				buffer.bindPipeline(newPipeline->pipelineBindPoint, newPipeline->pipeline);
 			}
 		}
+
+		virtual void SetViewport(Viewport viewport) override
+        {
+            vk::Viewport vkViewport;
+            vkViewport.x = viewport.x;
+            vkViewport.y = viewport.y;
+            vkViewport.width = viewport.w;
+            vkViewport.height = viewport.h;
+            vkViewport.minDepth = viewport.minZ;
+            vkViewport.maxDepth = viewport.maxZ;
+            buffer.setViewport(0, 1, &vkViewport);
+            vk::Rect2D scissorRect = vk::Rect2D(
+                vk::Offset2D((int)viewport.x, (int)viewport.y), vk::Extent2D((int)viewport.w, (int)viewport.h));
+            buffer.setScissor(0, 1, &scissorRect);
+        }
 
 		virtual void DispatchCompute(int groupCountX, int groupCountY, int groupCountZ) override
 		{
@@ -3883,95 +3874,6 @@ namespace VK
 				pendingDescSets.Buffer(),
 				0, nullptr);
 			buffer.drawIndexed(indexCount, numInstances, firstIndex, 0, 0);
-		}
-
-		virtual void SetViewport(int x, int y, int width, int height) override
-		{
-			buffer.setViewport(0, vk::Viewport((float)x, (float)y, (float)width, (float)height, 0.0f, 1.0f));
-			buffer.setScissor(0, vk::Rect2D(vk::Offset2D(x, y), vk::Extent2D(width, height)));
-		}
-
-		virtual void ClearAttachments(GameEngine::FrameBuffer * frameBuffer) override
-		{
-			auto & renderAttachments = ((VK::FrameBuffer*)frameBuffer)->renderAttachments;
-
-			CoreLib::List<vk::ClearAttachment> attachments;
-			CoreLib::List<vk::ClearRect> rects;
-
-			for (int k = 0; k < renderAttachments.attachments.Count(); k++)
-			{
-				vk::ImageAspectFlags aspectMask;
-
-				auto& attach = renderAttachments.attachments[k];
-
-				int w = 0, h = 0;
-				int layers = 0;
-				TextureUsage usage = TextureUsage::SampledColorAttachment;
-				if (attach.handle.tex2D)
-				{
-					auto internalHandle = dynamic_cast<VK::Texture2D*>(attach.handle.tex2D);
-					usage = internalHandle->usage;
-					w = internalHandle->width;
-					h = internalHandle->height;
-					layers = 1;
-				}
-				else if (attach.handle.tex2DArray)
-				{
-					auto internalHandle = dynamic_cast<VK::Texture2DArray*>(attach.handle.tex2DArray);
-					usage = internalHandle->usage;
-					w = internalHandle->width;
-					h = internalHandle->height;
-					layers = internalHandle->arrayLayers;
-				}
-				auto testUsageBit = [](GameEngine::TextureUsage value, GameEngine::TextureUsage bits)
-				{
-					return (value & bits) != GameEngine::TextureUsage::Unused;
-				};
-				if (testUsageBit(usage, GameEngine::TextureUsage::ColorAttachment))
-				{
-					attachments.Add(
-						vk::ClearAttachment()
-						.setAspectMask(vk::ImageAspectFlagBits::eColor)
-						.setColorAttachment(k)
-						.setClearValue(vk::ClearColorValue())
-					);
-				}
-				if (testUsageBit(usage, GameEngine::TextureUsage::DepthAttachment))
-				{
-					attachments.Add(
-						vk::ClearAttachment()
-						.setAspectMask(vk::ImageAspectFlagBits::eDepth)
-						.setColorAttachment(VK_ATTACHMENT_UNUSED)
-						.setClearValue(vk::ClearDepthStencilValue(1.0f, 0)));
-				}
-				if (testUsageBit(usage, GameEngine::TextureUsage::StencilAttachment))
-				{
-					attachments.Add(
-						vk::ClearAttachment()
-						.setAspectMask(vk::ImageAspectFlagBits::eStencil)
-						.setColorAttachment(VK_ATTACHMENT_UNUSED)
-						.setClearValue(vk::ClearDepthStencilValue(1.0f, 0)));
-				}
-				if (testUsageBit(usage, GameEngine::TextureUsage::DepthStencilAttachment))
-				{
-					attachments.Add(
-						vk::ClearAttachment()
-						.setAspectMask(vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil)
-						.setColorAttachment(VK_ATTACHMENT_UNUSED)
-						.setClearValue(vk::ClearDepthStencilValue(1.0f, 0)));
-				}
-
-				rects.Add(
-					vk::ClearRect()
-					.setBaseArrayLayer(0)
-					.setLayerCount(1)
-					.setRect(vk::Rect2D(vk::Offset2D(0, 0), vk::Extent2D(w, h)))
-				);
-			}
-			buffer.clearAttachments(
-				vk::ArrayProxy<const vk::ClearAttachment>(attachments.Count(), attachments.Buffer()),
-				vk::ArrayProxy<const vk::ClearRect>(rects.Count(), rects.Buffer())
-			);
 		}
 	};
 
@@ -4428,7 +4330,6 @@ namespace VK
         CoreLib::Array<vk::CommandBuffer, MaxRenderThreads> jobSubmissionBuffers;
 		List<vk::ImageMemoryBarrier> imageMemoryBarriers;
 
-		int pendingGraphicsQueueBarrierId = -1;
 		uint32_t taskId = 0;
 		std::mutex queueMutex;
 	public:
@@ -4455,9 +4356,9 @@ namespace VK
         {
             renderThreadId = threadId;
         }
-		virtual void SetMaxTempBufferVersions(int versionCount) override
+		virtual void Init(int versionCount) override
 		{
-			RendererState::SetMaxTempBufferVersions(versionCount);
+			RendererState::Init(versionCount);
 		}
 		virtual void ResetTempBufferVersion(int version) override
 		{
@@ -4469,64 +4370,6 @@ namespace VK
 			VkWindowSurface * rs = new VkWindowSurface(windowHandle, pwidth, pheight);
             return rs;
 		}
-
-		virtual void ClearTexture(GameEngine::Texture2D* texture) override
-		{
-			vk::CommandBufferBeginInfo primaryBeginInfo = vk::CommandBufferBeginInfo()
-				.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
-				.setPInheritanceInfo(nullptr);
-
-			auto primaryBuffer = RendererState::GetTempRenderCommandBuffer();
-
-			primaryBuffer.begin(primaryBeginInfo);
-
-			switch (dynamic_cast<VK::Texture2D*>(texture)->currentSubresourceLayouts[0])
-			{
-			case vk::ImageLayout::eColorAttachmentOptimal:
-				primaryBuffer.clearColorImage(
-					dynamic_cast<VK::Texture2D*>(texture)->image,
-					vk::ImageLayout::eGeneral,
-					vk::ClearColorValue(),
-					vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
-				);
-				break;
-			case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-				primaryBuffer.clearDepthStencilImage(
-					dynamic_cast<VK::Texture2D*>(texture)->image,
-					vk::ImageLayout::eGeneral,
-					vk::ClearDepthStencilValue(1.0f, 0),
-					vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1)
-				);
-				break;
-			default:
-				break;
-			}
-
-			primaryBuffer.end();
-
-			vk::SubmitInfo submitInfo = vk::SubmitInfo()
-				.setWaitSemaphoreCount(0)
-				.setPWaitSemaphores(nullptr)
-				.setPWaitDstStageMask(nullptr)
-				.setCommandBufferCount(1)
-				.setPCommandBuffers(&primaryBuffer)
-				.setSignalSemaphoreCount(0)
-				.setPSignalSemaphores(nullptr);
-
-			RendererState::RenderQueue().submit(submitInfo, vk::Fence());
-		}
-
-		vk::Semaphore GetWaitSemaphore()
-		{
-			if (pendingGraphicsQueueBarrierId != -1)
-			{
-				auto rs = transferSemaphores[pendingGraphicsQueueBarrierId];
-				pendingGraphicsQueueBarrierId = -1;
-				return rs;
-			}
-			return vk::Semaphore();
-		}
-
 
         virtual void BeginJobSubmission() override
         {
@@ -4550,13 +4393,6 @@ namespace VK
                 .setPCommandBuffers(&primaryBuffer)
                 .setSignalSemaphoreCount(0)
                 .setPSignalSemaphores(nullptr);
-            vk::Semaphore waitSemaphore = GetWaitSemaphore();
-            if (waitSemaphore)
-            {
-                vk::PipelineStageFlags waitDstStageMask = vk::PipelineStageFlags(vk::PipelineStageFlagBits::eTopOfPipe);
-                submitInfo.setWaitSemaphoreCount(1).setPWaitSemaphores(&waitSemaphore).setPWaitDstStageMask(
-                    &waitDstStageMask);
-            }
             RendererState::RenderQueue().submit(submitInfo, fence ? ((VK::Fence*)fence)->assocFence : nullptr);
         }
 
@@ -4567,12 +4403,14 @@ namespace VK
 				auto memBarrier = vk::MemoryBarrier()
 					.setSrcAccessMask(vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eHostWrite)
 					.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
-				cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllGraphics,
+                cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
+                    vk::PipelineStageFlagBits::eAllCommands,
 					vk::DependencyFlags(), 1, &memBarrier, 0, nullptr, imageMemoryBarriers.Count(), imageMemoryBarriers.Buffer());
 			}
 			else if (barriers == PipelineBarriers::ExecutionOnly)
 			{
-				cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllGraphics,
+                cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
+                    vk::PipelineStageFlagBits::eAllCommands,
 					vk::DependencyFlags(), 0, nullptr, 0, nullptr, 0, nullptr);
 			}
 		}
@@ -4606,7 +4444,8 @@ namespace VK
             primaryBuffer.dispatch(x, y, z);
         }
 
-		virtual void QueueRenderPass(GameEngine::FrameBuffer* frameBuffer, CoreLib::ArrayView<GameEngine::CommandBuffer*> commands,
+		virtual void QueueRenderPass(GameEngine::FrameBuffer *frameBuffer, bool clearFrameBuffer,
+            CoreLib::ArrayView<GameEngine::CommandBuffer *> commands,
 			PipelineBarriers barriers) override
 		{
 			std::lock_guard<std::mutex> lock(queueMutex);
@@ -4647,73 +4486,46 @@ namespace VK
 			}
 
 			// Create render pass begin info
-			vk::RenderPassBeginInfo renderPassBeginInfo = vk::RenderPassBeginInfo()
-				.setRenderPass(vkframeBuffer->renderTargetLayout->renderPass)
-				.setFramebuffer(vkframeBuffer->framebuffer)
-				.setRenderArea(vk::Rect2D().setOffset(vk::Offset2D(0, 0)).setExtent(vk::Extent2D(reinterpret_cast<VK::FrameBuffer*>(frameBuffer)->width, reinterpret_cast<VK::FrameBuffer*>(frameBuffer)->height)))
-				.setClearValueCount(0)
-				.setPClearValues(nullptr);
+            vk::RenderPassBeginInfo renderPassBeginInfo =
+                vk::RenderPassBeginInfo()
+                    .setRenderPass(clearFrameBuffer ? vkframeBuffer->renderTargetLayout->renderPassClear
+                                                    : vkframeBuffer->renderTargetLayout->renderPass)
+                    .setFramebuffer(clearFrameBuffer ? vkframeBuffer->framebufferClear : vkframeBuffer->framebuffer)
+                    .setRenderArea(vk::Rect2D()
+                                       .setOffset(vk::Offset2D(0, 0))
+                                       .setExtent(vk::Extent2D(reinterpret_cast<VK::FrameBuffer *>(frameBuffer)->width,
+                                           reinterpret_cast<VK::FrameBuffer *>(frameBuffer)->height)))
+                    .setClearValueCount(vkframeBuffer->clearValues.Count())
+                    .setPClearValues(vkframeBuffer->clearValues.Buffer());
 
 			// Aggregate secondary command buffers
-			bool pre = true, render = false, post = false;
-
-			CoreLib::List<vk::CommandBuffer> prePassCommandBuffers;
 			CoreLib::List<vk::CommandBuffer> renderPassCommandBuffers;
-			CoreLib::List<vk::CommandBuffer> postPassCommandBuffers;
 
 			for (auto& buffer : commands)
 			{
 				auto internalBuffer = static_cast<VK::CommandBuffer*>(buffer);
-				if (pre && internalBuffer->inRenderPass == true)
-				{
-					pre = false;
-					render = true;
-					post = false;
-				}
-				else if (render && internalBuffer->inRenderPass == false)
-				{
-					pre = false;
-					render = false;
-					post = true;
-				}
-				else
-				{
-					CORELIB_DEBUG_ASSERT(!(post && internalBuffer->inRenderPass == true) && "Command buffers must be in 3 groups - prePass, renderPass, and postPass");
-				}
-				
-				if (pre)
-					prePassCommandBuffers.Add(internalBuffer->buffer);
-				else if (render)
-					renderPassCommandBuffers.Add(internalBuffer->buffer);
-				else
-					postPassCommandBuffers.Add(internalBuffer->buffer);
+				renderPassCommandBuffers.Add(internalBuffer->buffer);
 			}
 
 			// Record primary command buffer
             auto primaryBuffer = jobSubmissionBuffers[renderThreadId];
 			QueuePipelineBarrier(primaryBuffer, barriers);
-			if (prePassCommandBuffers.Count() > 0)
-				primaryBuffer.executeCommands(prePassCommandBuffers.Count(), prePassCommandBuffers.Buffer());
 			if (renderPassCommandBuffers.Count() > 0)
             {
 				primaryBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eSecondaryCommandBuffers);
 				primaryBuffer.executeCommands(renderPassCommandBuffers.Count(), renderPassCommandBuffers.Buffer());
 				primaryBuffer.endRenderPass();
 			}
-			if (postPassCommandBuffers.Count() > 0)
-				primaryBuffer.executeCommands(postPassCommandBuffers.Count(), postPassCommandBuffers.Buffer());
 		}
+
 		virtual void Wait() override
 		{
 			RendererState::Device().waitIdle();
 		}
-		virtual void Blit(GameEngine::Texture2D* dstImage, GameEngine::Texture2D* srcImage, VectorMath::Vec2i dstOffset, bool flipSrc) override
+        virtual void Blit(GameEngine::Texture2D *dstImage, GameEngine::Texture2D *srcImage, VectorMath::Vec2i dstOffset,
+            SourceFlipMode flipSrc) override
 		{
-			vk::CommandBuffer transferCommandBuffer = RendererState::GetTempTransferCommandBuffer();
-
-			vk::CommandBufferBeginInfo commandBufferBeginInfo = vk::CommandBufferBeginInfo()
-				.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
-				.setPInheritanceInfo(nullptr);
+            auto primaryBuffer = jobSubmissionBuffers[renderThreadId];
 
 			vk::ImageSubresourceRange imageSubresourceRange = vk::ImageSubresourceRange()
 				.setAspectMask(vk::ImageAspectFlagBits::eColor)
@@ -4735,9 +4547,7 @@ namespace VK
 				.setSubresourceRange(imageSubresourceRange);
 
 			dstTexture->currentSubresourceLayouts[0] = vk::ImageLayout::eTransferDstOptimal;
-
-			transferCommandBuffer.begin(commandBufferBeginInfo); // start recording
-			
+						
 			auto srcTexture = dynamic_cast<Texture2D*>(srcImage);
 
 			vk::ImageMemoryBarrier textureTransferBarrier = vk::ImageMemoryBarrier()
@@ -4750,7 +4560,7 @@ namespace VK
 				.setImage(srcTexture->image)
 				.setSubresourceRange(imageSubresourceRange);
 
-			transferCommandBuffer.pipelineBarrier(
+			primaryBuffer.pipelineBarrier(
 				vk::PipelineStageFlagBits::eAllCommands,
 				vk::PipelineStageFlagBits::eTransfer,
 				vk::DependencyFlags(),
@@ -4770,7 +4580,7 @@ namespace VK
 			dynamic_cast<VK::Texture2D*>(dstImage)->GetSize(destWidth, destHeight);
 
 			std::array<vk::Offset3D, 2> srcOffsets;
-			if (flipSrc)
+			if (flipSrc != SourceFlipMode::None)
 			{
 				srcOffsets[0] = vk::Offset3D(0, srcHeight, 0);
 				srcOffsets[1] = vk::Offset3D(srcWidth, 0, 1);
@@ -4799,7 +4609,7 @@ namespace VK
 				.setDstSubresource(subresourceLayers)
 				.setDstOffsets(dstOffsets);
 
-			transferCommandBuffer.blitImage(
+			primaryBuffer.blitImage(
 				srcTexture->image,
 				vk::ImageLayout::eTransferSrcOptimal,
 				dstTexture->image,
@@ -4808,21 +4618,7 @@ namespace VK
 				vk::Filter::eNearest
 			);
 
-			transferCommandBuffer.end();
-
 			srcTexture->currentSubresourceLayouts[0] = vk::ImageLayout::eTransferSrcOptimal;
-
-			// Submit job
-			vk::SubmitInfo transferSubmitInfo = vk::SubmitInfo()
-				.setWaitSemaphoreCount(0)
-				.setPWaitSemaphores(nullptr)
-				.setPWaitDstStageMask(nullptr)
-				.setCommandBufferCount(1)
-				.setPCommandBuffers(&transferCommandBuffer)
-				.setSignalSemaphoreCount(0)
-				.setPSignalSemaphores(nullptr);
-
-			RendererState::RenderQueue().submit(transferSubmitInfo, vk::Fence());
 		}
 		virtual void Present(GameEngine::WindowSurface *surface, GameEngine::Texture2D* srcImage) override
 		{
@@ -4920,11 +4716,6 @@ namespace VK
 		virtual DescriptorSet * CreateDescriptorSet(GameEngine::DescriptorSetLayout* layout) override
 		{
 			return new DescriptorSet(reinterpret_cast<VK::DescriptorSetLayout*>(layout));
-		}
-
-		virtual int GetDescriptorPoolCount() override
-		{
-			CORELIB_NOT_IMPLEMENTED("GetDescriptorPoolCount");
 		}
 
 		Fence* CreateFence() override

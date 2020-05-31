@@ -56,7 +56,8 @@ namespace GameEngine
 		auto sharedRes = renderer->GetSharedResource();
 		RefPtr<PipelineBuilder> pb = hw->CreatePipelineBuilder();
 		VertexFormat quadVert;
-		pb->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
+        pb->FixedFunctionStates.cullMode = CullMode::Disabled;
+		pb->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleStrips;
 		quadVert.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 0, 0, "POSITION", 0));
 		quadVert.Attributes.Add(VertexAttributeDesc(DataType::Float2, 0, 8, 1, "TEXCOORD", 0));
 		pb->SetVertexLayout(quadVert);
@@ -151,14 +152,14 @@ namespace GameEngine
 				frameBuffers.Add(fb0);
 				auto cmdBuffer = hw->CreateCommandBuffer();
 				cmdBuffer->BeginRecording(fb0.Ptr());
-				cmdBuffer->SetViewport(0, 0, resolution, resolution);
+                cmdBuffer->SetViewport(Viewport(0, 0, resolution, resolution));
 				cmdBuffer->BindPipeline(copyPipeline.Ptr());
 				cmdBuffer->BindDescriptorSet(0, copyDescSet.Ptr());
 				cmdBuffer->BindVertexBuffer(sharedRes->fullScreenQuadVertBuffer.Ptr(), 0);
 				cmdBuffer->Draw(0, 4);
 				cmdBuffer->EndRecording();
 				commandBuffers.Add(cmdBuffer);
-				hw->QueueRenderPass(fb0.Ptr(), MakeArrayView(cmdBuffer));
+                hw->QueueRenderPass(fb0.Ptr(), true, MakeArrayView(cmdBuffer));
 			}
 
 			// copy to level 0 of result
@@ -169,22 +170,24 @@ namespace GameEngine
 				frameBuffers.Add(fb1);
 				auto cmdBuffer = hw->CreateCommandBuffer();
 				cmdBuffer->BeginRecording(fb1.Ptr());
-				cmdBuffer->SetViewport(0, 0, resolution, resolution);
+                cmdBuffer->SetViewport(Viewport(0, 0, resolution, resolution));
 				cmdBuffer->BindPipeline(copyPipeline.Ptr());
 				cmdBuffer->BindDescriptorSet(0, copyDescSet.Ptr());
 				cmdBuffer->BindVertexBuffer(sharedRes->fullScreenQuadVertBuffer.Ptr(), 0);
 				cmdBuffer->Draw(0, 4);
 				cmdBuffer->EndRecording();
 				commandBuffers.Add(cmdBuffer);
-				hw->QueueRenderPass(fb1.Ptr(), MakeArrayView(cmdBuffer));
+                hw->QueueRenderPass(fb1.Ptr(), true, MakeArrayView(cmdBuffer));
 			}
             hw->EndJobSubmission(fence.Ptr());
             fence->Wait();
             fence->Reset();
+            hw->ResetTempBufferVersion(0);
 		}
 		// prefilter
 		RefPtr<PipelineBuilder> pb2 = hw->CreatePipelineBuilder();
-		pb2->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
+		pb2->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleStrips;
+        pb2->FixedFunctionStates.cullMode = CullMode::Disabled;
 		pb2->SetVertexLayout(quadVert);
 		RefPtr<DescriptorSetLayout> prefilterPassLayout = hw->CreateDescriptorSetLayout(MakeArray(
 			DescriptorLayout(StageFlags::sfGraphics, 0, BindingType::UniformBuffer),
@@ -259,7 +262,8 @@ namespace GameEngine
 				frameBuffers.Add(fb);
 				auto cmdBuffer = hw->CreateCommandBuffer();
 				cmdBuffer->BeginRecording(fb.Ptr());
-				cmdBuffer->SetViewport(0, 0, resolution >> l, resolution >> l);
+                cmdBuffer->SetEventMarker((String("Prefilter Light Probe Level ") + String(l)).Buffer(), 0);
+                cmdBuffer->SetViewport(Viewport(0, 0, resolution >> l, resolution >> l));
 				cmdBuffer->BindPipeline(prefilterPipeline.Ptr());
 				cmdBuffer->BindDescriptorSet(0, prefilterDescSet.Ptr());
 				cmdBuffer->BindVertexBuffer(sharedRes->fullScreenQuadVertBuffer.Ptr(), 0);
@@ -267,10 +271,11 @@ namespace GameEngine
 				cmdBuffer->EndRecording();
 				commandBuffers.Add(cmdBuffer);
                 hw->BeginJobSubmission();
-				hw->QueueRenderPass(fb.Ptr(), cmdBuffer);
+                hw->QueueRenderPass(fb.Ptr(), true, cmdBuffer);
                 hw->EndJobSubmission(fence.Ptr());
                 fence->Wait();
                 fence->Reset();
+                hw->ResetTempBufferVersion(0);
 			}
 		}
 	}

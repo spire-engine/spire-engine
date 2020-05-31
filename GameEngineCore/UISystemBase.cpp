@@ -126,7 +126,9 @@ namespace GameEngine
         hwRenderer->Wait();
         surface->Resize(w, h);
         uiEntry->Posit(0, 0, w, h);
-        uiOverlayTexture = hwRenderer->CreateTexture2D("uiOverlayTexture", TextureUsage::SampledColorAttachment, w, h, 1, StorageFormat::RGBA_8);
+        uiOverlayTexture = hwRenderer->CreateTexture2D("uiOverlayTexture",
+            (TextureUsage)((int)TextureUsage::SampledColorAttachment | (int)TextureUsage::Storage), w, h, 1,
+            StorageFormat::RGBA_8);
         frameBuffer = sysInterface->CreateFrameBuffer(uiOverlayTexture.Ptr());
         screenWidth = w;
         screenHeight = h;
@@ -222,7 +224,7 @@ namespace GameEngine
                 DescriptorLayout(sfGraphics, 2, BindingType::StorageBuffer)).GetArrayView());
             pipeBuilder->SetBindingLayout(MakeArrayView(descLayout.Ptr()));
             pipeBuilder->FixedFunctionStates.PrimitiveRestartEnabled = true;
-            pipeBuilder->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
+            pipeBuilder->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleStrips;
             pipeBuilder->FixedFunctionStates.blendMode = BlendMode::AlphaBlend;
             pipeBuilder->FixedFunctionStates.DepthCompareFunc = CompareFunc::Disabled;
             pipeBuilder->FixedFunctionStates.cullMode = CullMode::Disabled;
@@ -257,7 +259,7 @@ namespace GameEngine
             indexStream.Clear();
             primCounter = 0;
         }
-        void EndUIDrawing(UIWindowContext * wndCtx, bool hasBackground)
+        void EndUIDrawing(UIWindowContext * wndCtx)
         {
             frameId = frameId % DynamicBufferLengthMultiplier;
             int indexCount = indexStream.Count();
@@ -271,13 +273,11 @@ namespace GameEngine
                 Math::Min((int)sizeof(UniformField) * uniformFields.Count(), wndCtx->primitiveBufferSize));
 
             auto cmdBuf = wndCtx->cmdBuffer->BeginRecording(wndCtx->frameBuffer.Ptr());
-            if (!hasBackground)
-                cmdBuf->ClearAttachments(wndCtx->frameBuffer.Ptr());
             cmdBuf->BindPipeline(pipeline.Ptr());
             cmdBuf->BindVertexBuffer(wndCtx->vertexBuffer.Ptr(), frameId * wndCtx->vertexBufferSize);
             cmdBuf->BindIndexBuffer(wndCtx->indexBuffer.Ptr(), frameId * wndCtx->indexBufferSize);
             cmdBuf->BindDescriptorSet(0, wndCtx->descSets[frameId].Ptr());
-            cmdBuf->SetViewport(0, 0, wndCtx->screenWidth, wndCtx->screenHeight);
+            cmdBuf->SetViewport(Viewport(0, 0, wndCtx->screenWidth, wndCtx->screenHeight));
             cmdBuf->DrawIndexed(0, indexCount);
             cmdBuf->EndRecording();
         }
@@ -287,10 +287,13 @@ namespace GameEngine
 
             if (baseTexture)
             {
-                rendererApi->Blit(wndCtx->uiOverlayTexture.Ptr(), baseTexture, VectorMath::Vec2i::Create(viewport.x, viewport.y), true);
+                rendererApi->Blit(wndCtx->uiOverlayTexture.Ptr(), baseTexture,
+                    VectorMath::Vec2i::Create(viewport.x, viewport.y), SourceFlipMode::ForPresent);
             }
 
-            rendererApi->QueueRenderPass(wndCtx->frameBuffer.Ptr(), MakeArrayView(wndCtx->cmdBuffer->GetBuffer()));
+            rendererApi->QueueRenderPass(
+                wndCtx->frameBuffer.Ptr(), (baseTexture == nullptr),
+                MakeArrayView(wndCtx->cmdBuffer->GetBuffer()));
         }
         bool IsBufferFull()
         {
@@ -315,8 +318,8 @@ namespace GameEngine
             //p1.x += lineDir.x; p1.y += lineDir.y;
             points[0].x = p0.x - lineDirOtho.x; points[0].y = p0.y - lineDirOtho.y; points[0].inputIndex = primCounter;
             points[1].x = p0.x + lineDirOtho.x; points[1].y = p0.y + lineDirOtho.y; points[1].inputIndex = primCounter;
-            points[2].x = p1.x + lineDirOtho.x; points[2].y = p1.y + lineDirOtho.y; points[2].inputIndex = primCounter;
-            points[3].x = p1.x - lineDirOtho.x; points[3].y = p1.y - lineDirOtho.y; points[3].inputIndex = primCounter;
+            points[2].x = p1.x - lineDirOtho.x; points[2].y = p1.y - lineDirOtho.y; points[2].inputIndex = primCounter;
+            points[3].x = p1.x + lineDirOtho.x; points[3].y = p1.y + lineDirOtho.y; points[3].inputIndex = primCounter;
             indexStream.Add(vertexStream.Count());
             indexStream.Add(vertexStream.Count() + 1);
             indexStream.Add(vertexStream.Count() + 2);
@@ -405,12 +408,21 @@ namespace GameEngine
         {
             if (IsBufferFull())
                 return;
-            for (auto p : points)
+            auto addPoint = [this](Vec2 p)
             {
                 UberVertex vtx;
-                vtx.x = p.x; vtx.y = p.y; vtx.inputIndex = primCounter;
+                vtx.x = p.x;
+                vtx.y = p.y;
+                vtx.inputIndex = primCounter;
                 indexStream.Add(vertexStream.Count());
                 vertexStream.Add(vtx);
+            };
+            addPoint(points[0]);
+            for (int i = 1; i <= points.Count() / 2; i++)
+            {
+                addPoint(points[i]);
+                if (points.Count() - i > i)
+                    addPoint(points[points.Count() - i]);
             }
             indexStream.Add(-1);
             UniformField fields;
@@ -437,8 +449,8 @@ namespace GameEngine
             UberVertex points[4];
             points[0].x = x; points[0].y = y; points[0].inputIndex = primCounter;
             points[1].x = x; points[1].y = y1; points[1].inputIndex = primCounter;
-            points[2].x = x1; points[2].y = y1; points[2].inputIndex = primCounter;
-            points[3].x = x1; points[3].y = y; points[3].inputIndex = primCounter;
+            points[2].x = x1; points[2].y = y; points[2].inputIndex = primCounter;
+            points[3].x = x1; points[3].y = y1; points[3].inputIndex = primCounter;
             vertexStream.AddRange(points, 4);
 
             UniformField fields;
@@ -516,8 +528,8 @@ namespace GameEngine
             UberVertex vertexData[4];
             vertexData[0].x = x; vertexData[0].y = y; vertexData[0].u = 0.0f; vertexData[0].v = 0.0f; vertexData[0].inputIndex = primCounter;
             vertexData[1].x = x; vertexData[1].y = y1; vertexData[1].u = 0.0f; vertexData[1].v = 1.0f; vertexData[1].inputIndex = primCounter;
-            vertexData[2].x = x1; vertexData[2].y = y1; vertexData[2].u = 1.0f; vertexData[2].v = 1.0f; vertexData[2].inputIndex = primCounter;
-            vertexData[3].x = x1; vertexData[3].y = y; vertexData[3].u = 1.0f; vertexData[3].v = 0.0f; vertexData[3].inputIndex = primCounter;
+            vertexData[2].x = x1; vertexData[2].y = y; vertexData[2].u = 1.0f; vertexData[2].v = 0.0f; vertexData[2].inputIndex = primCounter;
+            vertexData[3].x = x1; vertexData[3].y = y1; vertexData[3].u = 1.0f; vertexData[3].v = 1.0f; vertexData[3].inputIndex = primCounter;
             vertexStream.AddRange(vertexData, 4);
 
             UniformField fields;
@@ -546,8 +558,8 @@ namespace GameEngine
             UberVertex vertexData[4];
             vertexData[0].x = x + offsetX - shadowSize * 1.5f; vertexData[0].y = y + offsetY - shadowSize * 1.5f; vertexData[0].u = 0.0f; vertexData[0].v = 0.0f; vertexData[0].inputIndex = primCounter;
             vertexData[1].x = x + offsetX - shadowSize * 1.5f; vertexData[1].y = (y + h + offsetY) + shadowSize * 1.5f; vertexData[1].u = 0.0f; vertexData[1].v = 1.0f; vertexData[1].inputIndex = primCounter;
-            vertexData[2].x = x + w + offsetX + shadowSize * 1.5f; vertexData[2].y = (y + h + offsetY) + shadowSize * 1.5f; vertexData[2].u = 1.0f; vertexData[2].v = 1.0f; vertexData[2].inputIndex = primCounter;
-            vertexData[3].x = x + w + offsetX + shadowSize * 1.5f; vertexData[3].y = y + offsetY - shadowSize * 1.5f; vertexData[3].u = 1.0f; vertexData[3].v = 0.0f; vertexData[3].inputIndex = primCounter;
+            vertexData[2].x = x + w + offsetX + shadowSize * 1.5f; vertexData[2].y = y + offsetY - shadowSize * 1.5f; vertexData[2].u = 1.0f; vertexData[2].v = 0.0f; vertexData[2].inputIndex = primCounter;
+            vertexData[3].x = x + w + offsetX + shadowSize * 1.5f; vertexData[3].y = (y + h + offsetY) + shadowSize * 1.5f; vertexData[3].u = 1.0f; vertexData[3].v = 1.0f; vertexData[3].inputIndex = primCounter;
             vertexStream.AddRange(vertexData, 4);
 
             UniformField fields;
@@ -647,7 +659,7 @@ namespace GameEngine
         return textBufferPool.Alloc(size);
     }
 
-    void UISystemBase::TransferDrawCommands(UIWindowContext * ctx, bool hasBackground, CoreLib::List<GraphicsUI::DrawCommand>& commands)
+    void UISystemBase::TransferDrawCommands(UIWindowContext * ctx, CoreLib::List<GraphicsUI::DrawCommand>& commands)
     {
         const int MaxEllipseEdges = 32;
         uiRenderer->BeginUIDrawing();
@@ -755,7 +767,7 @@ namespace GameEngine
             }
             ptr++;
         }
-        uiRenderer->EndUIDrawing(ctx, hasBackground);
+        uiRenderer->EndUIDrawing(ctx);
     }
 
     void UISystemBase::QueueDrawCommands(Texture2D* baseTexture, UIWindowContext* ctx, WindowBounds viewport, Fence* frameFence)

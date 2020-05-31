@@ -52,10 +52,9 @@ namespace GameEngine
 
             outlinePassDesc = hwRenderer->CreateDescriptorSet(descLayouts[0].Ptr());
         }
-        virtual void UpdateDescriptorSetBinding(SharedModuleInstances sharedModules, DescriptorSetBindings & binding) override
+        virtual void UpdateDescriptorSetBinding(SharedModuleInstances /*sharedModules*/, DescriptorSetBindings & binding) override
         {
             binding.Bind(0, outlinePassDesc.Ptr());
-            binding.Bind(1, sharedModules.View->GetCurrentDescriptorSet());
         }
         virtual void UpdateRenderAttachments(RenderAttachments & attachments) override
         {

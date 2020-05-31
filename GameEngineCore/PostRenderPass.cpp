@@ -26,7 +26,8 @@ namespace GameEngine
         shaders.Add(compiledShader.fragmentShader);
 
 		pipelineBuilder->SetShaders(From(shaders).Select([](auto x) { return x.Ptr(); }).ToList().GetArrayView());
-		pipelineBuilder->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleFans;
+        pipelineBuilder->FixedFunctionStates.PrimitiveTopology = PrimitiveType::TriangleStrips;
+        pipelineBuilder->FixedFunctionStates.cullMode = CullMode::Disabled;
 		descLayouts.SetSize(rs.BindingLayouts.Count());
 		for (auto & desc : rs.BindingLayouts)
 		{
@@ -64,13 +65,11 @@ namespace GameEngine
 		frameBuffer->GetRenderAttachments().GetTextures(textures);
 
 		auto cmdBuf = commandBuffer->BeginRecording(frameBuffer.Ptr());
-		if (clearFrameBuffer)
-			cmdBuf->ClearAttachments(frameBuffer.Ptr());
 
 		DescriptorSetBindings descBindings;
 		UpdateDescriptorSetBinding(sharedModules, descBindings);
 
-		cmdBuf->SetViewport(0, 0, viewRes->GetWidth(), viewRes->GetHeight());
+        cmdBuf->SetViewport(Viewport(0, 0, viewRes->GetWidth(), viewRes->GetHeight()));
 		cmdBuf->BindPipeline(pipeline.Ptr());
 		cmdBuf->BindVertexBuffer(sharedRes->fullScreenQuadVertBuffer.Ptr(), 0);
 		for (auto & binding : descBindings.bindings)
@@ -79,7 +78,7 @@ namespace GameEngine
 		
 		cmdBuf->EndRecording();
 
-		hwRenderer->QueueRenderPass(frameBuffer.Ptr(), MakeArrayView(cmdBuf), barriers);
+		hwRenderer->QueueRenderPass(frameBuffer.Ptr(), clearFrameBuffer, MakeArrayView(cmdBuf), barriers);
 	}
 
 	RefPtr<RenderTask> PostRenderPass::CreateInstance(SharedModuleInstances sharedModules)

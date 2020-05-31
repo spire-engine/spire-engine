@@ -144,6 +144,7 @@ namespace GameEngine
 			else
 				params.view = View();
 			params.rendererService = renderService.Ptr();
+
             if (currentRenderProcedure)
 			    currentRenderProcedure->Run(params);
 		}
@@ -168,7 +169,7 @@ namespace GameEngine
 				break;
 			}
 			Engine::Instance()->SetTargetShadingLanguage(hardwareRenderer->GetShadingLanguage());
-			hardwareRenderer->SetMaxTempBufferVersions(DynamicBufferLengthMultiplier);
+			hardwareRenderer->Init(DynamicBufferLengthMultiplier);
             
             computeTaskManager = new ComputeTaskManager(hardwareRenderer, Engine::GetShaderCompiler());
 
@@ -342,6 +343,7 @@ namespace GameEngine
             sharedRes.renderStats.Divisor++;
 			sharedRes.renderStats.NumMaterials = 0;
 			sharedRes.renderStats.NumShaders = 0;
+            
             RunRenderProcedure();
 		}
 		virtual RendererSharedResource * GetSharedResource() override

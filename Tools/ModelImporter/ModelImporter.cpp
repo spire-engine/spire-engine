@@ -80,6 +80,7 @@ public:
     String IgnorePattern;
     Quaternion RootTransform = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
     Quaternion RootFixTransform = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+    bool ForceRecomputeNormal = false;
     bool ExportSkeleton = true;
     bool ExportMesh = true;
     bool ExportAnimation = true;
@@ -334,12 +335,12 @@ Mesh ExportMesh(
         vertPtr += meshNumVerts;
         auto srcIndices = mesh->GetPolygonVertices();
         auto srcVerts = mesh->GetControlPoints();
-        mesh->GenerateNormals();
-        mesh->GenerateTangentsData(0, false, false);
+        mesh->GenerateNormals(args.ForceRecomputeNormal, true);
+        mesh->GenerateTangentsData(0, true, false);
         int mvptr = startVertId;
         int vertexId = 0;
         List<int> vertexIdToControlPointIndex;
-        List<Quaternion> originalTangentFrames;
+        List<Vec3> originalNormals;
         List<Vec3> originalVerts;
         vertexIdToControlPointIndex.SetSize(meshNumVerts);
         for (int i = 0; i < mesh->GetPolygonCount(); i++)
@@ -495,7 +496,17 @@ Mesh ExportMesh(
                     }
                     else if (leNormal->GetMappingMode() == FbxGeometryElement::eByControlPoint)
                     {
-                        vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(controlPointIndex));
+                        switch (leNormal->GetReferenceMode())
+                        {
+                        case FbxGeometryElement::eDirect:
+                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(controlPointIndex));
+                            break;
+                        case FbxGeometryElement::eIndexToDirect: {
+                            int index = leNormal->GetIndexArray().GetAt(controlPointIndex);
+                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(index));
+                            break;
+                        }
+                        }
                     }
                 }
 
@@ -551,7 +562,7 @@ Mesh ExportMesh(
                     vq = -vq;
                 if (Vec3::Dot(refBitangent, vertTangent) < 0.0f)
                     vq = -vq;
-                originalTangentFrames.Add(vq);
+                originalNormals.Add(vertNormal);
                 originalVerts.Add(vertPos);
                 meshOut->SetVertexTangentFrame(mvptr + j, vq);
                 vertexId++;
@@ -689,37 +700,53 @@ Mesh ExportMesh(
                         CORELIB_ASSERT(fbxTargetShape->GetControlPointsCount() == mesh->GetControlPointsCount());
                         auto shapeControlPoints = fbxTargetShape->GetControlPoints();
                         auto shapeIndices = mesh->GetPolygonVertices();
+                        auto leNormal = fbxTargetShape->GetElementNormal(0);
                         for (auto f = 0; f < mesh->GetPolygonCount(); f++)
                         {
                             auto srcPolygonIndices = shapeIndices + mesh->GetPolygonVertexIndex(f);
-                            for (auto k = 0; k < mesh->GetPolygonSize(i); k++)
+                            for (auto k = 0; k < mesh->GetPolygonSize(f); k++)
                             {
                                 int controlPointIndex = srcPolygonIndices[k];
                                 auto srcVert = shapeControlPoints[srcPolygonIndices[k]];
                                 auto vertPos = Vec3::Create((float)srcVert[0], (float)srcVert[1], (float)srcVert[2]);
                                 vertPos = transformMat.TransformHomogeneous(vertPos);
-                                VectorMath::Vec3 vertNormal;
-                                vertNormal.SetZero();
-                                auto leNormal = fbxTargetShape->GetElementNormal(0);
-                                if (!leNormal)
-                                    throw InvalidOperationException("Blendshape has no normal data.");
-                                if (leNormal->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+                                VectorMath::Vec3 vertNormal = originalNormals[bsVertId];
+
+                                if (leNormal)
                                 {
-                                    switch (leNormal->GetReferenceMode())
+                                    if (leNormal->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
                                     {
-                                    case FbxGeometryElement::eDirect:
-                                        vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(vertexId));
+                                        switch (leNormal->GetReferenceMode())
+                                        {
+                                        case FbxGeometryElement::eDirect:
+                                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(vertexId));
+                                            break;
+                                        case FbxGeometryElement::eIndexToDirect: {
+                                            int id = leNormal->GetIndexArray().GetAt(vertexId);
+                                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(id));
+                                        }
                                         break;
-                                    case FbxGeometryElement::eIndexToDirect: {
-                                        int id = leNormal->GetIndexArray().GetAt(vertexId);
-                                        vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(id));
+                                        default:
+                                            break; // other reference modes not shown here!
+                                        }
                                     }
-                                    break;
-                                    default:
-                                        break; // other reference modes not shown here!
+                                    else if (leNormal->GetMappingMode() == FbxGeometryElement::eByControlPoint)
+                                    {
+                                        switch (leNormal->GetReferenceMode())
+                                        {
+                                        case FbxGeometryElement::eDirect:
+                                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(controlPointIndex));
+                                            break;
+                                        case FbxGeometryElement::eIndexToDirect: {
+                                            int index = leNormal->GetIndexArray().GetAt(controlPointIndex);
+                                            vertNormal = GetVec3(leNormal->GetDirectArray().GetAt(index));
+                                            break;
+                                        }
+                                        }
                                     }
+                                    vertNormal = normMat.TransformNormal(vertNormal);
                                 }
-                                vertNormal = transformMat.TransformNormal(vertNormal);
+
                                 int quantizedNormal[3] = {
                                     Math::Clamp((int)((vertNormal.x + 1.0f) * 511.5f), 0, 1023),
                                     Math::Clamp((int)((vertNormal.y + 1.0f) * 511.5f), 0, 1023),
@@ -1313,7 +1340,7 @@ class ModelImporterForm : public Form
 {
 private:
     RefPtr<Button> btnSelectFiles;
-    RefPtr<CheckBox> chkExportLevel, chkFlipYZ, chkFlipUV, chkFlipWinding, chkCreateSkeletonMesh, chkRemoveNamespace;
+    RefPtr<CheckBox> chkExportLevel, chkFlipYZ, chkFlipUV, chkFlipWinding, chkCreateSkeletonMesh, chkRemoveNamespace, chkForceRecomputeNormal;
     RefPtr<TextBox> txtRootTransform, txtRootFixTransform, txtRootBoneName, txtSuffix, txtMeshPathPrefix, txtIgnoreNamePattern;
     RefPtr<Label> lblRootTransform, lblRootFixTransform, lblRootBoneName, lblSuffix, lblMeshPathPrefix, lblIgnoreNamePattern;
     Quaternion ParseRootTransform(String txt)
@@ -1368,6 +1395,11 @@ public:
         chkExportLevel->SetPosition(200, 20, 180, 25);
         chkExportLevel->SetText("Export Level");
         chkExportLevel->SetChecked(ExportArguments().ExportScene);
+
+        chkForceRecomputeNormal = new CheckBox(this);
+        chkForceRecomputeNormal->SetPosition(200, 50, 180, 25);
+        chkForceRecomputeNormal->SetText("Force recomputed normal");
+        chkForceRecomputeNormal->SetChecked(ExportArguments().ForceRecomputeNormal);
 
         chkFlipYZ = new CheckBox(this);
         chkFlipYZ->SetPosition(90, 20, 80, 25);
@@ -1448,6 +1480,7 @@ public:
                     args.FlipUV = chkFlipUV->GetChecked();
                     args.FlipYZ = chkFlipYZ->GetChecked();
                     args.FlipWindingOrder = chkFlipWinding->GetChecked();
+                    args.ForceRecomputeNormal = chkForceRecomputeNormal->GetChecked();
                     args.FileName = file;
                     args.RootNodeName = txtRootBoneName->GetText();
                     args.RootTransform = ParseRootTransform(txtRootTransform->GetText());

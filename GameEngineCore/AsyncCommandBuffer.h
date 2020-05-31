@@ -14,7 +14,6 @@ namespace GameEngine
 	public:
 		AsyncCommandBuffer(HardwareRenderer * hwRender, int size = 3);
 		CommandBuffer * BeginRecording(FrameBuffer * frameBuffer);
-		CommandBuffer * BeginRecording();
 		CommandBuffer * GetBuffer();
 	};
 }

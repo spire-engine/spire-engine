@@ -116,7 +116,7 @@ namespace GameEngine
             {
                 auto entry = sysWindow.Value->uiEntry.Ptr();
                 auto uiCommands = entry->DrawUI();
-                uiSystemInterface->TransferDrawCommands(sysWindow.Value, (mainWindow == sysWindow.Key), uiCommands);
+                uiSystemInterface->TransferDrawCommands(sysWindow.Value, uiCommands);
             }
 			for (auto sysWindow : uiSystemInterface->windowContexts)
 			{
@@ -157,8 +157,6 @@ namespace GameEngine
                 engineMode = EngineMode::Editor;
 		
             RegisterEngineActorClasses(this);
-            
-            this->shaderCompiler = CreateShaderCompiler();
 
             if (args.LaunchParams.Directory.ToLower().EndsWith("mp4"))
             {
@@ -174,6 +172,7 @@ namespace GameEngine
 			// initialize renderer
 			renderer = CreateRenderer(args.API);
 			renderer->Resize(args.Width, args.Height);
+
 			currentViewport.x = currentViewport.y = 0;
 			currentViewport.width = args.Width;
 			currentViewport.height = args.Height;
@@ -341,7 +340,7 @@ namespace GameEngine
 
 		if (stats.Divisor == 0)
 			stats.StartTime = thisRenderingTime;
-
+        
 		for (auto & f : syncFences[frameCounter % DynamicBufferLengthMultiplier])
 		{
 			f->Wait();
@@ -362,7 +361,7 @@ namespace GameEngine
                 continue;
             auto uiEntry = sysWindow.Value->uiEntry.Ptr();
             auto uiCommands = uiEntry->DrawUI();
-            uiSystemInterface->TransferDrawCommands(sysWindow.Value, (mainWindow == sysWindow.Key), uiCommands);
+            uiSystemInterface->TransferDrawCommands(sysWindow.Value, uiCommands);
         }
 		
 		stats.CpuTime += CoreLib::Diagnostics::PerformanceCounter::EndSeconds(cpuTimePoint);

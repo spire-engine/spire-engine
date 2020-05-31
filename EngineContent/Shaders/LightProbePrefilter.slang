@@ -1,3 +1,5 @@
+import ShaderLib;
+
 struct VertexIn
 {
     float2 vertPos : POSITION;

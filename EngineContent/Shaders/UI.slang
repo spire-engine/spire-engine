@@ -38,10 +38,19 @@ struct VertexOut
 	int primId : PRIMID;
 };
 
+float4 PlatformNDC(float4 projCoord)
+{
+#ifdef __D3D__
+    return float4(projCoord.x, -projCoord.y, projCoord.z, projCoord.w);
+#else
+    return projCoord;
+#endif
+}
+
 VertexOut vs_main(VertexIn vin)
 {
 	VertexOut rs;
-	rs.projCoord = mul(params.orthoMatrix, float4(vin.vertPos, 0.0, 1.0));
+	rs.projCoord = PlatformNDC(mul(params.orthoMatrix, float4(vin.vertPos, 0.0, 1.0)));
 	rs.vertUV = vin.vertUV;
 	rs.primId = vin.primId;
 	rs.vertPos = vin.vertPos;

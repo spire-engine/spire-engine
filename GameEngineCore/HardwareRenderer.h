@@ -90,7 +90,7 @@ namespace GameEngine
 
 	enum class PrimitiveType
 	{
-		Points = 0, Lines = 1, LineStrips = 3, Triangles = 4, TriangleStrips = 5, TriangleFans = 6, Quads = 7, Patches = 14
+		Points = 0, Lines = 1, LineStrips = 3, Triangles = 4, TriangleStrips = 5, Patches = 14
 	};
 
 	enum class ShaderDataType
@@ -118,9 +118,13 @@ namespace GameEngine
 		RG_F16, RG_F32,
 		RGBA_8, RGBA_8_SRGB, RGBA_I8, RGBA_16, RGBA_I16, RGBA_I32_Raw,
 		RGBA_F16, RGBA_F32,
-		RGBA_Compressed, R11F_G11F_B10F, RGB10_A2,
-		BC1, BC5, BC3, BC1_SRGB,
+		R11F_G11F_B10F, RGB10_A2,
 		Depth24, Depth32, Depth24Stencil8,
+        RGBA_Compressed,
+        BC1,
+        BC5,
+        BC3,
+        BC1_SRGB,
         BC6H
 	};
 
@@ -177,6 +181,26 @@ namespace GameEngine
 	{
 		return x == TextureUsage::Unused;
 	}
+
+	struct Viewport
+    {
+        float x = 0.0f, y = 0.0f, w = 0.0f, h = 0.0f, minZ = 0.0f, maxZ = 1.0F;
+        Viewport() = default;
+        Viewport(int _x, int _y, int _w, int _h) : x((float)_x), y((float)_y), w((float)_w), h((float)_h)
+        {
+        }
+        Viewport(float _x, float _y, float _w, float _h) : x(_x), y(_y), w(_w), h(_h)
+        {
+        }
+        bool operator==(const Viewport &vp)
+        {
+            return x == vp.x && y == vp.y && w == vp.w && h == vp.h && minZ == vp.minZ && maxZ == vp.maxZ;
+        }
+        bool operator!=(const Viewport &vp)
+        {
+            return !this->operator==(vp);
+        }
+    };
 
 	struct BufferStructureInfo
 	{
@@ -805,14 +829,10 @@ namespace GameEngine
 	protected:
 		CommandBuffer() {};
 	public:
-		// Begin recording non-render-pass-specific commands
-		virtual void BeginRecording() = 0;
-		// Specifying the FrameBuffer can result in better performance, but will need to be re-recorded when FrameBuffer changes
 		virtual void BeginRecording(FrameBuffer* frameBuffer) = 0;
-		// Not specifying a specific FrameBuffer may result in worse performance, but can be used with any compatible FrameBuffer
-		virtual void BeginRecording(RenderTargetLayout* renderTargetLayout) = 0;
 		virtual void EndRecording() = 0;
-		virtual void SetViewport(int x, int y, int width, int height) = 0;
+        virtual void SetEventMarker(const char* name, uint32_t colorARGB) = 0;
+        virtual void SetViewport(Viewport viewport) = 0;
 		virtual void BindVertexBuffer(Buffer* vertexBuffer, int byteOffset) = 0;
 		virtual void BindIndexBuffer(Buffer* indexBuffer, int byteOffset) = 0;
 		virtual void BindPipeline(Pipeline* pipeline) = 0;
@@ -822,7 +842,6 @@ namespace GameEngine
 		virtual void DrawIndexed(int firstIndex, int indexCount) = 0;
 		virtual void DrawIndexedInstanced(int numInstances, int firstIndex, int indexCount) = 0;
 		virtual void DispatchCompute(int groupCountX, int groupCountY, int groupCountZ) = 0;
-		virtual void ClearAttachments(FrameBuffer * frameBuffer) = 0;
 	};
 
     class WindowSurface : public CoreLib::RefObject
@@ -852,19 +871,28 @@ namespace GameEngine
 		MemoryAndImage
 	};
 
+	enum class SourceFlipMode
+    {
+		None,
+		Flip,
+		ForPresent
+    };
+
 	class HardwareRenderer : public CoreLib::RefObject
 	{
 	public:
         virtual void ThreadInit(int threadId) = 0;
-		virtual void ClearTexture(GameEngine::Texture2D* texture) = 0;
         virtual void BeginJobSubmission() = 0;
-		virtual void QueueRenderPass(FrameBuffer* frameBuffer, CoreLib::ArrayView<CommandBuffer*> commands, PipelineBarriers barriers = PipelineBarriers::MemoryAndImage) = 0;
+        virtual void QueueRenderPass(FrameBuffer *frameBuffer,
+			bool clearFrameBuffer,
+            CoreLib::ArrayView<CommandBuffer *> commands,
+            PipelineBarriers barriers = PipelineBarriers::MemoryAndImage) = 0;
         virtual void QueueComputeTask(Pipeline* computePipeline, DescriptorSet* descriptorSet, int x, int y, int z, PipelineBarriers barriers = PipelineBarriers::MemoryAndImage) = 0;
         virtual void EndJobSubmission(GameEngine::Fence* fence) = 0;
 		virtual void Present(WindowSurface * surface, Texture2D* srcImage) = 0;
-		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, VectorMath::Vec2i destOffset, bool flipSrc) = 0;
+		virtual void Blit(Texture2D* dstImage, Texture2D* srcImage, VectorMath::Vec2i destOffset, SourceFlipMode flipSrc) = 0;
 		virtual void Wait() = 0;
-		virtual void SetMaxTempBufferVersions(int versionCount) = 0;
+		virtual void Init(int versionCount) = 0;
 		virtual void ResetTempBufferVersion(int version) = 0;
 		virtual Fence* CreateFence() = 0;
 		virtual Buffer* CreateBuffer(BufferUsage usage, int sizeInBytes, const BufferStructureInfo* structInfo = nullptr) = 0;
@@ -885,7 +913,6 @@ namespace GameEngine
 		virtual PipelineBuilder* CreatePipelineBuilder() = 0;
 		virtual DescriptorSetLayout* CreateDescriptorSetLayout(CoreLib::ArrayView<DescriptorLayout> descriptors) = 0;
 		virtual DescriptorSet* CreateDescriptorSet(DescriptorSetLayout* layout) = 0;
-		virtual int GetDescriptorPoolCount() = 0;
 		virtual CommandBuffer* CreateCommandBuffer() = 0;
 		virtual TargetShadingLanguage GetShadingLanguage() = 0;
 		virtual int UniformBufferAlignment() = 0;
