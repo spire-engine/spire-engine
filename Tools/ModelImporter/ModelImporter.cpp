@@ -81,6 +81,7 @@ public:
     Quaternion RootTransform = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
     Quaternion RootFixTransform = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
     bool ForceRecomputeNormal = false;
+    bool NoBlendShapeNormals = false;
     bool ExportSkeleton = true;
     bool ExportMesh = true;
     bool ExportAnimation = true;
@@ -712,7 +713,7 @@ Mesh ExportMesh(
                                 vertPos = transformMat.TransformHomogeneous(vertPos);
                                 VectorMath::Vec3 vertNormal = originalNormals[bsVertId];
 
-                                if (leNormal)
+                                if (!args.NoBlendShapeNormals && leNormal)
                                 {
                                     if (leNormal->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
                                     {
@@ -1204,6 +1205,7 @@ endOfSkeletonExport:
             printf("no animation layer is found.\n");
             return;
         }
+        printf("Converting animation...\n");
         FbxString animStackName = currAnimStack->GetName();
         char *mAnimationName = animStackName.Buffer();
         FbxTakeInfo *takeInfo = lScene->GetTakeInfo(animStackName);
@@ -1290,7 +1292,7 @@ endOfSkeletonExport:
                 for (int j = 0; j < blendshape->GetBlendShapeChannelCount(); j++)
                 {
                     BlendShapeAnimationChannel animChannel;
-                    animChannel.Name = blendshape->GetBlendShapeChannel(j)->GetNameWithoutNameSpacePrefix().Buffer();
+                    animChannel.Name = RemoveNamespace(blendshape->GetBlendShapeChannel(j)->GetNameWithoutNameSpacePrefix().Buffer(), args.RemoveNamespace);
                     auto curve = blendshape->GetBlendShapeChannel(j)->DeformPercent.GetCurve(animLayer);
                     if (!curve)
                         continue;
@@ -1322,7 +1324,8 @@ endOfSkeletonExport:
         int maxKeyFrames = 0;
         for (auto &c : anim.Channels)
             maxKeyFrames = Math::Max(maxKeyFrames, c.KeyFrames.Count());
-        printf("animation converted. keyframes %d, bones %d\n", maxKeyFrames, anim.Channels.Count());
+        printf("animation converted. keyframes %d, bones %d, blendshape channels %d\n", maxKeyFrames,
+            anim.Channels.Count(), anim.BlendShapeChannels.Count());
     }
 
     // Destroy the SDK manager and all the other objects it was handling.
@@ -1340,7 +1343,8 @@ class ModelImporterForm : public Form
 {
 private:
     RefPtr<Button> btnSelectFiles;
-    RefPtr<CheckBox> chkExportLevel, chkFlipYZ, chkFlipUV, chkFlipWinding, chkCreateSkeletonMesh, chkRemoveNamespace, chkForceRecomputeNormal;
+    RefPtr<CheckBox> chkExportLevel, chkFlipYZ, chkFlipUV, chkFlipWinding, chkCreateSkeletonMesh, chkRemoveNamespace,
+        chkForceRecomputeNormal, chkNoBlendShapeNormals;
     RefPtr<TextBox> txtRootTransform, txtRootFixTransform, txtRootBoneName, txtSuffix, txtMeshPathPrefix, txtIgnoreNamePattern;
     RefPtr<Label> lblRootTransform, lblRootFixTransform, lblRootBoneName, lblSuffix, lblMeshPathPrefix, lblIgnoreNamePattern;
     Quaternion ParseRootTransform(String txt)
@@ -1401,26 +1405,31 @@ public:
         chkForceRecomputeNormal->SetText("Force recomputed normal");
         chkForceRecomputeNormal->SetChecked(ExportArguments().ForceRecomputeNormal);
 
+        chkNoBlendShapeNormals = new CheckBox(this);
+        chkNoBlendShapeNormals->SetPosition(200, 80, 180, 25);
+        chkNoBlendShapeNormals->SetText("Disable blendshape normal");
+        chkNoBlendShapeNormals->SetChecked(ExportArguments().NoBlendShapeNormals);
+
         chkFlipYZ = new CheckBox(this);
-        chkFlipYZ->SetPosition(90, 20, 80, 25);
+        chkFlipYZ->SetPosition(50, 20, 80, 25);
         chkFlipYZ->SetText("Flip YZ");
         chkFlipYZ->SetChecked(ExportArguments().FlipYZ);
 
         chkFlipUV = new CheckBox(this);
-        chkFlipUV->SetPosition(90, 50, 120, 25);
+        chkFlipUV->SetPosition(50, 50, 120, 25);
         chkFlipUV->SetText("Flip UV");
         chkFlipUV->SetChecked(ExportArguments().FlipUV);
         chkFlipWinding = new CheckBox(this);
-        chkFlipWinding->SetPosition(90, 80, 120, 25);
+        chkFlipWinding->SetPosition(50, 80, 120, 25);
         chkFlipWinding->SetText("Flip Winding");
         chkFlipWinding->SetChecked(ExportArguments().FlipWindingOrder);
         chkCreateSkeletonMesh = new CheckBox(this);
-        chkCreateSkeletonMesh->SetPosition(90, 110, 180, 25);
+        chkCreateSkeletonMesh->SetPosition(50, 110, 180, 25);
         chkCreateSkeletonMesh->SetText("Create Mesh From Skeleton");
         chkCreateSkeletonMesh->SetChecked(ExportArguments().CreateMeshFromSkeleton);
 
         chkRemoveNamespace = new CheckBox(this);
-        chkRemoveNamespace->SetPosition(90, 140, 200, 25);
+        chkRemoveNamespace->SetPosition(50, 140, 200, 25);
         chkRemoveNamespace->SetText("Remove Namespace");
         chkRemoveNamespace->SetChecked(ExportArguments().RemoveNamespace);
 
@@ -1429,45 +1438,45 @@ public:
         txtRootBoneName->SetPosition(200, 170, 100, 25);
         lblRootBoneName = new Label(this);
         lblRootBoneName->SetText("Root Name:");
-        lblRootBoneName->SetPosition(90, 175, 100, 25);
+        lblRootBoneName->SetPosition(50, 175, 100, 25);
 
         txtRootTransform = new TextBox(this);
         txtRootTransform->SetPosition(200, 200, 100, 25);
         txtRootTransform->SetText("");
         lblRootTransform = new Label(this);
         lblRootTransform->SetText("Root Transform: ");
-        lblRootTransform->SetPosition(90, 205, 100, 25);
+        lblRootTransform->SetPosition(50, 205, 100, 25);
 
         txtRootFixTransform = new TextBox(this);
         txtRootFixTransform->SetPosition(200, 230, 100, 25);
         txtRootFixTransform->SetText("");
         lblRootFixTransform = new Label(this);
         lblRootFixTransform->SetText("Root Fix:");
-        lblRootFixTransform->SetPosition(90, 235, 100, 25);
+        lblRootFixTransform->SetPosition(50, 235, 100, 25);
 
         txtSuffix = new TextBox(this);
         txtSuffix->SetPosition(200, 260, 100, 25);
         txtSuffix->SetText("");
         lblSuffix = new Label(this);
         lblSuffix->SetText("Filename Suffix: ");
-        lblSuffix->SetPosition(90, 265, 100, 25);
+        lblSuffix->SetPosition(50, 265, 100, 25);
 
         txtMeshPathPrefix = new TextBox(this);
         txtMeshPathPrefix->SetPosition(200, 290, 100, 25);
         txtMeshPathPrefix->SetText("");
         lblMeshPathPrefix = new Label(this);
         lblMeshPathPrefix->SetText("Mesh Path Prefix: ");
-        lblMeshPathPrefix->SetPosition(90, 295, 100, 25);
+        lblMeshPathPrefix->SetPosition(50, 295, 100, 25);
 
         lblIgnoreNamePattern = new Label(this);
-        lblIgnoreNamePattern->SetPosition(90, 325, 100, 25);
+        lblIgnoreNamePattern->SetPosition(50, 325, 100, 25);
         lblIgnoreNamePattern->SetText("Ignore Pattern:");
         txtIgnoreNamePattern = new TextBox(this);
         txtIgnoreNamePattern->SetText("_Blendshapes");
         txtIgnoreNamePattern->SetPosition(200, 320, 100, 25);
 
         btnSelectFiles = new Button(this);
-        btnSelectFiles->SetPosition(90, 360, 120, 30);
+        btnSelectFiles->SetPosition(60, 360, 120, 30);
         btnSelectFiles->SetText("Select Files");
         btnSelectFiles->OnClick.Bind([=](Object *, EventArgs) {
             FileDialog dlg(this);
@@ -1481,6 +1490,7 @@ public:
                     args.FlipYZ = chkFlipYZ->GetChecked();
                     args.FlipWindingOrder = chkFlipWinding->GetChecked();
                     args.ForceRecomputeNormal = chkForceRecomputeNormal->GetChecked();
+                    args.NoBlendShapeNormals = chkNoBlendShapeNormals->GetChecked();
                     args.FileName = file;
                     args.RootNodeName = txtRootBoneName->GetText();
                     args.RootTransform = ParseRootTransform(txtRootTransform->GetText());

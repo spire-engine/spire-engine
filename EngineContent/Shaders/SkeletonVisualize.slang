@@ -1,8 +1,9 @@
 import ShaderLib;
 
-[Transparent]
-struct BoneHighlightMaterial : IMaterial
+
+struct SkeletonVisualizeMaterial : IMaterial
 {
+    float3 solidColor;
     float3 highlightColor;
     float alpha;
     int highlightId;
@@ -14,7 +15,7 @@ struct BoneHighlightMaterial : IMaterial
    	MaterialPattern evalPattern<TVertAttribs : IVertexAttribs>(VertexPositionInfo shadingPoint, TVertAttribs vertAttribs, ViewParams viewParams)
     {
         MaterialPattern rs;
-        rs.albedo = float3(0.9, 0.45, 0.05);
+        rs.albedo = solidColor;
         rs.normal = float3(0.0, 0.0, 1.0);
         rs.specular = 0.5;
         rs.roughness = 0.7;
