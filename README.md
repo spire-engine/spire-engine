@@ -3,7 +3,7 @@
 
 
 
-SpireEngine is a Vulkan-based, cross-platform mini game engine that uses Slang as its shader compiler.
+SpireEngine is cross-platform mini game engine that uses Slang as its shader compiler. SpireEngine supports both Direct3D 12 and Vulkan.
 
 | Platform | Build Status |
 |:--------:|:------------:|

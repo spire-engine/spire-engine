@@ -42,7 +42,7 @@ class LibPIX
 {
 private:
     typedef HRESULT(WINAPI *PFN_BeginEventOnCommandList)(
-    ID3D12GraphicsCommandList *commandList, UINT64 color, _In_ PCSTR formatString);
+        ID3D12GraphicsCommandList *commandList, UINT64 color, _In_ PCSTR formatString);
     typedef HRESULT(WINAPI *PFN_EndEventOnCommandList)(ID3D12GraphicsCommandList *commandList);
     typedef HRESULT(WINAPI *PFN_SetMarkerOnCommandList)(
         ID3D12GraphicsCommandList *commandList, UINT64 color, _In_ PCSTR formatString);
@@ -78,7 +78,6 @@ public:
             setMarkerOnCommandList(commandList, color, formatString);
     }
 };
-
 
 int Align(int size, int alignment)
 {
@@ -312,17 +311,9 @@ D3D12_PRIMITIVE_TOPOLOGY TranslatePrimitiveTopology(PrimitiveType type)
     }
 }
 
-typedef HRESULT(__stdcall *PFN_D3DCOMPILE)(LPCVOID pSrcData,
-  SIZE_T SrcDataSize,
-  LPCSTR pSourceName,
-  const D3D_SHADER_MACRO *pDefines,
-  ID3DInclude *pInclude,
-  LPCSTR pEntrypoint,
-  LPCSTR pTarget,
-  UINT Flags1,
-  UINT Flags2,
-  ID3DBlob **ppCode,
-  ID3DBlob **ppErrorMsgs);
+typedef HRESULT(__stdcall *PFN_D3DCOMPILE)(LPCVOID pSrcData, SIZE_T SrcDataSize, LPCSTR pSourceName,
+    const D3D_SHADER_MACRO *pDefines, ID3DInclude *pInclude, LPCSTR pEntrypoint, LPCSTR pTarget, UINT Flags1,
+    UINT Flags2, ID3DBlob **ppCode, ID3DBlob **ppErrorMsgs);
 
 struct CommandAllocator
 {
@@ -639,7 +630,6 @@ public:
     }
 };
 
-
 class Buffer : public GameEngine::Buffer
 {
 public:
@@ -661,8 +651,8 @@ public:
         bufferSize = Align(sizeInBytes, D3DConstantBufferAlignment);
         buffer.resource =
             state.CreateBufferResource(bufferSize, mappable ? D3D12_HEAP_TYPE_CUSTOM : D3D12_HEAP_TYPE_DEFAULT,
-            mappable ? D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE : D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-            usage == BufferUsage::StorageBuffer);
+                mappable ? D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE : D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+                usage == BufferUsage::StorageBuffer);
         buffer.subresourceStates.SetSize(1);
         buffer.subresourceStates[0] = D3D12_RESOURCE_STATE_COMMON;
 
@@ -690,12 +680,12 @@ public:
             range.End = (SIZE_T)(size + offset);
             void *mappedPtr = nullptr;
             CHECK_DX(buffer.resource->Map(0, &range, &mappedPtr));
-            memcpy((char*)mappedPtr + offset, data, size);
+            memcpy((char *)mappedPtr + offset, data, size);
             buffer.resource->Unmap(0, &range);
             buffer.subresourceStates[0] = D3D12_RESOURCE_STATE_COPY_DEST;
             return true;
         }
-        
+
         if (size < SharedStagingBufferDataSizeThreshold)
         {
             // Use shared staging buffer for async upload
@@ -710,7 +700,7 @@ public:
                 range.End = (SIZE_T)(size + stagingOffset);
                 void *mappedStagingPtr = nullptr;
                 CHECK_DX(state.stagingBuffers[state.version]->Map(0, &range, &mappedStagingPtr));
-                memcpy((char*)mappedStagingPtr + stagingOffset, data, size);
+                memcpy((char *)mappedStagingPtr + stagingOffset, data, size);
                 state.stagingBuffers[state.version]->Unmap(0, &range);
                 // Submit a copy command to GPU.
                 auto copyCommandList = state.GetCopyCommandList();
@@ -729,7 +719,7 @@ public:
         // Data is too large to use the shared staging buffer, or the staging buffer
         // is already full.
         // Create a dedicated staging buffer and perform uploading right here.
- 
+
         std::lock_guard<std::mutex> lock(state.largeCopyCmdListMutex);
         ID3D12Resource *stagingResource =
             state.CreateBufferResource(size, D3D12_HEAP_TYPE_UPLOAD, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, false);
@@ -1036,7 +1026,7 @@ public:
         int mipLevels = 0;
         int arraySize = 0;
     };
-    
+
     TextureProperties properties;
 
     D3DTexture()
@@ -1165,7 +1155,7 @@ public:
         mapRange.End = totalSize;
         char *stagingBufferPtr;
         ID3D12GraphicsCommandList *copyCmdList;
-        CHECK_DX(stagingResource->Map(0, &mapRange, (void**)&stagingBufferPtr));
+        CHECK_DX(stagingResource->Map(0, &mapRange, (void **)&stagingBufferPtr));
         for (int i = 0; i < slices; i++)
         {
             if (data)
@@ -1182,7 +1172,7 @@ public:
                             (char *)data + rowSize * row, rowSize);
                     }
                 }
-                data = (char*)data + packedResourceSize;
+                data = (char *)data + packedResourceSize;
             }
             else
             {
@@ -1191,7 +1181,7 @@ public:
             stagingBufferPtr += footPrint.Footprint.RowPitch * numRows;
         }
         stagingResource->Unmap(0, &mapRange);
-        
+
         CHECK_DX(state.device->CreateCommandList(
             0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.largeCopyCmdListAllocator, nullptr, IID_PPV_ARGS(&copyCmdList)));
         if (subresourceStates[subresourceId] != D3D12_RESOURCE_STATE_COPY_DEST)
@@ -1337,7 +1327,7 @@ public:
         properties.d3dformat = isDepth ? TranslateTypelessFormat(format) : TranslateStorageFormat(format);
         int arraySizeOrDepth = dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ? layers : depth;
         resource = CreateTextureResource(D3D12_HEAP_TYPE_DEFAULT, width, height, arraySizeOrDepth, properties.mipLevels,
-            properties.d3dformat, dimension, initialState, GetResourceFlags(usage), isDepth, 
+            properties.d3dformat, dimension, initialState, GetResourceFlags(usage), isDepth,
             isDepth ? TranslateDepthFormat(format) : properties.d3dformat);
         subresourceStates.SetSize(properties.mipLevels * properties.arraySize);
         for (auto &s : subresourceStates)
@@ -1352,7 +1342,8 @@ public:
             D3D12_SRV_DIMENSION_TEXTURE2D, D3D12_RESOURCE_STATE_COPY_DEST);
 
         // Copy data
-        SetData(0, 0, 0, 0, 0, properties.width, properties.height, 1, inputType, data, TextureUsageToInitialState(usage));
+        SetData(
+            0, 0, 0, 0, 0, properties.width, properties.height, 1, inputType, data, TextureUsageToInitialState(usage));
 
         // Build mipmaps
         BuildMipmaps();
@@ -1374,15 +1365,17 @@ public:
     {
         texture.resource = nullptr;
     }
-    virtual void GetSize(int &/*width*/, int &/*height*/) override
+    virtual void GetSize(int & /*width*/, int & /*height*/) override
     {
         CORELIB_UNREACHABLE("unreachable");
     }
-    virtual void SetData(int /*level*/, int /*width*/, int /*height*/, int /*samples*/, DataType /*inputType*/, void * /*data*/) override
+    virtual void SetData(
+        int /*level*/, int /*width*/, int /*height*/, int /*samples*/, DataType /*inputType*/, void * /*data*/) override
     {
         CORELIB_UNREACHABLE("unreachable");
     }
-    virtual void SetData(int /*width*/, int /*height*/, int /*samples*/, DataType /*inputType*/, void * /*data*/) override
+    virtual void SetData(
+        int /*width*/, int /*height*/, int /*samples*/, DataType /*inputType*/, void * /*data*/) override
     {
         CORELIB_UNREACHABLE("unreachable");
     }
@@ -1668,6 +1661,7 @@ public:
             break;
         }
     }
+
 public:
     virtual TextureFilter GetFilter() override
     {
@@ -1783,6 +1777,7 @@ class Fence : public GameEngine::Fence
 {
 public:
     SingleQueueFence direct, copy;
+
 public:
     virtual void Reset() override
     {
@@ -1904,8 +1899,7 @@ public:
                 }
                 framebuffer->dsvHandle = state.dsvDescHeap.Alloc(1).cpuHandle;
                 framebuffer->depthStencilTexture = d3dtexture;
-                state.device->CreateDepthStencilView(d3dtexture->resource, &dsv,
-                    framebuffer->dsvHandle);
+                state.device->CreateDepthStencilView(d3dtexture->resource, &dsv, framebuffer->dsvHandle);
             }
         }
         return framebuffer;
@@ -2054,7 +2048,7 @@ public:
             desc.Texture3D.ResourceMinLODClamp = 0.0f;
             desc.Texture3D.MostDetailedMip = 0;
         }
-        
+
         state.device->CreateShaderResourceView(d3dTexture->resource, &desc, descHandle);
     }
 
@@ -2126,7 +2120,7 @@ public:
             state.device->CreateUnorderedAccessView(d3dTexture->resource, nullptr, &desc, descAddr);
         }
     }
-    virtual void Update(int location, GameEngine::TextureSampler * sampler) override
+    virtual void Update(int location, GameEngine::TextureSampler *sampler) override
     {
         auto &state = RendererState::Get();
         state.device->CreateSampler(
@@ -2181,7 +2175,8 @@ public:
             desc.Buffer.FirstElement = offset / d3dbuffer->structInfo.StructureStride;
             desc.Buffer.StructureByteStride = d3dbuffer->structInfo.StructureStride;
             desc.Buffer.NumElements = d3dbuffer->structInfo.NumElements;
-            state.device->CreateShaderResourceView(d3dbuffer->buffer.resource, &desc, descriptors[location].address.cpuHandle);
+            state.device->CreateShaderResourceView(
+                d3dbuffer->buffer.resource, &desc, descriptors[location].address.cpuHandle);
             ResourceUse resourceUse;
             resourceUse.resource = &d3dbuffer->buffer;
             resourceUse.subresourceId = 0;
@@ -2233,6 +2228,7 @@ private:
     List<int> descSetBindingMapping; // DescriptorSet slot index -> D3D DescriptorTable Index.
     ID3D12RootSignature *rootSignature = nullptr;
     VertexFormat vertexFormat;
+
 public:
     PipelineBuilder()
     {
@@ -2250,7 +2246,7 @@ public:
         for (auto shader : shaders)
             d3dShaders.Add(reinterpret_cast<Shader *>(shader));
     }
-    
+
     virtual void SetVertexLayout(VertexFormat format) override
     {
         this->vertexFormat = format;
@@ -2453,10 +2449,10 @@ public:
         pipelineName = name;
     }
 
-    virtual GameEngine::Pipeline *ToPipeline(GameEngine::RenderTargetLayout * renderTargetLayout) override
+    virtual GameEngine::Pipeline *ToPipeline(GameEngine::RenderTargetLayout *renderTargetLayout) override
     {
         CORELIB_ASSERT(rootSignature != nullptr);
-        auto& state = RendererState::Get();
+        auto &state = RendererState::Get();
         D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
         desc.pRootSignature = rootSignature;
         desc.InputLayout = inputDesc;
@@ -2498,8 +2494,7 @@ public:
         desc.DepthStencilState.FrontFace.StencilFunc = TranslateCompareFunc(FixedFunctionStates.StencilCompareFunc);
         desc.DepthStencilState.FrontFace.StencilDepthFailOp =
             TranslateStencilOp(FixedFunctionStates.StencilDepthFailOp);
-        desc.DepthStencilState.FrontFace.StencilFailOp =
-            TranslateStencilOp(FixedFunctionStates.StencilFailOp);
+        desc.DepthStencilState.FrontFace.StencilFailOp = TranslateStencilOp(FixedFunctionStates.StencilFailOp);
         desc.DepthStencilState.FrontFace.StencilPassOp = TranslateStencilOp(FixedFunctionStates.StencilDepthPassOp);
         desc.DepthStencilState.BackFace = desc.DepthStencilState.FrontFace;
         desc.RasterizerState.ConservativeRaster = FixedFunctionStates.ConsevativeRasterization
@@ -2511,7 +2506,8 @@ public:
         desc.RasterizerState.FillMode = TranslateFillMode(FixedFunctionStates.PolygonFillMode);
         desc.RasterizerState.SlopeScaledDepthBias =
             FixedFunctionStates.EnablePolygonOffset ? FixedFunctionStates.PolygonOffsetFactor : 0.0f;
-        desc.RasterizerState.DepthBias = FixedFunctionStates.EnablePolygonOffset ? (int)FixedFunctionStates.PolygonOffsetUnits : 0;
+        desc.RasterizerState.DepthBias =
+            FixedFunctionStates.EnablePolygonOffset ? (int)FixedFunctionStates.PolygonOffsetUnits : 0;
         desc.RasterizerState.DepthClipEnable = 0;
 
         desc.BlendState.AlphaToCoverageEnable = 0;
@@ -2566,8 +2562,7 @@ public:
     }
 
     virtual GameEngine::Pipeline *CreateComputePipeline(
-        CoreLib::ArrayView<GameEngine::DescriptorSetLayout *> descriptorSets,
-        GameEngine::Shader * shader) override
+        CoreLib::ArrayView<GameEngine::DescriptorSetLayout *> descriptorSets, GameEngine::Shader *shader) override
     {
         auto &state = RendererState::Get();
         D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {};
@@ -2590,14 +2585,14 @@ class CommandBuffer : public GameEngine::CommandBuffer
 public:
     Buffer *vertexBuffer = nullptr;
     int vertexBufferOffset = 0;
-    
+
     // Current descriptor set bindings.
     Array<DescriptorSet *, 16> descSetBindings;
 
     // All descriptor sets referenced in this command buffer.
     List<DescriptorSet *> descSets;
 
-    Pipeline* currentPipeline = nullptr;
+    Pipeline *currentPipeline = nullptr;
     bool pipelineChanged = false, descBindingChanged = false;
     bool vertexBufferChanged = false;
 
@@ -2611,8 +2606,7 @@ public:
     {
         auto &state = RendererState::Get();
         CHECK_DX(state.device->CreateCommandAllocator(type, IID_PPV_ARGS(&commandAllocator)));
-        CHECK_DX(state.device->CreateCommandList(0, type, commandAllocator,
-            nullptr, IID_PPV_ARGS(&commandList)));
+        CHECK_DX(state.device->CreateCommandList(0, type, commandAllocator, nullptr, IID_PPV_ARGS(&commandList)));
         commandList->Close();
     }
     ~CommandBuffer()
@@ -2672,6 +2666,7 @@ public:
                 TranslatePrimitiveTopology(currentPipeline->FixedFunctionStates.PrimitiveTopology));
         }
     }
+
 public:
     Viewport viewport;
     ID3D12DescriptorHeap *descHeaps[2];
@@ -2683,7 +2678,7 @@ public:
         pipelineChanged = false;
         descBindingChanged = false;
         currentPipeline = nullptr;
-        for (auto & descSet : descSetBindings)
+        for (auto &descSet : descSetBindings)
             descSet = nullptr;
         descSets.Clear();
         vertexBuffer = nullptr;
@@ -2712,9 +2707,9 @@ public:
         state.pix.SetMarkerOnCommandList(commandList, color, name);
     }
 
-    virtual void BindVertexBuffer(GameEngine::Buffer * buffer, int byteOffset) override
+    virtual void BindVertexBuffer(GameEngine::Buffer *buffer, int byteOffset) override
     {
-        vertexBuffer = reinterpret_cast<Buffer*>(buffer);
+        vertexBuffer = reinterpret_cast<Buffer *>(buffer);
         vertexBufferOffset = byteOffset;
         vertexBufferChanged = true;
         ResourceUse resourceUse;
@@ -2723,7 +2718,7 @@ public:
         resourceUse.targetState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
         resourceUses.Add(resourceUse);
     }
-    virtual void BindIndexBuffer(GameEngine::Buffer * indexBuffer, int byteOffset) override
+    virtual void BindIndexBuffer(GameEngine::Buffer *indexBuffer, int byteOffset) override
     {
         auto d3dbuffer = reinterpret_cast<Buffer *>(indexBuffer);
         D3D12_INDEX_BUFFER_VIEW view = {};
@@ -2737,12 +2732,12 @@ public:
         resourceUse.targetState = D3D12_RESOURCE_STATE_INDEX_BUFFER;
         resourceUses.Add(resourceUse);
     }
-    virtual void BindPipeline(GameEngine::Pipeline * pipeline) override
+    virtual void BindPipeline(GameEngine::Pipeline *pipeline) override
     {
         pipelineChanged = (reinterpret_cast<Pipeline *>(pipeline) != currentPipeline);
-        currentPipeline = reinterpret_cast<Pipeline*>(pipeline);
+        currentPipeline = reinterpret_cast<Pipeline *>(pipeline);
     }
-    virtual void BindDescriptorSet(int binding, GameEngine::DescriptorSet * descSet) override
+    virtual void BindDescriptorSet(int binding, GameEngine::DescriptorSet *descSet) override
     {
         auto d3dDescSet = reinterpret_cast<DescriptorSet *>(descSet);
         descSets.Add(d3dDescSet);
@@ -2840,6 +2835,7 @@ public:
         if (swapchain)
             swapchain->Release();
     }
+
 public:
     virtual WindowHandle GetWindowHandle() override
     {
@@ -2852,7 +2848,7 @@ public:
             CreateSwapchain(width, height);
         }
     }
-    virtual void GetSize(int & width, int & height) override
+    virtual void GetSize(int &width, int &height) override
     {
         width = this->w;
         height = this->h;
@@ -2915,10 +2911,10 @@ private:
         descRanges[1].NumDescriptors = 1;
         descRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
         rootParams[1].DescriptorTable.pDescriptorRanges = descRanges;
-        rootSignatureDesc.Desc_1_0.pParameters = rootParams; 
+        rootSignatureDesc.Desc_1_0.pParameters = rootParams;
         CHECK_DX(state.serializeVersionedRootSignature(&rootSignatureDesc, &rootSignatureBlob, nullptr));
-        CHECK_DX(state.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(),
-            IID_PPV_ARGS(&blitRootSignature)));
+        CHECK_DX(state.device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
+            rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&blitRootSignature)));
         rootSignatureBlob->Release();
         D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineDesc = {};
         pipelineDesc.CS.BytecodeLength = code->GetBufferSize();
@@ -3080,7 +3076,7 @@ public:
         CORELIB_ASSERT(threadId < MaxRenderThreads);
         renderThreadId = threadId;
     }
-    
+
     virtual void BeginJobSubmission() override
     {
         auto &state = RendererState::Get();
@@ -3110,7 +3106,8 @@ public:
                     {
                         for (auto &resUse : useList)
                         {
-                            resUse.resource->TransferState(resUse.subresourceId, resUse.targetState, pendingBarrierList);
+                            resUse.resource->TransferState(
+                                resUse.subresourceId, resUse.targetState, pendingBarrierList);
                         }
                     }
                 }
@@ -3138,7 +3135,8 @@ public:
                 else if (attachment.handle.texCube)
                 {
                     auto d3dTexture = static_cast<D3DTexture *>(attachment.handle.texCube->GetInternalPtr());
-                    d3dTexture->TransferState((int)attachment.face * d3dTexture->properties.mipLevels + attachment.level,
+                    d3dTexture->TransferState(
+                        (int)attachment.face * d3dTexture->properties.mipLevels + attachment.level,
                         isDepthFormat(d3dTexture->properties.format) ? D3D12_RESOURCE_STATE_DEPTH_WRITE
                                                                      : D3D12_RESOURCE_STATE_RENDER_TARGET,
                         pendingBarrierList);
@@ -3157,7 +3155,7 @@ public:
             if (pendingBarrierList.Count())
                 cmdList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
         }
-        
+
         cmdList->OMSetRenderTargets(d3dframeBuffer->rtvCount, d3dframeBuffer->rtvHandles, false,
             d3dframeBuffer->dsvCount ? &d3dframeBuffer->dsvHandle : nullptr);
         if (clearFrameBuffer)
@@ -3166,12 +3164,13 @@ public:
             {
                 if (d3dframeBuffer->depthStencilTexture->properties.format == StorageFormat::Depth24Stencil8)
                 {
-                    cmdList->ClearDepthStencilView(d3dframeBuffer->dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 
-                        1.0f, 0, 0, nullptr);
+                    cmdList->ClearDepthStencilView(d3dframeBuffer->dsvHandle,
+                        D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
                 }
                 else
                 {
-                    cmdList->ClearDepthStencilView(d3dframeBuffer->dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+                    cmdList->ClearDepthStencilView(
+                        d3dframeBuffer->dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
                 }
             }
             for (int i = 0; i < d3dframeBuffer->rtvCount; i++)
@@ -3209,9 +3208,8 @@ public:
         }
     }
 
-    virtual void QueueComputeTask(GameEngine::Pipeline * computePipeline,
-        GameEngine::DescriptorSet * descriptorSet, int x, int y, int z,
-        PipelineBarriers barriers) override
+    virtual void QueueComputeTask(GameEngine::Pipeline *computePipeline, GameEngine::DescriptorSet *descriptorSet,
+        int x, int y, int z, PipelineBarriers barriers) override
     {
         auto &state = RendererState::Get();
         auto cmdList = pendingCommands[renderThreadId];
@@ -3230,7 +3228,7 @@ public:
             cmdList->SetComputeRootDescriptorTable(rootIndex, descSet->samplerAddr.gpuHandle);
             rootIndex++;
         }
-        
+
         // Collect texture uses in descriptor tables.
         if (barriers == PipelineBarriers::MemoryAndImage)
         {
@@ -3266,8 +3264,8 @@ public:
             d3dfence->copy.fence->SetEventOnCompletion(value, d3dfence->copy.waitEvent);
         }
     }
-    
-    virtual void Present(GameEngine::WindowSurface * surface, GameEngine::Texture2D * srcImage) override
+
+    virtual void Present(GameEngine::WindowSurface *surface, GameEngine::Texture2D *srcImage) override
     {
         auto &state = RendererState::Get();
         auto d3dsurface = reinterpret_cast<WindowSurface *>(surface);
@@ -3278,6 +3276,7 @@ public:
         Texture2DProxy proxyTexture(backBuffer, D3D12_RESOURCE_STATE_PRESENT);
         auto cmdList = presentCommandBuffers[state.version];
         presentFences[state.version]->Wait();
+        presentFences[state.version]->Reset();
         cmdList->commandAllocator->Reset();
         cmdList->commandList->Reset(cmdList->commandAllocator, nullptr);
         CORELIB_ASSERT(srcTexture->properties.d3dformat == DXGI_FORMAT_R8G8B8A8_UNORM);
@@ -3295,7 +3294,8 @@ public:
         D3D12_BOX srcBox;
         srcBox.left = 0;
         srcBox.top = 0;
-        srcBox.front = 0;srcBox.back = 1;
+        srcBox.front = 0;
+        srcBox.back = 1;
         srcBox.right = Math::Min(surfaceW, srcTexture->properties.width);
         srcBox.bottom = Math::Min(surfaceH, srcTexture->properties.height);
         auto &pendingBarrierList = pendingBarriers[state.version];
@@ -3351,8 +3351,8 @@ public:
         cmdList->Dispatch(width, height, 1);
     }
 
-    virtual void Blit(GameEngine::Texture2D * dstImage, GameEngine::Texture2D * srcImage,
-        VectorMath::Vec2i destOffset, SourceFlipMode flipSrc) override
+    virtual void Blit(GameEngine::Texture2D *dstImage, GameEngine::Texture2D *srcImage, VectorMath::Vec2i destOffset,
+        SourceFlipMode flipSrc) override
     {
         auto cmdList = pendingCommands[renderThreadId];
         BlitImpl(cmdList.list, dstImage, srcImage, destOffset, flipSrc == SourceFlipMode::Flip);
@@ -3366,7 +3366,7 @@ public:
     virtual void Init(int versionCount) override
     {
         auto &state = RendererState::Get();
-        
+
         CORELIB_ASSERT(state.stagingBuffers.Count() == 0);
         presentFences.SetSize(versionCount);
         presentCommandBuffers.SetSize(versionCount);
@@ -3378,8 +3378,9 @@ public:
         }
         state.resourceDescHeap.Create(
             state.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, ResourceDescriptorHeapSize, 512, versionCount, true);
-        state.samplerDescHeap.Create(state.device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, SamplerDescriptorHeapSize, 8, versionCount, true);
-        
+        state.samplerDescHeap.Create(
+            state.device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, SamplerDescriptorHeapSize, 8, versionCount, true);
+
         state.stagingBuffers.SetSize(versionCount);
         state.stagingBufferAllocPtr.SetSize(versionCount);
         state.tempCommandAllocatorManager.Init(versionCount, D3D12_COMMAND_LIST_TYPE_DIRECT);
@@ -3413,6 +3414,7 @@ public:
         state.stagingBufferAllocPtr[state.version] = 0;
         state.tempCommandListAllocPtr[state.version] = 0;
         state.tempCommandAllocatorManager.Reset(version);
+        state.copyCommandListAllocPtr[state.version] = 0;
         state.copyCommandAllocatorManager.Reset(version);
         state.resourceDescHeap.ResetTemp(version);
         state.samplerDescHeap.ResetTemp(version);
@@ -3511,7 +3513,7 @@ public:
         return new TextureSampler();
     }
 
-    virtual GameEngine::Shader *CreateShader(ShaderType stage, const char * data, int size) override
+    virtual GameEngine::Shader *CreateShader(ShaderType stage, const char *data, int size) override
     {
         return new Shader(stage, data, size);
     }
@@ -3558,8 +3560,7 @@ public:
         return D3DStorageBufferAlignment;
     }
 
-    virtual GameEngine::WindowSurface *CreateSurface(
-        WindowHandle windowHandle, int width, int height) override
+    virtual GameEngine::WindowSurface *CreateSurface(WindowHandle windowHandle, int width, int height) override
     {
         return new WindowSurface(windowHandle, width, height);
     }
