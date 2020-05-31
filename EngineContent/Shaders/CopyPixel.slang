@@ -16,7 +16,7 @@ VertexOut vs_main(VertexIn vin)
 {
     VertexOut rs;
     rs.vertPos = float4(vin.vertPos, 0.0, 1.0);
-    rs.vertUV = ProjCoordToUV(vin.vertUV);
+    rs.vertUV = vin.vertUV;
     return rs;
 }
 struct CopyParams
