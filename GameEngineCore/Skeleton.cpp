@@ -195,10 +195,8 @@ namespace GameEngine
 		writer.Write(SourceSkeletonName);
 		writer.Write(TargetSkeletonName);
 		writer.Write(RootTranslationScale);
-		writer.Write(RetargetedBoneOffsets.Count());
-		writer.Write(RetargetedBoneOffsets.Buffer(), RetargetedBoneOffsets.Count());
+        writer.Write(RetargetedInversePose.Count());
 		writer.Write(RetargetedInversePose.Buffer(), RetargetedInversePose.Count());
-		writer.Write(SourceRetargetTransforms.Buffer(), SourceRetargetTransforms.Count());
 		writer.Write(ModelBoneIdToAnimationBoneId.Buffer(), ModelBoneIdToAnimationBoneId.Count());
 		writer.ReleaseStream();
 	}
@@ -210,12 +208,10 @@ namespace GameEngine
 		reader.Read(RootTranslationScale);
 		int retargetTransformCount;
 		reader.Read(retargetTransformCount);
-		RetargetedBoneOffsets.SetSize(retargetTransformCount);
-		reader.Read(RetargetedBoneOffsets.Buffer(), RetargetedBoneOffsets.Count());
 		RetargetedInversePose.SetSize(retargetTransformCount);
 		reader.Read(RetargetedInversePose.Buffer(), RetargetedInversePose.Count());
-		SourceRetargetTransforms.SetSize(retargetTransformCount);
-		reader.Read(SourceRetargetTransforms.Buffer(), SourceRetargetTransforms.Count());
+		PreRotations.SetSize(retargetTransformCount);
+        reader.Read(PreRotations.Buffer(), PreRotations.Count());
 		ModelBoneIdToAnimationBoneId.SetSize(retargetTransformCount);
 		reader.Read(ModelBoneIdToAnimationBoneId.Buffer(), ModelBoneIdToAnimationBoneId.Count());
 		MaxAnimationBoneId = 0;
@@ -238,11 +234,7 @@ namespace GameEngine
 	void RetargetFile::SetBoneCount(int count)
 	{
 		RetargetedInversePose.SetSize(count);
-		SourceRetargetTransforms.SetSize(count);
-		RetargetedBoneOffsets.SetSize(count);
-		ModelBoneIdToAnimationBoneId.SetSize(count);
-		for (auto & q : SourceRetargetTransforms)
-			q = VectorMath::Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+        ModelBoneIdToAnimationBoneId.SetSize(count);
 		int i = 0;
 		for (auto & id : ModelBoneIdToAnimationBoneId)
 		{
@@ -261,36 +253,44 @@ namespace GameEngine
 		// So, we should skip those missing bones and using its bind pose
 		for (int i = 0; i < matrices.Count(); i++)
 		{
-			matrices[i] = skeleton->Bones[i].BindPose.ToMatrix();
+            if (retarget)
+            {
+                VectorMath::Matrix4::CreateIdentityMatrix(matrices[i]);
+                matrices[i].SetTranslation(retarget->RetargetedTranslations[i]);
+            }
+            else
+            {
+				matrices[i] = skeleton->Bones[i].BindPose.ToMatrix();
+            }
 		}
 
 		for (int i = 0; i < skeleton->BoneMapping.Count(); i++)
 		{
-			BoneTransformation transform = skeleton->Bones[i].BindPose;
+			BoneTransformation transform;
 			int targetId = i;
 			if (retarget)
 			{
 				targetId = retarget->ModelBoneIdToAnimationBoneId[i];
-				if (targetId != -1)
-					transform = Transforms[targetId];
-				if (i == 0)
-				{
-					transform.Translation.x *= retarget->RootTranslationScale.x;
-					transform.Translation.y *= retarget->RootTranslationScale.y;
-					transform.Translation.z *= retarget->RootTranslationScale.z;
-				}
-				else
-					transform.Translation = retarget->RetargetedBoneOffsets[i];
-				matrices[i] = transform.ToMatrix();
-				//matrices[i] = transform.ToMatrix() * skeleton->Bones[i].BindPose.Rotation.ToMatrix4();
+                if (targetId != -1)
+                    transform = Transforms[targetId];
+                if (i == 0)
+                {
+                    transform.Translation.x *= retarget->RootTranslationScale.x;
+                    transform.Translation.y *= retarget->RootTranslationScale.y;
+                    transform.Translation.z *= retarget->RootTranslationScale.z;
+                }
+                else
+                    transform.Translation.SetZero();
+                transform.Translation += retarget->RetargetedTranslations[i];
+                matrices[i] = (retarget->PreRotations[i] * transform.Rotation).ToMatrix4();
+                matrices[i].SetTranslation(transform.Translation);
 			}
 			else
 			{
 				transform = Transforms[i];
 				if (i != 0)
 					transform.Translation = skeleton->Bones[i].BindPose.Translation;
-				matrices[i] = transform.ToMatrix();
-				//matrices[i] = transform.ToMatrix() * skeleton->Bones[i].BindPose.Rotation.ToMatrix4();
+                matrices[i] = transform.ToMatrix() * matrices[i];
 			}
 		}
 		for (int i = 1; i < skeleton->Bones.Count(); i++)

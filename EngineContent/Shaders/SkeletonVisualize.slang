@@ -15,6 +15,7 @@ struct SkeletonVisualizeMaterial : IMaterial
    	MaterialPattern evalPattern<TVertAttribs : IVertexAttribs>(VertexPositionInfo shadingPoint, TVertAttribs vertAttribs, ViewParams viewParams)
     {
         MaterialPattern rs;
+        rs.init();
         rs.albedo = solidColor;
         rs.normal = float3(0.0, 0.0, 1.0);
         rs.specular = 0.5;

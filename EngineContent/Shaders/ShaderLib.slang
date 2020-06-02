@@ -133,7 +133,7 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
 {
     //uint4 lightmapId;
     float4x4 worldMat;
-    float4 boneTransforms[80 * 2]; // dual quaternions
+    float4 boneTransforms[90 * 2]; // dual quaternions
     uint4 blendShapeVertexStart[MAX_BLEND_SHAPES / 4];
     float4 blendShapeWeights[MAX_BLEND_SHAPES / 4];
     int blendShapeCount;
@@ -152,7 +152,6 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
         float3 normalBlendShapeBias = 0;
         if (blendShapeCount)
         {
-            input.tangentFrame.vertNormal = input.tangentFrame.vertNormal;
             [loop]
             for (int i = 0; i < blendShapeCount; i++)
             {
@@ -171,8 +170,6 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
                     normalBlendShapeBias += newNormal * weight;
                 }
             }
-            input.tangentFrame.vertBinormal = input.tangentFrame.vertBinormal;
-            input.tangentFrame.vertTangent = input.tangentFrame.vertTangent;
         }
         for (int i = 0; i < vertAttribs.getMaxBoneCount(); i++)
         {

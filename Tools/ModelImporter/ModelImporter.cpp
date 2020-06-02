@@ -362,7 +362,10 @@ Mesh ExportMesh(
 
             // we use one temp index buffer to hold vertex indices of each material
             if (!indexBuffers.ContainsKey(matId))
+            {
+                printf("    Subelement: %s\n", obj.mesh->GetScene()->GetMaterial(matId)->GetName());
                 indexBuffers[matId] = List<int>();
+            }
             auto &idxBuffer = indexBuffers[matId]();
 
             auto srcPolygonIndices = srcIndices + mesh->GetPolygonVertexIndex(i);
@@ -687,7 +690,7 @@ Mesh ExportMesh(
                 {
                     auto fbxBlendShapeChannel = (fbxsdk::FbxBlendShapeChannel*)(fbxBlendShape->GetBlendShapeChannel(channelId));
                     auto &blendShapeChannelOut = blendshapeChannels[channelId];
-                    blendShapeChannelOut.Name = fbxBlendShapeChannel->GetNameWithoutNameSpacePrefix().Buffer();
+                    blendShapeChannelOut.Name = RemoveNamespace(fbxBlendShapeChannel->GetNameWithoutNameSpacePrefix().Buffer(), args.RemoveNamespace);
                     blendShapeChannelOut.ChannelId = blendShapeChannelCount;
                     blendShapeChannelCount++;
                     blendShapeChannelOut.BlendShapes.SetSize(fbxBlendShapeChannel->GetTargetShapeCount());

@@ -88,12 +88,13 @@ namespace GameEngine
 	public:
 		CoreLib::String SourceSkeletonName, TargetSkeletonName;
 		/*
-		final model pos = AnimationPose * AnimationRetargetTransform * SourceRetargetTransform * InverseBindPose * modelVertPos
+		final model pos = AnimationPose * globalSourceRetargetTransform^-1 * modelVertPos
 		*/
-		CoreLib::List<VectorMath::Quaternion> SourceRetargetTransforms; // this is user input from retargeting tool
+		CoreLib::List<VectorMath::Quaternion> PreRotations; // this is user input from retargeting tool
+        CoreLib::List<VectorMath::Vec3> RetargetedTranslations; // this is user input from retargeting tool
+
 		CoreLib::List<int> ModelBoneIdToAnimationBoneId; // this is user specified source model bone to animation bone mapping (which animation bone to use for driving each source bone)
 		CoreLib::List<VectorMath::Matrix4> RetargetedInversePose; // equals to InverseAnimationSkeletonBindPose * SourceRetargetTransform * InverseBindPose
-		CoreLib::List<VectorMath::Vec3> RetargetedBoneOffsets;
 		VectorMath::Vec3 RootTranslationScale = VectorMath::Vec3::Create(1.0f, 1.0f, 1.0f);
 		int MaxAnimationBoneId = 0;
 		void SaveToStream(CoreLib::IO::Stream * stream);
