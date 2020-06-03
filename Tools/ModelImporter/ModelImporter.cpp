@@ -1055,6 +1055,12 @@ void Export(ExportArguments args)
             skeleton.Bones[i].Name = RemoveNamespace(skeletonNodes[i]->GetName(), args.RemoveNamespace);
             skeleton.Bones[i].ParentId = -1;
             skeleton.BoneMapping[skeleton.Bones[i].Name] = i;
+            /*
+            auto prerot = skeletonNodes[i]->PreRotation.Get();
+            printf("prerot %s %f %f %f\n", skeletonNodes[i]->GetName(), prerot[0], prerot[1], prerot[2]);
+            auto postRot = skeletonNodes[i]->PostRotation.Get();
+            printf("postrot %s %f %f %f\n", skeletonNodes[i]->GetName(), postRot[0], postRot[1], postRot[2]);
+            */
         }
         for (auto i = 0; i < skeletonNodes.Count(); i++)
         {
@@ -1228,7 +1234,7 @@ endOfSkeletonExport:
             {
                 auto inNode = skeletonNodes[boneId];
                 anim.Channels[channelId].BoneName = RemoveNamespace(inNode->GetName(), args.RemoveNamespace);
-
+                
                 bool isRoot = anim.Channels[channelId].BoneName == args.RootNodeName;
                 unsigned int ptrPos = 0, ptrRot = 0, ptrScale = 0;
                 int frameCounter = 0;

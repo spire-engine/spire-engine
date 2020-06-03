@@ -886,6 +886,7 @@ namespace GraphicsUI
 		ListBox(Container * parent);
 	public:
 		CoreLib::List<Control*> Items;
+        bool ManageItemFontColor = true;
 		bool HideSelection, MultiSelect;
 		Color SelectionColor,UnfocusedSelectionColor,SelectionForeColor,HighLightColor,HighLightForeColor;
 		CoreLib::List<Control *> Selection;

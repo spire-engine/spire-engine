@@ -30,6 +30,7 @@ struct SkeletonVisualizeMaterial : IMaterial
             if (boneId == 255) continue;
             if (boneId == highlightId)
             {
+                rs.albedo = highlightColor;
                 rs.opacity = lerp(0.4, 1.0, (sin(viewParams.time * 4.0)*0.5 + 0.5)) * alpha * boneWeight;
                 break;
             }   

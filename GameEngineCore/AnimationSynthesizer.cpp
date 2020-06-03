@@ -22,5 +22,9 @@ namespace GameEngine
 				p.Transforms[anim->Channels[i].BoneId] = anim->Channels[i].Sample(animTime);
 			}
 		}
+        for (int i = 0; i < anim->BlendShapeChannels.Count(); i++)
+        {
+            p.BlendShapeWeights[anim->BlendShapeChannels[i].Name] = anim->BlendShapeChannels[i].Sample(animTime);
+        }
 	}
 }
