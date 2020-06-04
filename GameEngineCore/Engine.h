@@ -278,7 +278,7 @@ namespace GameEngine
 			if (!instance->params.HeadlessMode)
             	OsApplication::DebugPrint(printBuffer);
 		}
-		static void SaveImage(Texture2D * texture, CoreLib::String fileName);
+		static void SaveImage(Texture2D * texture, CoreLib::String fileName, bool reverseY = false);
 	};
 
 	template<typename ...Args>

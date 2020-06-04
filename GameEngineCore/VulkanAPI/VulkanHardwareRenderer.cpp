@@ -4741,6 +4741,11 @@ namespace VK
 		{
 			return RendererState::PhysicalDevice().getProperties().deviceName;
 		}
+
+        virtual bool IsImageSpaceYAxisInverted() override
+        {
+            return true;
+        }
 	};
 }
 

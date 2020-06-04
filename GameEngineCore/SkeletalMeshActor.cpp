@@ -59,7 +59,7 @@ namespace GameEngine
 			{
 				if (retargetFile->RetargetedInversePose.Count() != model->GetSkeleton()->Bones.Count())
 					return false;
-				if (nextPose.Transforms.Count() < retargetFile->header.TargetBoneCount + 1)
+				if (nextPose.Transforms.Count() < retargetFile->header.TargetBoneCount)
 					return false;
 				return true;
 			}

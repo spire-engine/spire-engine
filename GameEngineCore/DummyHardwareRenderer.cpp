@@ -400,6 +400,10 @@ namespace DummyRenderer
         {
             return "Dummy Renderer";
         }
+        virtual bool IsImageSpaceYAxisInverted() override
+        {
+            return false;
+        }
 	};
 }
 }

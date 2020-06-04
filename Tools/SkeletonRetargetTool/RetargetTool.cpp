@@ -115,7 +115,11 @@ int __stdcall wWinMain(
 		auto & appParams = args.LaunchParams;
 		int w = 1920;
 		int h = 1080;
-		args.API = RenderAPI::Vulkan;
+#ifdef _WIN32
+        args.API = RenderAPI::D3D12;
+#else
+        args.API = RenderAPI::Vulkan;
+#endif
 		args.GpuId = 0;
 		args.Width = w;
 		args.Height = h;
