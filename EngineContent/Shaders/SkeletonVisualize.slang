@@ -1,8 +1,9 @@
 import ShaderLib;
 
-[Transparent]
-struct BoneHighlightMaterial : IMaterial
+
+struct SkeletonVisualizeMaterial : IMaterial
 {
+    float3 solidColor;
     float3 highlightColor;
     float alpha;
     int highlightId;
@@ -15,13 +16,13 @@ struct BoneHighlightMaterial : IMaterial
     {
         MaterialPattern rs;
         rs.init();
-        rs.albedo = float3(0.9, 0.45, 0.05);
+        rs.albedo = solidColor;
         rs.normal = float3(0.0, 0.0, 1.0);
         rs.specular = 0.5;
         rs.roughness = 0.7;
         rs.metallic = 0.4;
         rs.isDoubleSided = false;
-        rs.opacity = 0.0;
+        rs.opacity = 1.0;
         for (int i = 0; i < 4; i++)
         {
             uint boneId = vertAttribs.getBoneId(i);
@@ -29,9 +30,10 @@ struct BoneHighlightMaterial : IMaterial
             if (boneId == 255) continue;
             if (boneId == highlightId)
             {
+                rs.albedo = highlightColor;
                 rs.opacity = lerp(0.4, 1.0, (sin(viewParams.time * 4.0)*0.5 + 0.5)) * alpha * boneWeight;
                 break;
-            }
+            }   
         }
         rs.ao = 1.0;
         return rs;

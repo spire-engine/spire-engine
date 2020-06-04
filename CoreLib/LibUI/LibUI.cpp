@@ -3992,19 +3992,21 @@ namespace GraphicsUI
 			if (i==HighLightID)
 			{
 				CurItem->BackColor = HighLightColor;
-				CurItem->FontColor = HighLightForeColor;
+                if (ManageItemFontColor)
+					CurItem->FontColor = HighLightForeColor;
 			}
 			else if (SelectedIndex ==i || ItemInSelection(CurItem))
 			{
-
 				CurItem->BackColor = HideSelection && !focused ? BackColor : (focused ? SelectionColor : UnfocusedSelectionColor);
-				CurItem->FontColor = SelectionForeColor;
+                if (ManageItemFontColor)
+					CurItem->FontColor = SelectionForeColor;
 			}
 				
 			else
 			{
 				CurItem->BackColor = BackColor;
-				CurItem->FontColor = FontColor;
+                if (ManageItemFontColor)
+					CurItem->FontColor = FontColor;
 			}
 			CurItem->Posit(ContentPadding,ContentPadding+(i-scrollBar->GetPosition())*ItemHeight,Width-ContentPadding*2-bdr, ItemHeight);
 			graphics.SolidBrushColor = CurItem->BackColor;

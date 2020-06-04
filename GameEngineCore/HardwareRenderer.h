@@ -919,6 +919,7 @@ namespace GameEngine
 		virtual int StorageBufferAlignment() = 0;
         virtual WindowSurface * CreateSurface(WindowHandle windowHandle, int width, int height) = 0;
 		virtual CoreLib::String GetRendererName() = 0;
+        virtual bool IsImageSpaceYAxisInverted() = 0;
 	};
 
 	// HardwareRenderer instance constructors

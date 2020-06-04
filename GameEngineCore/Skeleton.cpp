@@ -192,35 +192,63 @@ namespace GameEngine
 	void RetargetFile::SaveToStream(CoreLib::IO::Stream * stream)
 	{
 		BinaryWriter writer(stream);
+        writer.Write(header);
 		writer.Write(SourceSkeletonName);
 		writer.Write(TargetSkeletonName);
 		writer.Write(RootTranslationScale);
-		writer.Write(RetargetedBoneOffsets.Count());
-		writer.Write(RetargetedBoneOffsets.Buffer(), RetargetedBoneOffsets.Count());
-		writer.Write(RetargetedInversePose.Buffer(), RetargetedInversePose.Count());
-		writer.Write(SourceRetargetTransforms.Buffer(), SourceRetargetTransforms.Count());
-		writer.Write(ModelBoneIdToAnimationBoneId.Buffer(), ModelBoneIdToAnimationBoneId.Count());
+        writer.Write(RetargetedBindPose);
+        writer.Write(RetargetedInversePose);
+        writer.Write(PreRotations);
+        writer.Write(PostRotations);
+        writer.Write(ModelBoneIdToAnimationBoneId);
+        writer.Write(MorphStates.Count());
+        for (auto &ms : MorphStates)
+        {
+            writer.Write(ms.Name);
+            writer.Write(ms.BoneStates);
+        }
 		writer.ReleaseStream();
 	}
 	void RetargetFile::LoadFromStream(CoreLib::IO::Stream * stream)
 	{
 		BinaryReader reader(stream);
+        reader.Read(header);
+        if (header.Identifier != RetargetFileIdentifier)
+        {
+            throw CoreLib::InvalidOperationException("Invalid retarget file.");
+        }
 		reader.Read(SourceSkeletonName);
 		reader.Read(TargetSkeletonName);
 		reader.Read(RootTranslationScale);
-		int retargetTransformCount;
-		reader.Read(retargetTransformCount);
-		RetargetedBoneOffsets.SetSize(retargetTransformCount);
-		reader.Read(RetargetedBoneOffsets.Buffer(), RetargetedBoneOffsets.Count());
-		RetargetedInversePose.SetSize(retargetTransformCount);
-		reader.Read(RetargetedInversePose.Buffer(), RetargetedInversePose.Count());
-		SourceRetargetTransforms.SetSize(retargetTransformCount);
-		reader.Read(SourceRetargetTransforms.Buffer(), SourceRetargetTransforms.Count());
-		ModelBoneIdToAnimationBoneId.SetSize(retargetTransformCount);
-		reader.Read(ModelBoneIdToAnimationBoneId.Buffer(), ModelBoneIdToAnimationBoneId.Count());
-		MaxAnimationBoneId = 0;
-		for (auto & id : ModelBoneIdToAnimationBoneId)
-			MaxAnimationBoneId = CoreLib::Math::Max(MaxAnimationBoneId, id);
+        reader.Read(RetargetedBindPose);
+		reader.Read(RetargetedInversePose);
+        reader.Read(PreRotations);
+        reader.Read(PostRotations);
+        reader.Read(ModelBoneIdToAnimationBoneId);
+        int morphStateCount = reader.ReadInt32();
+        MorphStates.SetSize(morphStateCount);
+        for (auto &ms : MorphStates)
+        {
+            reader.Read(ms.Name);
+            reader.Read(ms.BoneStates);
+        }
+
+        if (PostRotations.Count() != header.SourceBoneCount ||
+            RetargetedInversePose.Count() != header.SourceBoneCount ||
+            ModelBoneIdToAnimationBoneId.Count() != header.SourceBoneCount ||
+            RetargetedBindPose.Count() != header.SourceBoneCount)
+        {
+            throw CoreLib::InvalidOperationException("Invalid retarget file. Retarget data does not match skeleton size.");
+        }
+
+        for (auto &id : ModelBoneIdToAnimationBoneId)
+        {
+            if (id != -1 && id >= header.TargetBoneCount)
+            {
+                throw CoreLib::InvalidOperationException("Invalid retarget file. Bone mapping index out of range.");
+            }
+        }
+
 		reader.ReleaseStream();
 	}
 	void RetargetFile::SaveToFile(const CoreLib::String & filename)
@@ -237,16 +265,17 @@ namespace GameEngine
 	}
 	void RetargetFile::SetBoneCount(int count)
 	{
-		RetargetedInversePose.SetSize(count);
-		SourceRetargetTransforms.SetSize(count);
-		RetargetedBoneOffsets.SetSize(count);
-		ModelBoneIdToAnimationBoneId.SetSize(count);
-		for (auto & q : SourceRetargetTransforms)
-			q = VectorMath::Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+        header.SourceBoneCount = count;
+        PreRotations.SetSize(count);
+        PostRotations.SetSize(count);
+        RetargetedBindPose.SetSize(count);
+        RetargetedInversePose.SetSize(count);
+        ModelBoneIdToAnimationBoneId.SetSize(count);
+		
 		int i = 0;
 		for (auto & id : ModelBoneIdToAnimationBoneId)
 		{
-			id = i;
+			id = -1;
 			i++;
 		}
 	}
@@ -256,41 +285,80 @@ namespace GameEngine
 	{
 		matrices.Clear();
 		matrices.SetSize(skeleton->Bones.Count());
+        struct BoneRotationOverride
+        {
+            BoneTransformation transform;
+            float weight;
+        };
+        CoreLib::List<CoreLib::List<BoneRotationOverride>> morphStateOverrides;
+        if (retarget && retarget->MorphStates.Count())
+        {
+            morphStateOverrides.SetSize(matrices.Count());
+            for (auto &weight : BlendShapeWeights)
+            {
+                if (weight.Value == 0.0f)
+                    continue;
+                int msId = retarget->MorphStates.FindFirst([&](auto &ms) { return ms.Name == weight.Key; });
+                if (msId != -1)
+                {
+                    for (auto bs : retarget->MorphStates[msId].BoneStates)
+                    {
+                        morphStateOverrides[bs.BoneId].Add(BoneRotationOverride{bs.Transform, weight.Value});
+                    }
+                }
+            }
+        }
 
 		// Consider the case that the skeleton for animation may contain less bones than the skeleton for mesh
 		// So, we should skip those missing bones and using its bind pose
 		for (int i = 0; i < matrices.Count(); i++)
 		{
-			matrices[i] = skeleton->Bones[i].BindPose.ToMatrix();
+            if (retarget)
+            {
+                matrices[i] = retarget->RetargetedBindPose[i].ToMatrix();
+            }
+            else
+            {
+				matrices[i] = skeleton->Bones[i].BindPose.ToMatrix();
+            }
 		}
 
 		for (int i = 0; i < skeleton->BoneMapping.Count(); i++)
 		{
-			BoneTransformation transform = skeleton->Bones[i].BindPose;
+			BoneTransformation transform;
 			int targetId = i;
 			if (retarget)
 			{
 				targetId = retarget->ModelBoneIdToAnimationBoneId[i];
-				if (targetId != -1)
-					transform = Transforms[targetId];
-				if (i == 0)
-				{
-					transform.Translation.x *= retarget->RootTranslationScale.x;
-					transform.Translation.y *= retarget->RootTranslationScale.y;
-					transform.Translation.z *= retarget->RootTranslationScale.z;
-				}
-				else
-					transform.Translation = retarget->RetargetedBoneOffsets[i];
-				matrices[i] = transform.ToMatrix();
-				//matrices[i] = transform.ToMatrix() * skeleton->Bones[i].BindPose.Rotation.ToMatrix4();
+                if (targetId != -1)
+                    transform = Transforms[targetId];
+                if (i == 0)
+                {
+                    transform.Translation.x *= retarget->RootTranslationScale.x;
+                    transform.Translation.y *= retarget->RootTranslationScale.y;
+                    transform.Translation.z *= retarget->RootTranslationScale.z;
+                }
+                else
+					transform.Translation = retarget->RetargetedBindPose[i].Translation;
+                auto rotation = retarget->PreRotations[i] * transform.Rotation;
+                if (morphStateOverrides.Count() && morphStateOverrides[i].Count())
+                {
+                    for (auto &bs : morphStateOverrides[i])
+                    {
+                        rotation = VectorMath::Quaternion::Slerp(rotation, bs.transform.Rotation, bs.weight * 0.01f);
+                        transform.Translation =
+                            VectorMath::Vec3::Lerp(transform.Translation, bs.transform.Translation, bs.weight * 0.01f);
+                    }
+                }
+                matrices[i] = (rotation * retarget->PostRotations[i]).ToMatrix4();
+                matrices[i].SetTranslation(transform.Translation);
 			}
 			else
 			{
 				transform = Transforms[i];
 				if (i != 0)
 					transform.Translation = skeleton->Bones[i].BindPose.Translation;
-				matrices[i] = transform.ToMatrix();
-				//matrices[i] = transform.ToMatrix() * skeleton->Bones[i].BindPose.Rotation.ToMatrix4();
+                matrices[i] = transform.ToMatrix();
 			}
 		}
 		for (int i = 1; i < skeleton->Bones.Count(); i++)

@@ -56,7 +56,6 @@ namespace GameEngine
     void Win32SystemWindow::WindowResizing(CoreLib::Object * /*sender*/, CoreLib::WinForm::ResizingEventArgs &/* e*/)
     {
         uiContext->SetSize(BaseForm::GetClientWidth(), BaseForm::GetClientHeight());
-
         Engine::Instance()->RefreshUI();
     }
 

@@ -113,6 +113,10 @@ public:
         addr.gpuHandle.ptr += offsetInDescSlots * handleIncrementSize;
         return addr;
     }
+    int GetFreeTempSpace(int version)
+    {
+        return maxTempDescriptors - (tempAllocationPtrs[version] - tempAllocationStartIndices[version]);
+    }
 
 public:
     void Create(ID3D12Device *pDevice, D3D12_DESCRIPTOR_HEAP_TYPE Type, UINT numDescriptors, int tempDescriptorCount,
@@ -452,6 +456,17 @@ public:
         return D3DCommandList{cmdList, cmdAllocator};
     }
 
+    void ResetTempBuffers()
+    {
+        stagingBufferAllocPtr[version] = 0;
+        tempCommandListAllocPtr[version] = 0;
+        tempCommandAllocatorManager.Reset(version);
+        copyCommandListAllocPtr[version] = 0;
+        copyCommandAllocatorManager.Reset(version);
+        resourceDescHeap.ResetTemp(version);
+        samplerDescHeap.ResetTemp(version);
+    }
+
     D3DCommandList GetCopyCommandList()
     {
         return GetCommandList(&copyCommandAllocatorManager, copyCommandLists, copyCommandListAllocPtr);
@@ -789,7 +804,7 @@ public:
         CHECK_DX(stagingResource->Map(0, &mapRange, &stagingBufferPtr));
         memcpy(resultBuffer, stagingBufferPtr, size);
         mapRange.End = 0;
-        stagingResource->Unmap(0, &mapRange);
+        stagingResource->Unmap(0, nullptr);
         stagingResource->Release();
     }
     virtual int GetSize() override
@@ -1277,7 +1292,7 @@ public:
         {
             memcpy(data, stagingBufferPtr, resourceSize);
         }
-        stagingResource->Unmap(0, &mapRange);
+        stagingResource->Unmap(0, nullptr);
         copyCmdList->Release();
         stagingResource->Release();
         state.largeCopyCmdListAllocator->Reset();
@@ -1414,17 +1429,17 @@ public:
     {
         CORELIB_ASSERT(width == CoreLib::Math::Max(1, (texture.properties.width >> level)));
         CORELIB_ASSERT(height == CoreLib::Math::Max(1, (texture.properties.height >> level)));
-        texture.SetData(level, 0, 0, 0, 0, width, height, 0, inputType, data, D3D12_RESOURCE_STATE_GENERIC_READ);
+        texture.SetData(level, 0, 0, 0, 0, width, height, 1, inputType, data, D3D12_RESOURCE_STATE_GENERIC_READ);
     }
     virtual void SetData(int width, int height, int /*samples*/, DataType inputType, void *data) override
     {
         CORELIB_ASSERT(width == texture.properties.width);
         CORELIB_ASSERT(height == texture.properties.height);
-        texture.SetData(0, 0, 0, 0, 0, width, height, 0, inputType, data, D3D12_RESOURCE_STATE_GENERIC_READ);
+        texture.SetData(0, 0, 0, 0, 0, width, height, 1, inputType, data, D3D12_RESOURCE_STATE_GENERIC_READ);
     }
     virtual void GetData(int mipLevel, void *data, int bufSize) override
     {
-        texture.GetData(mipLevel, 0, 0, 0, texture.properties.width, texture.properties.height, 0, data, bufSize);
+        texture.GetData(mipLevel, 0, 0, 0, texture.properties.width, texture.properties.height, 1, data, bufSize);
     }
     virtual void BuildMipmaps() override
     {
@@ -2174,7 +2189,7 @@ public:
             desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
             desc.Buffer.FirstElement = offset / d3dbuffer->structInfo.StructureStride;
             desc.Buffer.StructureByteStride = d3dbuffer->structInfo.StructureStride;
-            desc.Buffer.NumElements = d3dbuffer->structInfo.NumElements;
+            desc.Buffer.NumElements = static_cast<UINT>(d3dbuffer->structInfo.NumElements - desc.Buffer.FirstElement);
             state.device->CreateShaderResourceView(
                 d3dbuffer->buffer.resource, &desc, descriptors[location].address.cpuHandle);
             ResourceUse resourceUse;
@@ -2794,6 +2809,7 @@ class WindowSurface : public GameEngine::WindowSurface
 {
 public:
     WindowHandle windowHandle;
+    HANDLE waitObject;
     IDXGISwapChain3 *swapchain = nullptr;
     int w, h;
     void CreateSwapchain(int width, int height)
@@ -2802,13 +2818,14 @@ public:
         this->w = width;
         this->h = height;
         DXGI_SWAP_CHAIN_DESC1 desc = {};
+        desc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
         desc.Width = width;
         desc.Height = height;
         desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.Stereo = 0;
         desc.SampleDesc.Count = 1;
         desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        desc.BufferCount = 2;
+        desc.BufferCount = 3;
         desc.Scaling = DXGI_SCALING_STRETCH;
         desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
@@ -2822,6 +2839,7 @@ public:
             state.queue, (HWND)windowHandle, &desc, nullptr, nullptr, &swapchain1));
         CHECK_DX(swapchain1->QueryInterface(IID_PPV_ARGS(&swapchain)));
         swapchain1->Release();
+        waitObject = swapchain->GetFrameLatencyWaitableObject();
     }
 
 public:
@@ -2843,9 +2861,12 @@ public:
     }
     virtual void Resize(int width, int height) override
     {
-        if (width != w && height != h && width > 1 && height > 1)
+        if ((width != w || height != h) && width > 1 && height > 1)
         {
-            CreateSwapchain(width, height);
+            swapchain->ResizeBuffers(
+                3, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
+            w = width;
+            h = height;
         }
     }
     virtual void GetSize(int &width, int &height) override
@@ -3080,6 +3101,11 @@ public:
     virtual void BeginJobSubmission() override
     {
         auto &state = RendererState::Get();
+        if (state.resourceDescHeap.GetFreeTempSpace(state.version) < (state.resourceDescHeap.maxTempDescriptors >> 2))
+        {
+            state.Wait();
+            state.ResetTempBuffers();
+        }
         pendingCommands[renderThreadId] = state.GetTempCommandList();
         ID3D12DescriptorHeap *descHeaps[2] = {state.resourceDescHeap.heap, state.samplerDescHeap.heap};
         pendingCommands[renderThreadId]->SetDescriptorHeaps(2, descHeaps);
@@ -3315,6 +3341,7 @@ public:
         d3dfence->fence->SetEventOnCompletion(value, d3dfence->waitEvent);
         backBuffer->Release();
         CHECK_DX(d3dsurface->swapchain->Present(0, 0));
+        WaitForSingleObject(d3dsurface->waitObject, INFINITE);
     }
 
     void BlitImpl(ID3D12GraphicsCommandList *cmdList, GameEngine::Texture2D *dstImage, GameEngine::Texture2D *srcImage,
@@ -3568,6 +3595,11 @@ public:
     virtual CoreLib::String GetRendererName() override
     {
         return RendererState::Get().deviceName;
+    }
+
+    virtual bool IsImageSpaceYAxisInverted() override
+    {
+        return false;
     }
 };
 } // namespace D3DRenderer

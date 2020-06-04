@@ -17,6 +17,11 @@
 using namespace GraphicsUI;
 using namespace GameEngine;
 
+enum class EditorMode
+{
+	EditPreRotation, EditMorphState, EditMapping
+};
+
 class SkeletonRetargetVisualizerActor : public Actor
 {
 private:
@@ -26,10 +31,12 @@ private:
 	RefPtr<SystemWindow> sysWindow;
 	Mesh * mMesh = nullptr;
 	Skeleton * mSkeleton = nullptr;
-	bool mappingMode = false;
+    EditorMode editorMode = EditorMode::EditPreRotation;
+    int editingMorphStateId;
 	Matrix4 targetSkeletonTransform, oldTargetSkeletonTransform;
 	Mesh sourceSkeletonMesh, targetSkeletonMesh;
 	Quaternion originalTransform;
+    Vec3 originalTranslation;
 	RefPtr<Model> sourceModel, sourceSkeletonModel, targetSkeletonModel;
 	TransformManipulator * manipulator;
 	ModelDrawableInstance sourceModelInstance, highlightModelInstance;
@@ -37,7 +44,9 @@ private:
 	Material sourceSkeletonMaterial, targetSkeletonMaterial, sourceMeshMaterial,
 		xAxisMaterial, yAxisMaterial, zAxisMaterial;
 	ManipulationMode manipulationMode = ManipulationMode::Translation;
-	GraphicsUI::Label * lblFrame, * lblMappingMode;
+    ManipulationMode morphStateManipulationMode = ManipulationMode::Translation;
+
+	GraphicsUI::Label * lblFrame, * lblEditorMode;
 	GraphicsUI::Form * infoForm;
 	GraphicsUI::MultiLineTextBox * infoFormTextBox;
 	GraphicsUI::ListBox* lstBones;
@@ -45,11 +54,13 @@ private:
 	GraphicsUI::TextBox *txtScaleX, *txtScaleY, *txtScaleZ;
 	GraphicsUI::MultiLineTextBox * txtInfo;
 	List<GraphicsUI::ComboBox*> cmbAnimBones;
-	GraphicsUI::VScrollPanel * pnlBoneMapping;
+    GraphicsUI::VScrollPanel *pnlBoneMapping;
+	GraphicsUI::Container *pnlMorphState;
 	GraphicsUI::ScrollBar * scTimeline;
+    GraphicsUI::ListBox *lstMorphStates;
+    GraphicsUI::Button *btnEditMorphState;
 	RetargetFile retargetFile;
 	SkeletalAnimation currentAnim;
-	Pose currentPose;
 	GraphicsUI::UIEntry * uiEntry = nullptr;
 	bool isPlaying = false;
 	bool showSourceModel = true; // if false, draw skeleton
@@ -60,24 +71,49 @@ private:
 	struct Modification
 	{
 		int boneId;
+        String morphStateName;
+        Vec3 originalTranslation, newTranslation;
 		Quaternion originalTransform, newTransform;
+        EditorMode editorMode;
 	};
 	List<Modification> undoStack;
 public:
 	void ToggleMappingMode(bool v)
 	{
-		mappingMode = v;
-		if (mappingMode)
-		{
-			this->targetSkeletonSelected = false;
-			pnlBoneMapping->BackColor = GraphicsUI::Color(0xBF, 0x36, 0x0C, 200);
-		}
-		else
-		{
-			pnlBoneMapping->BackColor = GraphicsUI::Color(0, 0, 0, 200);
-		}
-		lblMappingMode->Visible = mappingMode;
+        if (v)
+            editorMode = EditorMode::EditMapping;
+        else
+            editorMode = EditorMode::EditPreRotation;
+        UpdateEditorMode();
 	}
+
+    void UpdateEditorMode()
+    {
+        if (editorMode == EditorMode::EditMapping)
+        {
+            this->targetSkeletonSelected = false;
+            pnlBoneMapping->BackColor = GraphicsUI::Color(0xBF, 0x36, 0x0C, 200);
+			lblEditorMode->SetText("Editing Bone Mapping");
+        }
+        else
+        {
+            pnlBoneMapping->BackColor = GraphicsUI::Color(0, 0, 0, 0);
+        }
+        if (editorMode == EditorMode::EditMorphState)
+        {
+            lblEditorMode->SetText("Editing Bone Mapping");
+            lblEditorMode->SetText(
+                "Editing Morph State '" + lstMorphStates->GetTextItem(editingMorphStateId)->GetText() + "'");
+            lstMorphStates->Enabled = false;
+            pnlMorphState->BackColor = GraphicsUI::Color(0xBF, 0x36, 0x0C, 200);
+        }
+        else
+        {
+            lstMorphStates->Enabled = true;
+            pnlMorphState->BackColor = GraphicsUI::Color(0, 0, 0, 0);
+        }
+        lblEditorMode->Visible = editorMode != EditorMode::EditPreRotation;
+    }
 	virtual EngineActorType GetEngineType() override
 	{
 		return EngineActorType::Drawable;
@@ -85,6 +121,8 @@ public:
 
 	virtual void Tick() override
 	{
+        if (!scTimeline)
+            return;
 		if (isPlaying)
 		{
 			if (currentAnim.Duration > 0.0f)
@@ -125,7 +163,11 @@ public:
 					bonePositions[i] = Vec3::Create(matrices[i].values[12], matrices[i].values[13], matrices[i].values[14]);
 				}
 			}
-			manipulator->SetTarget(ManipulationMode::Rotation, view, level->CurrentCamera->GetCameraTransform(), level->CurrentCamera->GetPosition(), bonePositions[lstBones->SelectedIndex]);
+            auto mode = ManipulationMode::Rotation;
+            if (editorMode == EditorMode::EditMorphState)
+                mode = morphStateManipulationMode;
+            manipulator->SetTarget(mode, view, level->CurrentCamera->GetCameraTransform(),
+                level->CurrentCamera->GetPosition(), bonePositions[lstBones->SelectedIndex]);
 			manipulator->Visible = true;
 		}
 		else if (targetSkeletonSelected)
@@ -150,85 +192,112 @@ public:
 	void SetBoneMapping(int sourceBone, int animBone)
 	{
 		retargetFile.ModelBoneIdToAnimationBoneId[sourceBone] = animBone;
+        auto sourceSkeleton = sourceModel->GetSkeleton();
 		UpdateCombinedRetargetTransform();
 	}
 
 	void UpdateCombinedRetargetTransform()
 	{
-		auto sourceSkeleton = sourceModel->GetSkeleton();
-		
-		Skeleton* tarSekeleton = targetSkeleton.Ptr();
-		if (!tarSekeleton)
-			tarSekeleton = sourceModel->GetSkeleton();
-		List<BoneTransformation> animationBindPose;
-		List<Matrix4> matrices, accumSourceBindPose, animationBindPoseM;
-		accumSourceBindPose.SetSize(sourceSkeleton->Bones.Count());
-		animationBindPoseM.SetSize(sourceSkeleton->Bones.Count());
-		for (int i = 0; i < accumSourceBindPose.Count(); i++)
-		{
-			auto trans = sourceSkeleton->Bones[i].BindPose;
-			trans.Rotation = retargetFile.SourceRetargetTransforms[i] * trans.Rotation;
-			accumSourceBindPose[i] = trans.ToMatrix();
-		}
-		for (int i = 1; i < accumSourceBindPose.Count(); i++)
-			Matrix4::Multiply(accumSourceBindPose[i], accumSourceBindPose[sourceSkeleton->Bones[i].ParentId], accumSourceBindPose[i]);
-		animationBindPose.SetSize(sourceSkeleton->Bones.Count());
-		matrices.SetSize(sourceSkeleton->Bones.Count());
-		// update translation terms in animationBindPose to match new skeleton
-		List<Matrix4> accumAnimBindPose;
-		accumAnimBindPose.SetSize(sourceSkeleton->Bones.Count());
-		animationBindPose[0].Translation = sourceSkeleton->Bones[0].BindPose.Translation;
-		accumAnimBindPose[0] = animationBindPose[0].ToMatrix();
-		for (int i = 0; i < matrices.Count(); i++)
-		{
-			BoneTransformation transform;
-			transform.Rotation = retargetFile.SourceRetargetTransforms[i] * sourceSkeleton->Bones[i].BindPose.Rotation;
-			transform.Translation = sourceSkeleton->Bones[i].BindPose.Translation;
-			
-			matrices[i] = transform.ToMatrix();
+        auto sourceSkeleton = sourceModel->GetSkeleton();
+        List<Matrix4> forwardGlobalMatrix;
+        List<Matrix4> retargetGlobalBindPoseTransform;
+        List<Quaternion> targetBindPoseRotations;
+        List<Quaternion> retargetBindPoseRotations;
+        List<Quaternion> retargetGlobalBindPoseRotations;
+        if (targetSkeleton)
+        {
+            targetBindPoseRotations.SetSize(targetSkeleton->Bones.Count());
+            for (int i = 0; i < targetSkeleton->Bones.Count(); i++)
+            {
+                targetBindPoseRotations[i] = targetSkeleton->Bones[i].BindPose.Rotation;
+                int parentId = targetSkeleton->Bones[i].ParentId;
+                if (parentId != -1)
+                {
+                    targetBindPoseRotations[i] =
+                        targetBindPoseRotations[parentId] * targetBindPoseRotations[i];
+                }
+            }
+        }
+        forwardGlobalMatrix.SetSize(sourceSkeleton->Bones.Count());
+        retargetBindPoseRotations.SetSize(sourceSkeleton->Bones.Count());
+        retargetGlobalBindPoseRotations.SetSize(sourceSkeleton->Bones.Count());
+        retargetGlobalBindPoseTransform.SetSize(sourceSkeleton->Bones.Count());
 
-			animationBindPose[i].Rotation = sourceSkeleton->Bones[i].BindPose.Rotation;
-			int animBoneId = retargetFile.ModelBoneIdToAnimationBoneId[i];
-			if (animBoneId != -1)
-			{
-				animationBindPose[i].Rotation = tarSekeleton->Bones[animBoneId].BindPose.Rotation;
-			}
-			if (i > 0)
-			{
-				Matrix4 invP;
-				accumAnimBindPose[sourceSkeleton->Bones[i].ParentId].Inverse(invP);
-				auto P = accumSourceBindPose[sourceSkeleton->Bones[i].ParentId];
-				animationBindPose[i].Translation = invP.TransformHomogeneous(P.TransformHomogeneous(sourceSkeleton->Bones[i].BindPose.Translation));
-				Matrix4::Multiply(accumAnimBindPose[i], accumAnimBindPose[sourceSkeleton->Bones[i].ParentId], animationBindPose[i].ToMatrix());
-			}
-			else
-			{
-				accumAnimBindPose[i] = animationBindPose[i].ToMatrix();
-			}
-		}
-		for (int i = 0; i < animationBindPoseM.Count(); i++)
-			animationBindPoseM[i] = animationBindPose[i].ToMatrix();
-		for (int i = 1; i < matrices.Count(); i++)
-		{
-			Matrix4::Multiply(matrices[i], matrices[sourceSkeleton->Bones[i].ParentId], matrices[i]);
-			Matrix4::Multiply(animationBindPoseM[i], animationBindPoseM[sourceSkeleton->Bones[i].ParentId], animationBindPoseM[i]);
-		}
-		for (int i = 0; i < matrices.Count(); i++)
-			Matrix4::Multiply(matrices[i], matrices[i], sourceSkeleton->InversePose[i]);
+        for (int i = 0; i < sourceSkeleton->Bones.Count(); i++)
+        {
+            int parentId = sourceSkeleton->Bones[i].ParentId;
+            int targetId = retargetFile.ModelBoneIdToAnimationBoneId[i];
+            retargetFile.PostRotations[i] = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+            forwardGlobalMatrix[i] = sourceSkeleton->Bones[i].BindPose.ToMatrix();
+            if (targetId != -1)
+            {
+                // We need to find a retargeted bind pose rotation such that the global
+				// coordinate space of the retargeted bind pose at this node is the same as the target
+				// skeleton node.
+                auto targetGlobalSpace = targetBindPoseRotations[targetId];
+                Quaternion parentGlobalRotation = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+                if (parentId != -1)
+                    parentGlobalRotation = retargetGlobalBindPoseRotations[parentId];
+				retargetBindPoseRotations[i] = parentGlobalRotation.Inverse() * targetGlobalSpace;
+                retargetFile.PostRotations[i] =
+                    targetSkeleton->Bones[targetId].BindPose.Rotation.Inverse() * retargetBindPoseRotations[i]; 
+            }
+            else
+            {
+				// If there is no matching target bone, just use world-space aligned local coordinates.
+                retargetBindPoseRotations[i] = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+                retargetFile.PostRotations[i] = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+            }
+			// Compute global bind pose rotations and matrices.
+            retargetGlobalBindPoseRotations[i] = retargetBindPoseRotations[i];
+            if (parentId != -1)
+            {
+                forwardGlobalMatrix[i] = forwardGlobalMatrix[parentId] * forwardGlobalMatrix[i];
+                retargetGlobalBindPoseRotations[i] = retargetGlobalBindPoseRotations[parentId] * retargetBindPoseRotations[i];
+            }
+        }
 
-		for (int i = 0; i < matrices.Count(); i++)
-		{
-			Matrix4 invAnimBindPose;
-			animationBindPoseM[i].Inverse(invAnimBindPose);
-			Matrix4::Multiply(retargetFile.RetargetedInversePose[i], invAnimBindPose, matrices[i]);
-		}
-		// derive the retargeted offset
-		for (int i = 0; i < matrices.Count(); i++)
-		{
-			retargetFile.RetargetedBoneOffsets[i] = animationBindPose[i].Translation;
-		}
-		
+		// Figure out the correct translation terms.
+        for (int i = 0; i < sourceSkeleton->Bones.Count(); i++)
+        {
+            int parentId = sourceSkeleton->Bones[i].ParentId;
+            Vec3 targetGlobalTranslation = forwardGlobalMatrix[i].GetTranslation();
+            Matrix4 parentGlobalBindPoseTransform;
+			if (parentId == -1)
+                Matrix4::CreateIdentityMatrix(parentGlobalBindPoseTransform);
+            else
+            {
+                parentGlobalBindPoseTransform = retargetGlobalBindPoseTransform[parentId];
+            }
+            Matrix4 invParentGlobalBindPoseTransform;
+            parentGlobalBindPoseTransform.Inverse(invParentGlobalBindPoseTransform);
+            Vec3 localTranslation = invParentGlobalBindPoseTransform.Transform(Vec4::Create(targetGlobalTranslation, 1.0f)).xyz();
+            retargetFile.RetargetedBindPose[i].Translation = localTranslation;
+            retargetFile.RetargetedBindPose[i].Rotation = retargetBindPoseRotations[i];
+            Matrix4 retargetBindPoseTransform = retargetBindPoseRotations[i].ToMatrix4();
+            retargetBindPoseTransform.SetTranslation(localTranslation);
+            retargetGlobalBindPoseTransform[i] = parentGlobalBindPoseTransform * retargetBindPoseTransform;
+            retargetGlobalBindPoseTransform[i].Inverse(retargetFile.RetargetedInversePose[i]);
+            
+        }
 	}
+
+	void UpdateMorphStateView()
+    {
+        lstMorphStates->Clear();
+        for (auto &state : retargetFile.MorphStates)
+        {
+            lstMorphStates->AddTextItem(state.Name);
+        }
+        for (auto &channel : currentAnim.BlendShapeChannels)
+        {
+            if (retargetFile.MorphStates.FindFirst([&](auto &ms) { return ms.Name == channel.Name; }) == -1)
+            {
+                int item = lstMorphStates->AddTextItem(channel.Name);
+                lstMorphStates->GetTextItem(item)->FontColor = GraphicsUI::Global::Colors.MenuItemDisabledForeColor; 
+            }
+        }
+    }
 
 	void LoadTargetSkeleton(GraphicsUI::UI_Base *)
 	{
@@ -248,18 +317,11 @@ public:
 			targetSkeletonMesh.FromSkeleton(targetSkeleton.Ptr(), 6.0f);
 			targetSkeletonDrawable = nullptr;
 			targetSkeletonMaterial.SetVariable("highlightId", -1);
-			retargetFile.RetargetedInversePose = sourceModel->GetSkeleton()->InversePose;
-			int i = 0;
-			for (auto & bone : sourceModel->GetSkeleton()->Bones)
-			{
-				retargetFile.RetargetedBoneOffsets[i] = bone.BindPose.Translation;
-				i++;
-			}
 			retargetFile.TargetSkeletonName = targetSkeleton->Name;
 			for (auto & id : retargetFile.ModelBoneIdToAnimationBoneId)
 				id = -1;
 			int j = 0;
-			i = 0;
+			int i = 0;
 			for (auto & b : sourceModel->GetSkeleton()->Bones)
 			{
 				j = 0;
@@ -273,10 +335,9 @@ public:
 			}
 			UpdateBoneMappingPanel();
 			currentAnim = SkeletalAnimation();
-			currentPose.Transforms.Clear();
-			
 			targetSkeletonModel = new Model(&targetSkeletonMesh, targetSkeleton.Ptr(), &targetSkeletonMaterial);
 			targetSkeletonPhysInstance = targetSkeletonModel->CreatePhysicsInstance(level->GetPhysicsScene(), this, (void*)2);
+            retargetFile.header.TargetBoneCount = targetSkeleton->Bones.Count();
 		}
 		undoStack.Clear();
 		undoPtr = -1;
@@ -299,7 +360,9 @@ public:
 		if (dlg->ShowOpen())
 		{
 			currentAnim.LoadFromFile(dlg->FileName);
+            curPose.Transforms.Clear();
 			scTimeline->SetValue(0, (int)(currentAnim.Duration * 30.0f), 0, 1);
+            UpdateMorphStateView();
 		}
 	}
 
@@ -321,19 +384,23 @@ public:
 			sourceSkeletonModel = new Model(&sourceSkeletonMesh, sourceModel->GetSkeleton(), &sourceSkeletonMaterial);
 			highlightModelInstance.Drawables = List<RefPtr<Drawable>>();
 			retargetFile.SourceSkeletonName = sourceModel->GetSkeleton()->Name;
-			retargetFile.SetBoneCount(sourceModel->GetSkeleton()->Bones.Count()); 
+			retargetFile.SetBoneCount(sourceModel->GetSkeleton()->Bones.Count());
 			targetSkeleton = nullptr;
 			targetSkeletonModel = nullptr;
 			targetSkeletonPhysInstance = nullptr;
 			targetSkeletonDrawable = nullptr;
-			curPose.Transforms.Clear();
 			lstBones->Clear();
 			auto sourceSkeleton = sourceModel->GetSkeleton();
 			for (int i = 0; i < sourceSkeleton->Bones.Count(); i++)
 				lstBones->AddTextItem(sourceSkeleton->Bones[i].Name);
 			physInstance = sourceModel->CreatePhysicsInstance(level->GetPhysicsScene(), this, 0);
 			skeletonPhysInstance = sourceSkeletonModel->CreatePhysicsInstance(level->GetPhysicsScene(), this, (void*)1);
-
+            curPose.Transforms.SetSize(sourceSkeleton->Bones.Count());
+            for (int i = 0; i < sourceSkeleton->Bones.Count(); i++)
+            {
+                curPose.Transforms[i] = sourceSkeleton->Bones[i].BindPose;
+                retargetFile.PreRotations[i] = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+            }
 			UpdateCombinedRetargetTransform();
 		}
 		undoStack.Clear();
@@ -376,6 +443,7 @@ public:
 					txtScaleZ->SetText(String(file.RootTranslationScale.z));
 					UpdateMappingSelection();
 					UpdateCombinedRetargetTransform();
+                    UpdateMorphStateView();
 				}
 			}
 		}
@@ -461,7 +529,7 @@ public:
 				float angle = p.ReadFloat();
 				if (angle > -360.0f && angle < 360.0f)
 				{
-					auto & info = retargetFile.SourceRetargetTransforms[lstBones->SelectedIndex];
+					auto & info = retargetFile.PostRotations[lstBones->SelectedIndex];
 					EulerAngleToQuaternion(info, StringToFloat(txtX->GetText()) / 180.0f * Math::Pi, StringToFloat(txtY->GetText()) / 180.0f * Math::Pi, StringToFloat(txtZ->GetText()) / 180.0f * Math::Pi, EulerAngleOrder::ZXY);
 				}
 				UpdateCombinedRetargetTransform();
@@ -490,7 +558,7 @@ public:
 		if (lstBones->SelectedIndex != -1)
 		{
 			float x, y, z;
-			QuaternionToEulerAngle(retargetFile.SourceRetargetTransforms[lstBones->SelectedIndex], x, y, z, EulerAngleOrder::ZXY);
+			QuaternionToEulerAngle(retargetFile.PostRotations[lstBones->SelectedIndex], x, y, z, EulerAngleOrder::ZXY);
 			disableTextChange = true;
 			txtX->SetText(String(x * 180.0f / Math::Pi, "%.1f"));
 			txtY->SetText(String(y * 180.0f / Math::Pi, "%.1f"));
@@ -518,7 +586,32 @@ public:
 				auto trans = targetSkeleton->Bones[animBoneId].BindPose.Translation;
 				sbInfo << "  Offset " << String(trans.x, "%.1f") << ", " << String(trans.y, "%.1f") << ", " << String(trans.z, "%.1f") << "\n";
 			}
-			originalTransform = retargetFile.SourceRetargetTransforms[lstBones->SelectedIndex];
+            switch (editorMode)
+            {
+            case EditorMode::EditPreRotation:
+				{
+					originalTransform = retargetFile.PreRotations[lstBones->SelectedIndex];
+					break;
+				}
+            case EditorMode::EditMorphState:
+				{
+					auto boneStateId = retargetFile.MorphStates[editingMorphStateId].BoneStates.FindFirst(
+						[&](auto &bs) { return bs.BoneId == lstBones->SelectedIndex; });
+					if (boneStateId == -1)
+					{
+						originalTransform = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+                        originalTranslation = retargetFile.RetargetedBindPose[lstBones->SelectedIndex].Translation;
+					}
+					else
+					{
+						originalTransform =
+							retargetFile.MorphStates[editingMorphStateId].BoneStates[boneStateId].Transform.Rotation;
+                        originalTranslation =
+                            retargetFile.MorphStates[editingMorphStateId].BoneStates[boneStateId].Transform.Translation;
+					}
+					break;
+				}
+            }
 			txtInfo->SetText(sbInfo.ProduceString());
 			disableTextChange = false;
 		}
@@ -542,6 +635,25 @@ public:
 		}
 	}
 
+	Pose GetNullPose()
+    {
+        Pose rs;
+        if (targetSkeleton)
+        {
+            rs.Transforms.SetSize(targetSkeleton->Bones.Count());
+            for (int i = 0; i < targetSkeleton->Bones.Count(); i++)
+                rs.Transforms[i] = retargetFile.RetargetedBindPose[i];
+        }
+        else if (auto srcSkeleton = sourceModel->GetSkeleton())
+        {
+            rs.Transforms.SetSize(srcSkeleton->Bones.Count());
+            for (int i = 0; i < srcSkeleton->Bones.Count(); i++)
+                rs.Transforms[i] = BoneTransformation();
+        }
+
+        return rs;
+    }
+
 	Pose GetAnimSkeletonBindPose()
 	{
 		Pose rs;
@@ -554,22 +666,39 @@ public:
 		return rs;
 	}
 
+	Pose GetSourceSkeletonBindPose()
+    {
+        Pose rs;
+        if (auto srcSkeleton = sourceModel->GetSkeleton())
+        {
+            rs.Transforms.SetSize(srcSkeleton->Bones.Count());
+            for (int i = 0; i < srcSkeleton->Bones.Count(); i++)
+                rs.Transforms[i] = srcSkeleton->Bones[i].BindPose;
+        }
+        return rs;
+    }
+
 	Pose GetCurrentPose()
 	{
-		if (targetSkeleton)
-		{
-			if (scTimeline->GetPosition() == 0)
-				return GetAnimSkeletonBindPose();
-			else
-			{
-				animSynthesizer->SetSource(targetSkeleton.Ptr(), &currentAnim);
-				float time = scTimeline->GetPosition() / 30.0f;
-				Pose p;
-				animSynthesizer->GetPose(p, time);
-				return p;
-			}
-		}
-		return Pose();
+        Pose result;
+        if (targetSkeleton)
+        {
+            if (scTimeline->GetPosition() == 0)
+                result = GetAnimSkeletonBindPose();
+            else
+            {
+                animSynthesizer->SetSource(targetSkeleton.Ptr(), &currentAnim);
+                float time = scTimeline->GetPosition() / 30.0f;
+                animSynthesizer->GetPose(result, time);
+            }
+        }
+        else
+            result = GetNullPose();
+        if (editorMode == EditorMode::EditMorphState)
+        {
+            result.BlendShapeWeights[retargetFile.MorphStates[editingMorphStateId].Name] = 100.0f;
+        }
+        return result;
 	}
 
 	void GetSkeletonInfo(StringBuilder & sb, Skeleton * skeleton, int id, int indent)
@@ -600,7 +729,7 @@ public:
 	}
 	void mnMappingMode_Clicked(UI_Base * sender)
 	{
-		ToggleMappingMode(!mappingMode);
+        ToggleMappingMode(editorMode != EditorMode::EditMapping);
 	}
 	void mnPlayAnim_Clicked(UI_Base * sender)
 	{
@@ -655,69 +784,135 @@ public:
 				cmb->AddTextItem(b.Name);
 			cmb->SetSelectedIndex(selIdx + 1);
 			cmbAnimBones.Add(cmb);
-			cmb->Posit(EM(0.2f), EM(i * 2.5f + 1.1f), EM(12.5f), EM(1.2f));
+			cmb->Posit(EM(0.2f), EM(i * 2.5f + 1.1f), EM(11.5f), EM(1.2f));
 			cmb->OnChanged.Bind(this, &SkeletonRetargetVisualizerActor::cmbBoneMappingChanged);
 		}
 		pnlBoneMapping->SizeChanged();
 		UpdateCombinedRetargetTransform();
 	}
 
-	Quaternion GetAccumRotation(int id)
+	void GetAccumRotation(int id, Quaternion &qLocal, Quaternion &q, Quaternion &qParent)
 	{
-		Quaternion rs = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
-		int curId = id;
-		Skeleton * srcSkeleton = sourceModel->GetSkeleton();
-		while (curId != -1)
-		{
-			rs = retargetFile.SourceRetargetTransforms[curId] * srcSkeleton->Bones[curId].BindPose.Rotation * rs;
-			curId = sourceModel->GetSkeleton()->Bones[curId].ParentId;
-		}
-		Skeleton * tarSkeleton = targetSkeleton.Ptr();
-		if (!tarSkeleton)
-			tarSkeleton = sourceModel->GetSkeleton();
-		int animBoneId = GetAnimationBoneIndex(id);
-		Pose bindPose = GetAnimSkeletonBindPose();
-		Quaternion animRot = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
-		Quaternion animBindRot = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
-		if (bindPose.Transforms.Count())
-		{
-			while (animBoneId != -1)
-			{
-				animBindRot = bindPose.Transforms[animBoneId].Rotation * animBindRot;
-				animRot = curPose.Transforms[animBoneId].Rotation * animRot;
-				animBoneId = tarSkeleton->Bones[animBoneId].ParentId;
-			}
-		}
-		rs = animRot * animBindRot.Inverse() * rs;
-		return rs;
+        List<Matrix4> matrices;
+        auto pose = GetCurrentPose();
+        
+		pose.GetMatrices(sourceModel->GetSkeleton(), matrices, false, &retargetFile);
+        qLocal = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+        int targetId = retargetFile.ModelBoneIdToAnimationBoneId[id];
+        if (targetId != -1)
+            qLocal = pose.Transforms[targetId].Rotation;
+        q = Quaternion::FromMatrix(matrices[id].GetMatrix3());
+        int parentId = sourceModel->GetSkeleton()->Bones[id].ParentId;
+        if (parentId != -1)
+            qParent = Quaternion::FromMatrix(matrices[parentId].GetMatrix3());
+        else
+            qParent = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
 	}
+
+	void GetAccumTransform(int id, Matrix4 &t, Matrix4 &tParent)
+    {
+        List<Matrix4> matrices;
+        GetCurrentPose().GetMatrices(sourceModel->GetSkeleton(), matrices, false, &retargetFile);
+        t = matrices[id];
+        int parentId = sourceModel->GetSkeleton()->Bones[id].ParentId;
+        if (parentId != -1)
+            tParent = matrices[parentId];
+        else
+            Matrix4::CreateIdentityMatrix(tParent);
+    }
 
 	void ApplyManipulation(UI_Base *, ManipulationEventArgs e)
 	{
+        if (editorMode == EditorMode::EditMapping)
+            return;
 		PreviewManipulation(nullptr, e);
 		if (IsRotationHandle(e.Handle))
 		{
 			Modification m;
+            m.editorMode = editorMode;
 			m.boneId = lstBones->SelectedIndex;
 			m.originalTransform = originalTransform;
-			m.newTransform = retargetFile.SourceRetargetTransforms[lstBones->SelectedIndex];
-			originalTransform = retargetFile.SourceRetargetTransforms[lstBones->SelectedIndex];
+            m.newTranslation = m.originalTranslation = originalTranslation;
+            if (editorMode == EditorMode::EditPreRotation)
+            {
+				m.newTransform = retargetFile.PreRotations[lstBones->SelectedIndex];
+				originalTransform = retargetFile.PreRotations[lstBones->SelectedIndex];
+            }
+            else if (editorMode == EditorMode::EditMorphState)
+            {
+                m.morphStateName = retargetFile.MorphStates[editingMorphStateId].Name;
+                int bsId = retargetFile.MorphStates[editingMorphStateId].BoneStates.FindFirst(
+                    [&](auto &bs) { return bs.BoneId == lstBones->SelectedIndex; });
+                originalTransform = m.newTransform =
+                    retargetFile.MorphStates[editingMorphStateId].BoneStates[bsId].Transform.Rotation;
+            }
 			undoStack.SetSize(undoPtr + 1);
 			undoStack.Add(m);
 			undoPtr = undoStack.Count() - 1;
 			UpdateCombinedRetargetTransform();
 		}
-		else
-			oldTargetSkeletonTransform = targetSkeletonTransform;
+        else
+        {
+            if (editorMode == EditorMode::EditMorphState && IsTranslationHandle(e.Handle))
+            {
+                Modification m;
+                m.editorMode = editorMode;
+                m.boneId = lstBones->SelectedIndex;
+                m.newTransform = originalTransform;
+                m.originalTransform = originalTransform;
+                m.originalTranslation = originalTranslation;
+                m.morphStateName = retargetFile.MorphStates[editingMorphStateId].Name;
+                int bsId = retargetFile.MorphStates[editingMorphStateId].BoneStates.FindFirst(
+                    [&](auto &bs) { return bs.BoneId == lstBones->SelectedIndex; });
+                originalTranslation = m.newTranslation =
+                    retargetFile.MorphStates[editingMorphStateId].BoneStates[bsId].Transform.Translation;
+                undoStack.SetSize(undoPtr + 1);
+                undoStack.Add(m);
+                undoPtr = undoStack.Count() - 1;
+            }
+            else
+            {
+				oldTargetSkeletonTransform = targetSkeletonTransform;
+            }
+        }
 	}
 
 	void PreviewManipulation(UI_Base *, ManipulationEventArgs e)
 	{
+        if (editorMode == EditorMode::EditMapping)
+            return;
 		if (IsTranslationHandle(e.Handle))
 		{
-			targetSkeletonTransform.values[12] = oldTargetSkeletonTransform.values[12] + e.TranslationOffset.x;
-			targetSkeletonTransform.values[13] = oldTargetSkeletonTransform.values[13] + e.TranslationOffset.y;
-			targetSkeletonTransform.values[14] = oldTargetSkeletonTransform.values[14] + e.TranslationOffset.z;
+            if (editorMode == EditorMode::EditMorphState)
+            {
+                int bsId = retargetFile.MorphStates[editingMorphStateId].BoneStates.FindFirst(
+                    [&](auto &bs) { return bs.BoneId == lstBones->SelectedIndex; });
+                if (bsId == -1)
+                {
+                    MorphState::BoneState newBs;
+                    newBs.BoneId = lstBones->SelectedIndex;
+                    newBs.Transform.Rotation = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+                    newBs.Transform.Translation = sourceModel->GetSkeleton()->Bones[newBs.BoneId].BindPose.Translation;
+                    retargetFile.MorphStates[editingMorphStateId].BoneStates.Add(newBs);
+                    bsId = retargetFile.MorphStates[editingMorphStateId].BoneStates.Count() - 1;
+                }
+                retargetFile.MorphStates[editingMorphStateId].BoneStates[bsId].Transform.Translation = originalTranslation;
+                Matrix4 originAnimTransform, originAnimParentTransform;
+                GetAccumTransform(lstBones->SelectedIndex, originAnimTransform, originAnimParentTransform);
+                auto targetAnimTransform = originAnimTransform;
+                targetAnimTransform.SetTranslation(targetAnimTransform.GetTranslation() + e.TranslationOffset);
+                Matrix4 invOriginalAnimParentTransform;
+                originAnimParentTransform.Inverse(invOriginalAnimParentTransform);
+                auto localTransform = invOriginalAnimParentTransform * targetAnimTransform;
+                retargetFile.MorphStates[editingMorphStateId].BoneStates[bsId].Transform.Translation =
+                    localTransform.GetTranslation();
+            }
+            else
+            {
+				targetSkeletonTransform.values[12] = oldTargetSkeletonTransform.values[12] + e.TranslationOffset.x;
+				targetSkeletonTransform.values[13] = oldTargetSkeletonTransform.values[13] + e.TranslationOffset.y;
+				targetSkeletonTransform.values[14] = oldTargetSkeletonTransform.values[14] + e.TranslationOffset.z;
+            }
 		}
 		else if (IsScaleHandle(e.Handle))
 		{
@@ -734,25 +929,83 @@ public:
 			case ManipulationHandleType::RotationY: axis = Vec3::Create(0.0f, 1.0f, 0.0f); break;
 			case ManipulationHandleType::RotationZ: axis = Vec3::Create(0.0f, 0.0f, 1.0f); break;
 			}
-			retargetFile.SourceRetargetTransforms[lstBones->SelectedIndex] = originalTransform;
-			auto rot = Quaternion::FromAxisAngle(axis, e.RotationAngle);
-			auto accumRot = GetAccumRotation(lstBones->SelectedIndex);
-			auto invSrcLocal = sourceModel->GetSkeleton()->Bones[lstBones->SelectedIndex].BindPose.Rotation.Inverse();
-			auto accumParentRot = accumRot * invSrcLocal * originalTransform.Inverse();
 
-			retargetFile.SourceRetargetTransforms[lstBones->SelectedIndex] = accumParentRot.Inverse() * rot * accumRot * invSrcLocal;
-			UpdateCombinedRetargetTransform();
+            switch (editorMode)
+            {
+            case EditorMode::EditPreRotation: {
+                retargetFile.PreRotations[lstBones->SelectedIndex] = originalTransform;
+                UpdateCombinedRetargetTransform();
+                auto rot = Quaternion::FromAxisAngle(axis, e.RotationAngle);
+                Quaternion originAnimRot, originAnimParentRot, animRotLocal;
+                GetAccumRotation(lstBones->SelectedIndex, animRotLocal, originAnimRot, originAnimParentRot);
+                auto targetAnimRot = rot * originAnimRot;
+                retargetFile.PreRotations[lstBones->SelectedIndex] = originAnimParentRot.Inverse() * targetAnimRot * animRotLocal.Inverse();
+                UpdateCombinedRetargetTransform();
+                break;
+            }
+            case EditorMode::EditMorphState: {
+                int bsId = retargetFile.MorphStates[editingMorphStateId].BoneStates.FindFirst(
+                    [&](auto &bs) { return bs.BoneId == lstBones->SelectedIndex; });
+                if (bsId == -1)
+                {
+                    MorphState::BoneState newBs;
+                    newBs.BoneId = lstBones->SelectedIndex;
+                    newBs.Transform.Rotation = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+                    newBs.Transform.Translation = sourceModel->GetSkeleton()->Bones[newBs.BoneId].BindPose.Translation;
+                    retargetFile.MorphStates[editingMorphStateId].BoneStates.Add(newBs);
+                    bsId = retargetFile.MorphStates[editingMorphStateId].BoneStates.Count() - 1;
+                }
+                retargetFile.MorphStates[editingMorphStateId].BoneStates[bsId].Transform.Rotation = originalTransform;
+                auto rot = Quaternion::FromAxisAngle(axis, e.RotationAngle);
+                Quaternion animRotLocal, originAnimRot, originAnimParentRot;
+                GetAccumRotation(lstBones->SelectedIndex, animRotLocal, originAnimRot, originAnimParentRot);
+                auto targetAnimRot = rot * originAnimRot;
+                retargetFile.MorphStates[editingMorphStateId].BoneStates[bsId].Transform.Rotation =
+                    originAnimParentRot.Inverse() * targetAnimRot;
+                break;
+            }
+            }
+            
 		}
 	}
 
 	int undoPtr = -1;
+    void RecoverFromStack()
+    {
+        switch (undoStack[undoPtr].editorMode)
+        {
+        case EditorMode::EditPreRotation:
+            originalTransform = retargetFile.PreRotations[undoStack[undoPtr].boneId] =
+                undoStack[undoPtr].originalTransform;
+            UpdateCombinedRetargetTransform();
+            break;
+        case EditorMode::EditMorphState: {
+            int msId = retargetFile.MorphStates.FindFirst(
+                [&](auto &ms) { return ms.Name == undoStack[undoPtr].morphStateName; });
+            if (msId != -1)
+            {
+                int bsId = retargetFile.MorphStates[msId].BoneStates.FindFirst(
+                    [&](auto &bs) { return bs.BoneId == undoStack[undoPtr].boneId; });
+                if (bsId != -1)
+                {
+                    retargetFile.MorphStates[msId].BoneStates[bsId].Transform.Rotation =
+                        undoStack[undoPtr].originalTransform;
+                    retargetFile.MorphStates[msId].BoneStates[bsId].Transform.Translation =
+                        undoStack[undoPtr].originalTranslation;
+                }
+                originalTransform = undoStack[undoPtr].originalTransform;
+                originalTranslation = undoStack[undoPtr].originalTranslation;
+            }
+            break;
+        }
+        }
+    }
 	void mnUndo_Clicked(UI_Base *)
 	{
 		if (sourceModel && undoPtr >= 0)
 		{
-			originalTransform = retargetFile.SourceRetargetTransforms[undoStack[undoPtr].boneId] = undoStack[undoPtr].originalTransform;
+            RecoverFromStack();
 			undoPtr--;
-			UpdateCombinedRetargetTransform();
 		}
 	}
 
@@ -761,13 +1014,16 @@ public:
 		if (sourceModel && undoPtr < undoStack.Count() - 1)
 		{
 			undoPtr++;
-			originalTransform = retargetFile.SourceRetargetTransforms[undoStack[undoPtr].boneId] = undoStack[undoPtr].newTransform;
-			UpdateCombinedRetargetTransform();
+            RecoverFromStack();
 		}
 	}
 
 	void OnKeyDown(UI_Base *, GraphicsUI::UIKeyEventArgs & e)
 	{
+        if (e.Shift == SS_CONTROL && e.Key == '1')
+            morphStateManipulationMode = ManipulationMode::Translation;
+        if (e.Shift == SS_CONTROL && e.Key == '2')
+            morphStateManipulationMode = ManipulationMode::Rotation;
 		if (e.Shift == SS_CONTROL && (e.Key == 'Z' || e.Key == 'z'))
 			mnUndo_Clicked(nullptr);
 		if (e.Shift == SS_CONTROL && (e.Key == 'Y' || e.Key == 'y'))
@@ -779,6 +1035,79 @@ public:
 		if (e.Shift == 0 && (e.Key == 'M' || e.Key == 'm'))
 			mnMappingMode_Clicked(nullptr);
 	}
+
+	void CreateMorphState(GraphicsUI::UI_Base *sender)
+    {
+        if (lstMorphStates->SelectedIndex != -1)
+        {
+            auto nameLabel = reinterpret_cast<Label *>(lstMorphStates->GetSelectedItem())->GetText();
+            if (retargetFile.MorphStates.FindFirst([&](auto &ms) { return ms.Name == nameLabel; }) == -1)
+            {
+                retargetFile.MorphStates.Add(MorphState());
+                auto &newState = retargetFile.MorphStates.Last();
+                newState.Name = nameLabel;
+                UpdateMorphStateView();
+                int index = lstMorphStates->Items.FindFirst(
+                    [&](auto *item) { return static_cast<Label *>(item)->GetText() == nameLabel; });
+                lstMorphStates->SelectedIndex = index;
+                EditMorphState(sender);
+            }
+        }
+    }
+
+	void DeleteMorphState(GraphicsUI::UI_Base *sender)
+    {
+        if (lstMorphStates->SelectedIndex != -1)
+        {
+            int msId = retargetFile.MorphStates.FindFirst([&](auto &ms) {
+                return ms.Name == lstMorphStates->GetTextItem(lstMorphStates->SelectedIndex)->GetText();
+            });
+            if (msId != -1)
+            {
+                editingMorphStateId = -1;
+                editorMode = EditorMode::EditPreRotation;
+                btnEditMorphState->Checked = false;
+                retargetFile.MorphStates.RemoveAt(msId);
+                UpdateMorphStateView();
+            }
+        }
+    }
+
+	void ResetMorphState(GraphicsUI::UI_Base *sender)
+    {
+        if (lstMorphStates->SelectedIndex != -1)
+        {
+            int msId = retargetFile.MorphStates.FindFirst([&](auto &ms) {
+                return ms.Name == lstMorphStates->GetTextItem(lstMorphStates->SelectedIndex)->GetText();
+            });
+            if (msId != -1)
+            {
+                retargetFile.MorphStates[msId].BoneStates.Clear();
+            }
+        }
+    }
+
+    void EditMorphState(GraphicsUI::UI_Base *sender)
+    {
+        btnEditMorphState->Checked = !btnEditMorphState->Checked;
+        if (btnEditMorphState->Checked)
+        {
+            editingMorphStateId = lstMorphStates->SelectedIndex;
+            if (editingMorphStateId != -1 && retargetFile.MorphStates.Count() <= editingMorphStateId)
+            {
+                editingMorphStateId = -1;
+                editorMode = EditorMode::EditPreRotation;
+                btnEditMorphState->Checked = false;
+                UpdateEditorMode();
+                return;
+            }
+        }
+        editorMode = btnEditMorphState->Checked ? EditorMode::EditMorphState : EditorMode::EditPreRotation;
+        lblEditorMode->Visible = editorMode == EditorMode::EditMorphState;
+        editingMorphStateId = lstMorphStates->SelectedIndex;
+        UpdateEditorMode();
+    }
+
 
 	virtual void RegisterUI(GraphicsUI::UIEntry * pUiEntry) override
 	{
@@ -803,7 +1132,7 @@ public:
 		auto mnViewBindPose = new GraphicsUI::MenuItem(mnView, "Bind Pose");
 		mnViewBindPose->OnClick.Bind(this, &SkeletonRetargetVisualizerActor::ViewBindPose);
 
-		auto mnToggleSkeletonModel = new GraphicsUI::MenuItem(mnView, "Toggle Skeelton/Model", "Ctrl+T");
+		auto mnToggleSkeletonModel = new GraphicsUI::MenuItem(mnView, "Toggle Skeleton/Model", "Ctrl+T");
 		mnToggleSkeletonModel->OnClick.Bind(this, &SkeletonRetargetVisualizerActor::mnToggleSkeletonModel_Clicked);
 
 		auto mnLoadSourceMesh = new GraphicsUI::MenuItem(mnFile, "Load Model...");
@@ -852,6 +1181,7 @@ public:
 			auto lbl = new GraphicsUI::Label(parent);
 			lbl->Posit(EM(left), EM(top), 0, 0);
 			lbl->SetText(label);
+            return lbl;
 		};
 
 		addLabel(pnl2, "Root Translation Scale", 0.0f, 0.0f, 4.0f, 1.0f);
@@ -900,10 +1230,50 @@ public:
 		txtInfo = GraphicsUI::CreateMultiLineTextBox(pnl2);
 		txtInfo->Posit(EM(0.0f), EM(9.0f), EM(11.0f), EM(8.5f));
 
-		pnlBoneMapping = new GraphicsUI::VScrollPanel(uiEntry);
-		pnlBoneMapping->BackColor = pnl->BackColor;
-		pnlBoneMapping->SetWidth(EM(14.0f));
-		pnlBoneMapping->DockStyle = GraphicsUI::Control::dsRight;
+		auto rightPanel = new GraphicsUI::Container(uiEntry);
+        rightPanel->DockStyle = GraphicsUI::Control::dsRight;
+        rightPanel->BackColor = pnl->BackColor;
+        rightPanel->SetWidth(EM(14.0f));
+        
+		pnlMorphState = new GraphicsUI::Container(rightPanel);
+        pnlMorphState->Padding = EM(0.5f);
+        pnlMorphState->DockStyle = GraphicsUI::Control::dsTop;
+        pnlMorphState->SetHeight(EM(18.0f));
+        auto lblMorphStates = addLabel(pnlMorphState, "Morph States", 0.0f, 0.0f, (float)EM(2.0f), (float)EM(1.2f));
+        lblMorphStates->SetHeight(EM(1.5f));
+        lblMorphStates->DockStyle = GraphicsUI::Control::dsTop;
+        lstMorphStates = new GraphicsUI::ListBox(pnlMorphState);
+        lstMorphStates->ManageItemFontColor = false;
+        lstMorphStates->Posit(0, 0, rightPanel->GetWidth() - EM(1.0f), EM(12.0f));
+        auto btnCreateMorphState = new GraphicsUI::Button(pnlMorphState);
+        btnCreateMorphState->SetText("Create");
+        btnCreateMorphState->Posit(
+            lstMorphStates->Left, lstMorphStates->Top + lstMorphStates->GetHeight(), EM(4.0f), EM(1.5f));
+        btnCreateMorphState->OnClick.Bind(this, &SkeletonRetargetVisualizerActor::CreateMorphState);
+        auto btnDeleteMorphState = new GraphicsUI::Button(pnlMorphState);
+        btnDeleteMorphState->SetText("Delete");
+        btnDeleteMorphState->Posit(
+            lstMorphStates->Left + EM(4.5f), lstMorphStates->Top + lstMorphStates->GetHeight(), EM(4.0f), EM(1.5f));
+        btnDeleteMorphState->OnClick.Bind(this, &SkeletonRetargetVisualizerActor::DeleteMorphState);
+        auto btnResetMorphState = new GraphicsUI::Button(pnlMorphState);
+        btnResetMorphState->SetText("Reset");
+        btnResetMorphState->Posit(
+            lstMorphStates->Left + EM(9.0f), lstMorphStates->Top + lstMorphStates->GetHeight(), EM(4.0f), EM(1.5f));
+        btnResetMorphState->OnClick.Bind(this, &SkeletonRetargetVisualizerActor::ResetMorphState);
+        btnEditMorphState = new GraphicsUI::Button(pnlMorphState);
+        btnEditMorphState->SetText("Edit");
+        btnEditMorphState->Posit(
+            lstMorphStates->Left, btnResetMorphState->Top + EM(2.0f), EM(13.0f), EM(1.5f));
+        btnEditMorphState->OnClick.Bind(this, &SkeletonRetargetVisualizerActor::EditMorphState);
+        auto pnlBoneMappingContainer = new GraphicsUI::Container(rightPanel);
+        pnlBoneMappingContainer->Padding = EM(0.5f);
+        pnlBoneMappingContainer->DockStyle = GraphicsUI::Control::dsFill;
+        auto lblBoneMapping =
+            addLabel(pnlBoneMappingContainer, "Bone Mapping", 0.0f, 0.0f, (float)EM(10.0f), (float)EM(1.2f));
+        lblBoneMapping->Padding.Bottom = EM(0.2f);
+        lblBoneMapping->DockStyle = GraphicsUI::Control::dsTop;
+        pnlBoneMapping = new GraphicsUI::VScrollPanel(pnlBoneMappingContainer);
+        pnlBoneMapping->DockStyle = GraphicsUI::Control::dsFill;
 
 		auto pnlBottom = new GraphicsUI::Container(uiEntry);
 		pnlBottom->BackColor = pnl->BackColor;
@@ -927,15 +1297,14 @@ public:
 		infoForm->SizeChanged();
 		uiEntry->CloseWindow(infoForm);
 
-		lblMappingMode = new GraphicsUI::Label(uiEntry);
-		lblMappingMode->Posit(EM(0.5f), EM(0.5f), 100, 30);
-		lblMappingMode->SetText("Bone Mapping Mode On");
-		lblMappingMode->FontColor = GraphicsUI::Color(0xD8, 0x43, 0x15, 255);
-		lblMappingMode->Visible = false;
+		lblEditorMode = new GraphicsUI::Label(uiEntry);
+		lblEditorMode->Posit(EM(0.5f), EM(0.5f), 100, 30);
+		lblEditorMode->SetText("Bone Mapping Mode On");
+		lblEditorMode->FontColor = GraphicsUI::Color(0xD8, 0x43, 0x15, 255);
+		lblEditorMode->Visible = false;
 
 		uiEntry->OnMouseDown.Bind(this, &SkeletonRetargetVisualizerActor::WindowMouseDown);
 		uiEntry->OnDblClick.Bind(this, &SkeletonRetargetVisualizerActor::WindowDblClick);
-
 	}
 	
 	virtual void OnLoad() override
@@ -988,7 +1357,7 @@ public:
 		{
 			if (traceRs.Object->Tag == (void*)2)
 			{
-				if (mappingMode)
+				if (editorMode == EditorMode::EditMapping)
 				{
 					if (traceRs.Object->SkeletalBoneId != -1 && lstBones->SelectedIndex != -1)
 					{
@@ -1079,26 +1448,13 @@ public:
 			if (!sourceSkeletonDrawable)
 				sourceSkeletonDrawable = param.rendererService->CreateSkeletalDrawable(&sourceSkeletonMesh, 0, sourceModel->GetSkeleton(), &sourceSkeletonMaterial, false);
 			
-			if (targetSkeleton)
-			{
-				p = GetCurrentPose();
-                sourceSkeletonDrawable->UpdateTransformUniform(identity, p, &retargetFile, nullptr);
-				sourceModelInstance.UpdateTransformUniform(identity, p, &retargetFile, nullptr);
-                highlightModelInstance.UpdateTransformUniform(identity, p, &retargetFile, nullptr);
-				skeletonPhysInstance->SetTransform(identity, p, &retargetFile);
-				physInstance->SetTransform(identity, p, &retargetFile);
-			}
-			else
-			{
-				p.Transforms.SetSize(sourceSkeleton->Bones.Count());
-				for (int i = 0; i < p.Transforms.Count(); i++)
-					p.Transforms[i] = sourceSkeleton->Bones[i].BindPose;
-                sourceSkeletonDrawable->UpdateTransformUniform(identity, p, &retargetFile, nullptr);
-                sourceModelInstance.UpdateTransformUniform(identity, p, &retargetFile, nullptr);
-				highlightModelInstance.UpdateTransformUniform(identity, p, &retargetFile, nullptr);
-				skeletonPhysInstance->SetTransform(identity, p, &retargetFile);
-				physInstance->SetTransform(identity, p, &retargetFile);
-			}
+			p = GetCurrentPose();
+            sourceSkeletonDrawable->UpdateTransformUniform(identity, p, &retargetFile, nullptr);
+			sourceModelInstance.UpdateTransformUniform(identity, p, &retargetFile, nullptr);
+            highlightModelInstance.UpdateTransformUniform(identity, p, &retargetFile, nullptr);
+			skeletonPhysInstance->SetTransform(identity, p, &retargetFile);
+			physInstance->SetTransform(identity, p, &retargetFile);
+
 			curPose = p;
 			if (!showSourceModel)
 				param.sink->AddDrawable(sourceSkeletonDrawable.Ptr());

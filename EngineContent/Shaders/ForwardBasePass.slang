@@ -75,11 +75,11 @@ VSOutput vs_main(SPECIALIZATION_TYPE_4 vertexIn, uint vertIndex : SV_VertexID)
     
     float3 displacement = gMaterial.getDisplacement(worldPos, vattribs, gView);
     rs.worldPos_binormalSign = float4(worldPos.vertPos + displacement, worldPos.tangentFrame.binormalSign);
-    rs.projPos = PlatformNDC(mul(gView.viewProjectionTransform, float4(rs.worldPos_binormalSign.xyz, 1.0)));
+    rs.projPos = mul(gView.viewProjectionTransform, float4(rs.worldPos_binormalSign.xyz, 1.0));
     return rs;
 }
 
-float4 ps_main(VSOutput vsOut) : SV_Target
+float4 ps_main(VSOutput vsOut, float4 pixelLocation : SV_Position) : SV_Target
 {
     VertexPositionInfo vin;
     vin.vertPos = vsOut.worldPos_binormalSign.xyz;
@@ -95,5 +95,5 @@ float4 ps_main(VSOutput vsOut) : SV_Target
     if (!pattern.alphaTest())
         discard;
     return pattern.computeForwardLighting<1>(gLighting, vin, gView, gWorldTransform.getLightmapId(), vattribs.uvSet.getUV(1),
-        vsOut.projPos);
+        float4(pixelLocation.xy, vsOut.projPos.zw));
 }

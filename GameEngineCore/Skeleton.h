@@ -83,24 +83,57 @@ namespace GameEngine
 		BoneTransformation BindPose;
 	};
 
+    constexpr int CurrentRetargetFileVersion = 100;
+    constexpr uint32_t RetargetFileIdentifier = 'S' + ('R' << 8) + ('E' << 16) + ('T' << 24);
+
+	class MorphState
+    {
+    public:
+        CoreLib::String Name;
+        struct BoneState
+        {
+            int BoneId;
+            BoneTransformation Transform;
+        };
+        CoreLib::List<BoneState> BoneStates;
+    };
+
 	class RetargetFile
 	{
 	public:
+        struct Header
+        {
+            uint32_t Identifier = RetargetFileIdentifier;
+			int Version = CurrentRetargetFileVersion;
+            int SourceBoneCount = 0;
+			int TargetBoneCount = 0;
+            int Reserved[16] = {};
+        };
+        Header header;
+
 		CoreLib::String SourceSkeletonName, TargetSkeletonName;
-		/*
-		final model pos = AnimationPose * AnimationRetargetTransform * SourceRetargetTransform * InverseBindPose * modelVertPos
-		*/
-		CoreLib::List<VectorMath::Quaternion> SourceRetargetTransforms; // this is user input from retargeting tool
-		CoreLib::List<int> ModelBoneIdToAnimationBoneId; // this is user specified source model bone to animation bone mapping (which animation bone to use for driving each source bone)
-		CoreLib::List<VectorMath::Matrix4> RetargetedInversePose; // equals to InverseAnimationSkeletonBindPose * SourceRetargetTransform * InverseBindPose
-		CoreLib::List<VectorMath::Vec3> RetargetedBoneOffsets;
+        // Pre rotations to apply to each bone.
+        CoreLib::List<VectorMath::Quaternion> PreRotations;
+        // Post rotations to apply to each bone.
+		CoreLib::List<VectorMath::Quaternion> PostRotations;
+        // New bind pose (local space).
+        CoreLib::List<BoneTransformation> RetargetedBindPose;
+		// User specified source model bone to animation bone mapping (which animation bone to use for driving each
+        // source bone).
+		CoreLib::List<int> ModelBoneIdToAnimationBoneId;
+        // The new inverse pose to use with the model.
+		CoreLib::List<VectorMath::Matrix4> RetargetedInversePose;
+		// The scale factor of root translation terms.
 		VectorMath::Vec3 RootTranslationScale = VectorMath::Vec3::Create(1.0f, 1.0f, 1.0f);
-		int MaxAnimationBoneId = 0;
+
+		// Morph States: blendshape animation curves can be used to blend the pose into these states.
+		CoreLib::List<MorphState> MorphStates;
+
+    public:
 		void SaveToStream(CoreLib::IO::Stream * stream);
 		void LoadFromStream(CoreLib::IO::Stream * stream);
 		void SaveToFile(const CoreLib::String & filename);
 		void LoadFromFile(const CoreLib::String & filename);
-
 		void SetBoneCount(int count);
 	};
 

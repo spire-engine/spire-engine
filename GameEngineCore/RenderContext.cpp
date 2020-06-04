@@ -94,7 +94,7 @@ namespace GameEngine
 	struct SkeletalAnimationTransform
     {
         VectorMath::Matrix4 worldMat;
-        DualQuaternion boneTransforms[80];
+        DualQuaternion boneTransforms[90];
         uint32_t blendShapeVertexStart[MaxBlendShapes];
         float blendShapeWeights[MaxBlendShapes] = {};
         int blendShapeCount = 0;
@@ -637,8 +637,8 @@ namespace GameEngine
 		indexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::IndexBuffer, false, 26, 256, nullptr);
 		vertexBufferMemory.Init(hardwareRenderer.Ptr(), BufferUsage::ArrayBuffer, false, 28, 256, nullptr);
         auto blendShapeMemoryStructInfo =
-            BufferStructureInfo(sizeof(BlendShapeVertex), (1 << 26) / sizeof(BlendShapeVertex));
-        blendShapeMemory.Init(hardwareRenderer.Ptr(), BufferUsage::StorageBuffer, false, 26, 256, &blendShapeMemoryStructInfo);
+            BufferStructureInfo(sizeof(BlendShapeVertex), (1 << 28) / sizeof(BlendShapeVertex));
+        blendShapeMemory.Init(hardwareRenderer.Ptr(), BufferUsage::StorageBuffer, false, 28, 256, &blendShapeMemoryStructInfo);
 
 		envMapArray = hardwareRenderer->CreateTextureCubeArray("envMapArray", TextureUsage::SampledColorAttachment, EnvMapSize, Math::Log2Floor(EnvMapSize) + 1, MaxEnvMapCount, StorageFormat::RGBA_F16);
 	

@@ -99,7 +99,6 @@ namespace CoreLib
 
 		void ImageRef::SaveAsBmpFile(Basic::String fileName, bool reverseY)
 		{
-			FILE *f = 0;
 			int filesize = 54 + 3*Width*Height;
 			Basic::List<unsigned char> img;
 			img.SetSize(3*Width*Height);
@@ -146,20 +145,12 @@ namespace CoreLib
 			bmpinfoheader[11] = (unsigned char)(       Height>>24);
 
 			CoreLib::IO::BinaryWriter writer(new CoreLib::IO::FileStream(fileName, IO::FileMode::Create));
-
-			if (f)
+			writer.Write(bmpfileheader, 14);
+			writer.Write(bmpinfoheader, 40);
+			for(int i=0; i<Height; i++)
 			{
-				writer.Write(bmpfileheader, 14);
-				writer.Write(bmpinfoheader, 40);
-				for(int i=0; i<Height; i++)
-				{
-					writer.Write(img.Buffer()+(Width*i*3),3*Width);
-					writer.Write(bmppad,(4-(Width*3)%4)%4);
-				}
-			}
-			else
-			{
-				throw IO::IOException("Failed to open file for writing the bitmap.");
+				writer.Write(img.Buffer()+(Width*i*3),3*Width);
+				writer.Write(bmppad,(4-(Width*3)%4)%4);
 			}
 		}
 

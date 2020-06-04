@@ -75,7 +75,7 @@ namespace GameEngine
                     }
                     compressFunc(outBlock, block);
                     int ptr = (i/4) * blocksPerRow + (j/4);
-                    memcpy(buffer.Buffer() + ptr * blockSize, outBlock, 8);
+                    memcpy(buffer.Buffer() + ptr * blockSize, outBlock, blockSize);
                 }
             }
 

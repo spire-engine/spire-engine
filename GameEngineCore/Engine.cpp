@@ -485,7 +485,8 @@ namespace GameEngine
 			{
 				parser.ReadToken();
 				auto fileName = parser.ReadStringLiteral();
-				SaveImage(renderer->GetRenderedImage(), fileName);
+                SaveImage(renderer->GetRenderedImage(), fileName,
+                    renderer->GetHardwareRenderer()->IsImageSpaceYAxisInverted());
 			}
 			catch (const IOException &)
 			{
@@ -758,7 +759,7 @@ namespace GameEngine
 		instance = nullptr;
 		PropertyContainer::FreeRegistry();
 	}
-	void Engine::SaveImage(Texture2D * image, String fileName)
+	void Engine::SaveImage(Texture2D * image, String fileName, bool reverseY)
 	{
 		CoreLib::Imaging::ImageRef imgRef;
 		image->GetSize(imgRef.Width, imgRef.Height);
@@ -777,9 +778,9 @@ namespace GameEngine
 		imgRef.Pixels = imageBufferf.Buffer();
 		auto lfileName = fileName.ToLower();
 		if (lfileName.EndsWith("bmp"))
-			imgRef.SaveAsBmpFile(fileName, true);
+            imgRef.SaveAsBmpFile(fileName, reverseY);
 		else if (lfileName.EndsWith("png"))
-			imgRef.SaveAsPngFile(fileName, true);
+            imgRef.SaveAsPngFile(fileName, reverseY);
 		else
 			throw InvalidOperationException("Cannot save image as the specified file format.");
 	}

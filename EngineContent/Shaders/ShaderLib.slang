@@ -19,6 +19,14 @@ float2 ProjCoordToUV(float2 coord)
     return coord;
 #endif
 }
+float2 UVToProjCoord(float2 coord)
+{
+#ifdef __D3D__
+    return float2(coord.x, 1.0-coord.y);
+#else
+    return coord;
+#endif
+}
 
 float4 QuaternionMul(float4 q1, float4 q2)
 {
@@ -69,10 +77,10 @@ struct TangentFrame
 		q.y = float((frame >> 8) & 255) * inv255 - 1.0;
 		q.z = float((frame >> 16) & 255) * inv255 - 1.0;
 		q.w = float((frame >> 24) & 255) * inv255 - 1.0;
-		
+		q = normalize(q);
 		binormalSign = sign(q.w);
-		vertNormal = normalize(QuaternionRotate(q, float3(0.0, 1.0, 0.0)));
-		vertTangent = normalize(QuaternionRotate(q, float3(1.0, 0.0, 0.0)));
+		vertNormal = QuaternionRotate(q, float3(0.0, 1.0, 0.0));
+		vertTangent = QuaternionRotate(q, float3(1.0, 0.0, 0.0));
 		vertBinormal = cross(vertTangent, vertNormal);
 	}
 	float3 WorldSpaceToTangentSpace(float3 v)
@@ -106,8 +114,9 @@ struct StaticMeshTransform : IWorldSpaceTransform
 	{
 		VertexPositionInfo rs;
 		rs.vertPos = mul(worldMat, float4(input.vertPos, 1.0)).xyz;
-		rs.tangentFrame.vertTangent = mul(worldMat, float4(input.tangentFrame.vertTangent, 0.0)).xyz;
-		rs.tangentFrame.vertBinormal = mul(worldMat, float4(input.tangentFrame.vertBinormal, 0.0)).xyz;
+        float3x3 worldRotMat = float3x3(worldMat);
+		rs.tangentFrame.vertTangent = normalize(mul(worldRotMat, input.tangentFrame.vertTangent));
+		rs.tangentFrame.vertBinormal = normalize(mul(worldRotMat, input.tangentFrame.vertBinormal));
 		rs.tangentFrame.vertNormal = cross(rs.tangentFrame.vertBinormal, rs.tangentFrame.vertTangent);
         rs.tangentFrame.binormalSign = input.tangentFrame.binormalSign;
 		return rs;
@@ -124,7 +133,7 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
 {
     //uint4 lightmapId;
     float4x4 worldMat;
-    float4 boneTransforms[80 * 2]; // dual quaternions
+    float4 boneTransforms[90 * 2]; // dual quaternions
     uint4 blendShapeVertexStart[MAX_BLEND_SHAPES / 4];
     float4 blendShapeWeights[MAX_BLEND_SHAPES / 4];
     int blendShapeCount;
@@ -158,11 +167,9 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
                     float3 newNormal = float3((packedNormal & 1023) * inv1023,
                                               ((packedNormal >> 10) & 1023) * inv1023,
                                               ((packedNormal >> 20) & 1023) * inv1023) - 1;
-                    normalBlendShapeBias += (newNormal - input.tangentFrame.vertNormal) * weight;
+                    normalBlendShapeBias += newNormal * weight;
                 }
             }
-            input.tangentFrame.vertBinormal = normalize(input.tangentFrame.vertBinormal);
-            input.tangentFrame.vertTangent = normalize(input.tangentFrame.vertTangent);
         }
         for (int i = 0; i < vertAttribs.getMaxBoneCount(); i++)
         {
@@ -192,18 +199,17 @@ struct SkeletalAnimationTransform : IWorldSpaceTransform
 
         // apply world transform
         float3x3 worldRotMat = float3x3(worldMat);
-        result.tangentFrame.vertBinormal = mul(worldRotMat, QuaternionRotate(q, input.tangentFrame.vertBinormal));
-        result.tangentFrame.vertTangent = mul(worldRotMat, QuaternionRotate(q, input.tangentFrame.vertTangent));
+        result.tangentFrame.vertBinormal = normalize(mul(worldRotMat, QuaternionRotate(q, input.tangentFrame.vertBinormal)));
+        result.tangentFrame.vertTangent = normalize(mul(worldRotMat, QuaternionRotate(q, input.tangentFrame.vertTangent)));
         result.vertPos = mul(worldMat, float4(result.vertPos, 1.0)).xyz;
 		result.tangentFrame.vertNormal = cross(result.tangentFrame.vertBinormal, result.tangentFrame.vertTangent);
         
         if (blendShapeCount)
         {
-            float3 newNormal = result.tangentFrame.vertNormal + normalBlendShapeBias;
+            float3 newNormal = normalize(mul(worldRotMat, QuaternionRotate(q, input.tangentFrame.vertNormal + normalBlendShapeBias)));
             if (dot(newNormal, result.tangentFrame.vertNormal) > 0.6)
             {
-                result.tangentFrame.vertNormal += normalBlendShapeBias;
-                result.tangentFrame.vertNormal = normalize(result.tangentFrame.vertNormal);
+                result.tangentFrame.vertNormal = newNormal;
                 result.tangentFrame.vertBinormal = normalize(cross(result.tangentFrame.vertTangent, result.tangentFrame.vertNormal));
                 result.tangentFrame.vertTangent = cross(result.tangentFrame.vertNormal, result.tangentFrame.vertBinormal);
             }
