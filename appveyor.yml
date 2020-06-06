@@ -79,17 +79,13 @@ after_build:
 
     7z a "$env:ENGINE_BINARY_ARCHIVE" .\ExampleGame\
 
-    Start-Process -FilePath ".\$($env:PLATFORM)\$($env:CONFIGURATION)\RenderTest.exe" -ArgumentList @("-bindir", ".\$($env:PLATFORM)\$($env:CONFIGURATION)", "-appveyor") -Wait
-
-    7z a "$env:ENGINE_BINARY_ARCHIVE" .\0.bmp
-
     Set-Content -Path "RunGame.bat" -Value "GameEngine.exe -dir ExampleGame" -Encoding ASCII
 
     7z a "$env:ENGINE_BINARY_ARCHIVE" .\RunGame.bat
 
 test_script:
 - ps: >-
-    Start-Process -FilePath ".\$($env:PLATFORM)\$($env:CONFIGURATION)\RenderTest.exe" -ArgumentList @("-bindir", ".\$($env:PLATFORM)\$($env:CONFIGURATION)", "-appveyor") -Wait
+    Start-Process -FilePath ".\$($env:PLATFORM)\$($env:CONFIGURATION)\RenderTest.exe" -ArgumentList @("-slndir", ".", "-bindir", ".\$($env:PLATFORM)\$($env:CONFIGURATION)", "-appveyor") -Wait
 
 artifacts:
 - path: $(ENGINE_BINARY_ARCHIVE)
