@@ -79,6 +79,8 @@ after_build:
 
     7z a "$env:ENGINE_BINARY_ARCHIVE" .\ExampleGame\
 
+    7z a "$env:ENGINE_BINARY_ARCHIVE" .\0.bmp
+
     Set-Content -Path "RunGame.bat" -Value "GameEngine.exe -dir ExampleGame" -Encoding ASCII
 
     7z a "$env:ENGINE_BINARY_ARCHIVE" .\RunGame.bat
