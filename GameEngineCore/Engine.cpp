@@ -126,7 +126,8 @@ namespace GameEngine
                 renderer->GetHardwareRenderer()->BeginJobSubmission();
 				uiSystemInterface->QueueDrawCommands(backgroundImage, sysWindow.Value, currentViewport, nullptr);
                 renderer->GetHardwareRenderer()->EndJobSubmission(nullptr);
-				renderer->GetHardwareRenderer()->Present(sysWindow.Value->surface.Ptr(), sysWindow.Value->uiOverlayTexture.Ptr());
+                if (sysWindow.Value->surface)
+					renderer->GetHardwareRenderer()->Present(sysWindow.Value->surface.Ptr(), sysWindow.Value->uiOverlayTexture.Ptr());
 			}
 			renderer->Wait();
 		}
@@ -388,7 +389,8 @@ namespace GameEngine
 			aggregateTime += renderingTimeDelta;
             if (sysWindow.Key->GetClientHeight() < 2)
                 continue;
-			renderer->GetHardwareRenderer()->Present(sysWindow.Value->surface.Ptr(), sysWindow.Value->uiOverlayTexture.Ptr());
+            if (sysWindow.Value->surface)
+				renderer->GetHardwareRenderer()->Present(sysWindow.Value->surface.Ptr(), sysWindow.Value->uiOverlayTexture.Ptr());
 		}
 
 		inDataTransfer = false;
@@ -552,7 +554,7 @@ namespace GameEngine
     {
 		if (params.HeadlessMode)
 			return OsApplication::CreateDummyWindow(uiSystemInterface.Ptr(), log2BufferSize);
-		return OsApplication::CreateSystemWindow(uiSystemInterface.Ptr(), log2BufferSize);
+		return OsApplication::CreateSystemWindow(uiSystemInterface.Ptr(), log2BufferSize, params.ForceDPI);
 	}
 
 	Texture2D * Engine::GetRenderResult(bool withUI)

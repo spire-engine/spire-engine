@@ -34,9 +34,9 @@ namespace GameEngine
     {
         WinForm::Application::SetMainLoopEventHandler(new WinForm::NotifyEvent([=](auto, auto) {handler(); }));
     }
-    SystemWindow* OsApplication::CreateSystemWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize)
+    SystemWindow* OsApplication::CreateSystemWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize, int forceDPI)
     {
-        auto rs = new Win32SystemWindow(dynamic_cast<UISystemBase*>(sysInterface), log2BufferSize);
+        auto rs = new Win32SystemWindow(dynamic_cast<UISystemBase *>(sysInterface), log2BufferSize, forceDPI);
         rs->GetUIEntry()->BackColor = GraphicsUI::Color(50, 50, 50);
         return dynamic_cast<SystemWindow*>(rs);
     }

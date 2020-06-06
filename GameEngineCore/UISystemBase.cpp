@@ -124,7 +124,8 @@ namespace GameEngine
         if (w == 0 || h == 0)
             return;
         hwRenderer->Wait();
-        surface->Resize(w, h);
+        if (surface)
+            surface->Resize(w, h);
         uiEntry->Posit(0, 0, w, h);
         uiOverlayTexture = hwRenderer->CreateTexture2D("uiOverlayTexture",
             (TextureUsage)((int)TextureUsage::SampledColorAttachment | (int)TextureUsage::Storage), w, h, 1,
@@ -793,7 +794,8 @@ namespace GameEngine
         
         rs->sysInterface = this;
         rs->hwRenderer = rendererApi;
-        rs->surface = rendererApi->CreateSurface(handle->GetNativeHandle(), w, h);
+        if (handle->GetNativeHandle())
+            rs->surface = rendererApi->CreateSurface(handle->GetNativeHandle(), w, h);
 
         rs->uiEntry = new GraphicsUI::UIEntry(w, h, rs.Ptr(), this);
         rs->uniformBuffer = rendererApi->CreateMappedBuffer(BufferUsage::UniformBuffer, sizeof(VectorMath::Matrix4));

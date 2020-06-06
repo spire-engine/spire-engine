@@ -12,13 +12,14 @@ namespace GameEngine
     // Defined in OS-Linux.cpp
     LinuxApplicationContext* GetLinuxApplicationContext();
 
-    LinuxSystemWindow::LinuxSystemWindow(UISystemBase* pSysInterface, int log2UIBufferSize)
+    LinuxSystemWindow::LinuxSystemWindow(UISystemBase* pSysInterface, int log2UIBufferSize, int forceDPI)
     {
         auto context = GetLinuxApplicationContext();
         int blackColor = BlackPixel(context->xdisplay, DefaultScreen(context->xdisplay));
         int whiteColor = WhitePixel(context->xdisplay, DefaultScreen(context->xdisplay));
         currentWidth = 1920;
         currentHeight = 1080;
+        forceDPIValue = forceDPI;
         handle = XCreateSimpleWindow(context->xdisplay, DefaultRootWindow(context->xdisplay), 0, 0,
                                      currentWidth, currentHeight, 0, blackColor, blackColor);
         context->systemWindows[handle] = this;
@@ -141,6 +142,8 @@ namespace GameEngine
     }
     int LinuxSystemWindow::GetCurrentDpi()
     {
+        if (forceDPIValue != 0)
+            return forceDPIValue;
         char *resourceString = XResourceManagerString(GetLinuxApplicationContext()->xdisplay);
         XrmDatabase db;
         XrmValue value;

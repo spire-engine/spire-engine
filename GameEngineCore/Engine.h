@@ -30,6 +30,7 @@ namespace GameEngine
         int FramesPerSecond = 30;
         int RunForFrames = 0; // run for this many frames and then terminate
 		bool HeadlessMode = false;
+        int ForceDPI = 0;
     };
 	class EngineInitArguments
 	{
@@ -254,7 +255,8 @@ namespace GameEngine
 #if __GNUC__
 #pragma GCC diagnostic pop
 #endif
-			if (instance && instance->uiCommandForm && !instance->params.HeadlessMode)
+            bool uiCommandFormAvailable = instance && instance->uiCommandForm;
+            if (uiCommandFormAvailable)
 			{
 				instance->uiCommandForm->Write(printBuffer);
 				float timeElapsed = CoreLib::Diagnostics::PerformanceCounter::EndSeconds(lastUIUpdate);
@@ -264,7 +266,7 @@ namespace GameEngine
 					lastUIUpdate = CoreLib::Diagnostics::PerformanceCounter::Start();
 				}
 			}
-			else
+            if (instance->params.HeadlessMode || !uiCommandFormAvailable)
 			{
 #if __GNUC__
 #pragma GCC diagnostic push
