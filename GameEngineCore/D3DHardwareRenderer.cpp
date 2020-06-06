@@ -403,6 +403,8 @@ public:
     ID3D12Device *device = nullptr;
     ID3D12CommandQueue *queue = nullptr;
     ID3D12CommandQueue *transferQueue = nullptr;
+    int pendingCopyCount = 0;
+    D3DCommandList pendingCopyCommandLists;
 
     DescriptorHeap resourceDescHeap, rtvDescHeap, dsvDescHeap, samplerDescHeap;
     IDXGIFactory4 *dxgiFactory = nullptr;
@@ -475,6 +477,16 @@ public:
     D3DCommandList GetTempCommandList()
     {
         return GetCommandList(&tempCommandAllocatorManager, tempCommandLists, tempCommandListAllocPtr);
+    }
+
+    void FlushCopy()
+    {
+        if (pendingCopyCount)
+        {
+            pendingCopyCommandLists.Close();
+            transferQueue->ExecuteCommandLists(1, (ID3D12CommandList**)&pendingCopyCommandLists.list);
+            pendingCopyCount = 0;
+        }
     }
 
     ID3D12Resource *CreateBufferResource(size_t sizeInBytes, D3D12_HEAP_TYPE heapType,
@@ -718,16 +730,20 @@ public:
                 memcpy((char *)mappedStagingPtr + stagingOffset, data, size);
                 state.stagingBuffers[state.version]->Unmap(0, &range);
                 // Submit a copy command to GPU.
-                auto copyCommandList = state.GetCopyCommandList();
+                if (state.pendingCopyCount == 0)
+                    state.pendingCopyCommandLists = state.GetCopyCommandList();
+                auto &copyCommandList = state.pendingCopyCommandLists;
                 resourceBarriers.Clear();
                 buffer.TransferState(0, D3D12_RESOURCE_STATE_COPY_DEST, resourceBarriers);
                 if (resourceBarriers.Count())
                     copyCommandList->ResourceBarrier(resourceBarriers.Count(), resourceBarriers.Buffer());
                 copyCommandList->CopyBufferRegion(
                     buffer.resource, offset, state.stagingBuffers[state.version], stagingOffset, size);
-                CHECK_DX(copyCommandList.Close());
-                ID3D12CommandList *cmdList = copyCommandList.list;
-                state.transferQueue->ExecuteCommandLists(1, &cmdList);
+                state.pendingCopyCount++;
+                if (state.pendingCopyCount >= 16)
+                {
+                    state.FlushCopy();
+                }
                 return true;
             }
         }
@@ -2809,7 +2825,6 @@ class WindowSurface : public GameEngine::WindowSurface
 {
 public:
     WindowHandle windowHandle;
-    HANDLE waitObject;
     IDXGISwapChain3 *swapchain = nullptr;
     int w, h;
     void CreateSwapchain(int width, int height)
@@ -2818,7 +2833,7 @@ public:
         this->w = width;
         this->h = height;
         DXGI_SWAP_CHAIN_DESC1 desc = {};
-        desc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+        desc.Flags = 0;
         desc.Width = width;
         desc.Height = height;
         desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -2839,7 +2854,6 @@ public:
             state.queue, (HWND)windowHandle, &desc, nullptr, nullptr, &swapchain1));
         CHECK_DX(swapchain1->QueryInterface(IID_PPV_ARGS(&swapchain)));
         swapchain1->Release();
-        waitObject = swapchain->GetFrameLatencyWaitableObject();
     }
 
 public:
@@ -2864,7 +2878,7 @@ public:
         if ((width != w || height != h) && width > 1 && height > 1)
         {
             swapchain->ResizeBuffers(
-                3, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
+                3, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
             w = width;
             h = height;
         }
@@ -3101,6 +3115,7 @@ public:
     virtual void BeginJobSubmission() override
     {
         auto &state = RendererState::Get();
+        state.FlushCopy();
         if (state.resourceDescHeap.GetFreeTempSpace(state.version) < (state.resourceDescHeap.maxTempDescriptors >> 2))
         {
             state.Wait();
@@ -3118,6 +3133,8 @@ public:
         auto d3dframeBuffer = reinterpret_cast<FrameBuffer *>(frameBuffer);
 
         auto &state = RendererState::Get();
+        state.FlushCopy();
+
         if (barriers == PipelineBarriers::MemoryAndImage)
         {
             auto &pendingBarrierList = pendingBarriers[state.version];
@@ -3238,6 +3255,8 @@ public:
         int x, int y, int z, PipelineBarriers barriers) override
     {
         auto &state = RendererState::Get();
+        state.FlushCopy();
+
         auto cmdList = pendingCommands[renderThreadId];
         auto pipeline = reinterpret_cast<Pipeline *>(computePipeline);
         cmdList->SetPipelineState(pipeline->pipelineState);
@@ -3249,6 +3268,7 @@ public:
             cmdList->SetComputeRootDescriptorTable(rootIndex, descSet->resourceAddr.gpuHandle);
             rootIndex++;
         }
+        if (descSet->samplerCount)
         if (descSet->samplerCount)
         {
             cmdList->SetComputeRootDescriptorTable(rootIndex, descSet->samplerAddr.gpuHandle);
@@ -3341,7 +3361,6 @@ public:
         d3dfence->fence->SetEventOnCompletion(value, d3dfence->waitEvent);
         backBuffer->Release();
         CHECK_DX(d3dsurface->swapchain->Present(0, 0));
-        WaitForSingleObject(d3dsurface->waitObject, INFINITE);
     }
 
     void BlitImpl(ID3D12GraphicsCommandList *cmdList, GameEngine::Texture2D *dstImage, GameEngine::Texture2D *srcImage,
@@ -3375,7 +3394,7 @@ public:
         dstTexture->TransferState(0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, pendingBarrierList);
         if (pendingBarrierList.Count())
             cmdList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
-        cmdList->Dispatch(width, height, 1);
+        cmdList->Dispatch((width + 15) >> 4, (height + 15) >> 4, 1);
     }
 
     virtual void Blit(GameEngine::Texture2D *dstImage, GameEngine::Texture2D *srcImage, VectorMath::Vec2i destOffset,
@@ -3437,6 +3456,7 @@ public:
     virtual void ResetTempBufferVersion(int version) override
     {
         auto &state = RendererState::Get();
+        CORELIB_DEBUG_ASSERT(state.pendingCopyCount == 0);
         state.version = version;
         state.stagingBufferAllocPtr[state.version] = 0;
         state.tempCommandListAllocPtr[state.version] = 0;
