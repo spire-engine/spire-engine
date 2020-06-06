@@ -23,7 +23,7 @@ namespace GameEngine
     // Implemented in FontRasterizer-Generic.cpp
     OsFontRasterizer* CreateGenericFontRasterizer();
     // Implemented in SystemWindow-Linux.cpp
-    SystemWindow* CreateLinuxSystemWindow(UISystemBase* sysInterface, int log2BufferSize);
+    SystemWindow* CreateLinuxSystemWindow(UISystemBase* sysInterface, int log2BufferSize, int forceDPI);
     // Implemented in X11KeyCodeTranslater.cpp
     void InitKeyCodeTranslationTable(Display* display);
     void FreeKeyCodeTranslationTable();

@@ -387,9 +387,9 @@ namespace GameEngine
         Hide();
     }
 
-    SystemWindow* CreateLinuxSystemWindow(UISystemBase* sysInterface, int log2BufferSize)
+    SystemWindow* CreateLinuxSystemWindow(UISystemBase* sysInterface, int log2BufferSize, int forceDPI)
     {
-        return new LinuxSystemWindow(sysInterface, log2BufferSize);
+        return new LinuxSystemWindow(sysInterface, log2BufferSize, forceDPI);
     }
 }
 #endif
