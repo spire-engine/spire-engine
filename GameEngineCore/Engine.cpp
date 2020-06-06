@@ -126,8 +126,7 @@ namespace GameEngine
                 renderer->GetHardwareRenderer()->BeginJobSubmission();
 				uiSystemInterface->QueueDrawCommands(backgroundImage, sysWindow.Value, currentViewport, nullptr);
                 renderer->GetHardwareRenderer()->EndJobSubmission(nullptr);
-                if (sysWindow.Value->surface)
-					renderer->GetHardwareRenderer()->Present(sysWindow.Value->surface.Ptr(), sysWindow.Value->uiOverlayTexture.Ptr());
+                renderer->GetHardwareRenderer()->Present(sysWindow.Value->surface.Ptr(), sysWindow.Value->uiOverlayTexture.Ptr());
 			}
 			renderer->Wait();
 		}
@@ -389,8 +388,7 @@ namespace GameEngine
 			aggregateTime += renderingTimeDelta;
             if (sysWindow.Key->GetClientHeight() < 2)
                 continue;
-            if (sysWindow.Value->surface)
-				renderer->GetHardwareRenderer()->Present(sysWindow.Value->surface.Ptr(), sysWindow.Value->uiOverlayTexture.Ptr());
+            renderer->GetHardwareRenderer()->Present(sysWindow.Value->surface.Ptr(), sysWindow.Value->uiOverlayTexture.Ptr());
 		}
 
 		inDataTransfer = false;

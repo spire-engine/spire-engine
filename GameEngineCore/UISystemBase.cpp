@@ -794,8 +794,7 @@ namespace GameEngine
         
         rs->sysInterface = this;
         rs->hwRenderer = rendererApi;
-        if (handle->GetNativeHandle())
-            rs->surface = rendererApi->CreateSurface(handle->GetNativeHandle(), w, h);
+        rs->surface = rendererApi->CreateSurface(handle->GetNativeHandle(), w, h);
 
         rs->uiEntry = new GraphicsUI::UIEntry(w, h, rs.Ptr(), this);
         rs->uniformBuffer = rendererApi->CreateMappedBuffer(BufferUsage::UniformBuffer, sizeof(VectorMath::Matrix4));
