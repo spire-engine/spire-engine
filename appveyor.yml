@@ -79,6 +79,8 @@ after_build:
 
     7z a "$env:ENGINE_BINARY_ARCHIVE" .\ExampleGame\
 
+    Start-Process -FilePath ".\$($env:PLATFORM)\$($env:CONFIGURATION)\RenderTest.exe" -ArgumentList @("-bindir", ".\$($env:PLATFORM)\$($env:CONFIGURATION)", "-appveyor") -Wait
+
     7z a "$env:ENGINE_BINARY_ARCHIVE" .\0.bmp
 
     Set-Content -Path "RunGame.bat" -Value "GameEngine.exe -dir ExampleGame" -Encoding ASCII
