@@ -84,7 +84,8 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
     zMax = (params.invProjMatrix[2][2]*zMax + params.invProjMatrix[2][3]) / (params.invProjMatrix[3][2] * zMax + params.invProjMatrix[3][3]);
     float zMin = asfloat(sharedZMin);
     zMin = (params.invProjMatrix[2][2] * zMin + params.invProjMatrix[2][3]) / (params.invProjMatrix[3][2] * zMin + params.invProjMatrix[3][3]);
-	for (uint i = localThreadIndex; i < params.lightCount; i += THREAD_GROUP_SIZE)
+	[loop]
+    for (uint i = localThreadIndex; i < params.lightCount; i += THREAD_GROUP_SIZE)
 	{
 		float3 viewSpaceLightPos = mul(params.viewMatrix, float4(params.lights[i].position, 1.0f)).xyz;
         float radius = params.lights[i].radius;
@@ -109,7 +110,7 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
     GroupMemoryBarrierWithGroupSync();
 	
 	// step 4: classify light probes
-	
+	[loop]
 	for (uint i = localThreadIndex; i < params.lightProbeCount; i += THREAD_GROUP_SIZE)
 	{
 		float4 pos_rad = params.lightProbes[i].position_radius;
@@ -148,6 +149,7 @@ void cs_BuildTiledLightList(uint3 globalId : SV_DispatchThreadID, uint3 localId 
 	// step 5: write to output buffer
 	int numTilesX = (params.width + TILE_RES_X - 1) / TILE_RES_X;
 	uint tileOffset = (groupId.y * numTilesX + groupId.x)*LIGHT_LIST_MAX_SIZE;
+    [loop]
 	for (int i = localThreadIndex; i < min(max(lightIndexPtr, lightProbeIndexPtr) + 1, LIGHT_LIST_MAX_SIZE); i+= THREAD_GROUP_SIZE)
 		params.tiles[tileOffset + i] = lightList[i];
 }
