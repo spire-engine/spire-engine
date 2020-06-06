@@ -51,7 +51,7 @@ int wmain(int argc, const wchar_t** argv)
 {
     String binDir = "";
     String slnDir = "";
-    for (int i = 0; i < argc - 1; i++)
+    for (int i = 0; i < argc; i++)
     {
         if (String::FromWString(argv[i]) == "-bindir")
         {
@@ -96,7 +96,7 @@ int wmain(int argc, const wchar_t** argv)
                 if (actual.GetPixels()[i] != expected.GetPixels()[i])
                 {
                     diffCount++;
-                    if (diffCount > 50)
+                    if (diffCount > 200)
                     {
                         Fail("Smoke");
                         return -1;
