@@ -709,7 +709,6 @@ public:
             CHECK_DX(buffer.resource->Map(0, &range, &mappedPtr));
             memcpy((char *)mappedPtr + offset, data, size);
             buffer.resource->Unmap(0, &range);
-            buffer.subresourceStates[0] = D3D12_RESOURCE_STATE_COPY_DEST;
             return true;
         }
 
@@ -733,10 +732,6 @@ public:
                 if (state.pendingCopyCount == 0)
                     state.pendingCopyCommandLists = state.GetCopyCommandList();
                 auto &copyCommandList = state.pendingCopyCommandLists;
-                resourceBarriers.Clear();
-                buffer.TransferState(0, D3D12_RESOURCE_STATE_COPY_DEST, resourceBarriers);
-                if (resourceBarriers.Count())
-                    copyCommandList->ResourceBarrier(resourceBarriers.Count(), resourceBarriers.Buffer());
                 copyCommandList->CopyBufferRegion(
                     buffer.resource, offset, state.stagingBuffers[state.version], stagingOffset, size);
                 state.pendingCopyCount++;
@@ -764,15 +759,7 @@ public:
         ID3D12GraphicsCommandList *copyCmdList;
         CHECK_DX(state.device->CreateCommandList(
             0, D3D12_COMMAND_LIST_TYPE_DIRECT, state.largeCopyCmdListAllocator, nullptr, IID_PPV_ARGS(&copyCmdList)));
-        D3D12_RESOURCE_BARRIER barrier = {};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = buffer.resource;
-        barrier.Transition.Subresource = 0;
-        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-        copyCmdList->ResourceBarrier(1, &barrier);
         copyCmdList->CopyBufferRegion(buffer.resource, offset, stagingResource, 0, size);
-        buffer.subresourceStates[0] = D3D12_RESOURCE_STATE_COPY_DEST;
         ID3D12CommandList *cmdList = copyCmdList;
         CHECK_DX(copyCmdList->Close());
         state.queue->ExecuteCommandLists(1, &cmdList);
@@ -838,7 +825,7 @@ public:
         CHECK_DX(buffer.resource->Map(0, &range, &mappedPtr));
         mappedStart = offset;
         mappedEnd = offset + size;
-        return mappedPtr;
+        return (char*)mappedPtr + offset;
     }
     virtual void *Map() override
     {

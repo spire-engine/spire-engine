@@ -49,7 +49,6 @@
 #include <assert.h>
 
 #include "typedef.h"
-#include "memory.h"
 #include "IWelsVP.h"
 
 WELSVP_NAMESPACE_BEGIN

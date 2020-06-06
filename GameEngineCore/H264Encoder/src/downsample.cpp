@@ -32,6 +32,7 @@
 
 #include "downsample.h"
 #include "cpu.h"
+#include "memory.h"
 #include <assert.h>
 
 WELSVP_NAMESPACE_BEGIN

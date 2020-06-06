@@ -31,6 +31,7 @@
  */
 
 #include "imagerotate.h"
+#include "memory.h"
 
 WELSVP_NAMESPACE_BEGIN
 
