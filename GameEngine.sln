@@ -42,6 +42,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.clang-format = .clang-format
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderTest", "Tools\RenderTest\RenderTest.vcxproj", "{4D0DEE7A-428C-47AD-A9A8-FBFD3DF9B140}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -100,6 +102,10 @@ Global
 		{D0AB5219-F056-4966-B37A-5B04DD2DF9E3}.Debug|x64.Build.0 = Debug|x64
 		{D0AB5219-F056-4966-B37A-5B04DD2DF9E3}.Release|x64.ActiveCfg = Release|x64
 		{D0AB5219-F056-4966-B37A-5B04DD2DF9E3}.Release|x64.Build.0 = Release|x64
+		{4D0DEE7A-428C-47AD-A9A8-FBFD3DF9B140}.Debug|x64.ActiveCfg = Debug|x64
+		{4D0DEE7A-428C-47AD-A9A8-FBFD3DF9B140}.Debug|x64.Build.0 = Debug|x64
+		{4D0DEE7A-428C-47AD-A9A8-FBFD3DF9B140}.Release|x64.ActiveCfg = Release|x64
+		{4D0DEE7A-428C-47AD-A9A8-FBFD3DF9B140}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -114,6 +120,7 @@ Global
 		{11C0D805-6E17-4B9A-8A9F-729AF6B0E56A} = {2B999327-7CF3-4231-8141-B1ADC656C244}
 		{48E8DF09-B1DF-4218-A160-F0EC2A19708A} = {5CECF065-F300-4261-A45C-F80A7D8F4658}
 		{D0AB5219-F056-4966-B37A-5B04DD2DF9E3} = {2B999327-7CF3-4231-8141-B1ADC656C244}
+		{4D0DEE7A-428C-47AD-A9A8-FBFD3DF9B140} = {2B999327-7CF3-4231-8141-B1ADC656C244}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9CCF140A-BBBB-4014-8DC7-E2450AB99906}

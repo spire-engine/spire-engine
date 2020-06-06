@@ -86,9 +86,11 @@ namespace CoreLib
 #ifdef _WIN32
 			FILE * f;
 			_wfopen_s(&f, fileName.ToWString(), L"rb");
-			if (f)
+            if (f)
+            {
 				pixels = stbi_load_from_file(f, &width, &height, &channel, 4);
-			fclose(f);
+				fclose(f);
+            }
 #else
 			pixels = stbi_load(fileName.Buffer(), &width, &height, &channel, 4);
 #endif

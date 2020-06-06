@@ -48,6 +48,7 @@ namespace GameEngine
     {
     private:
         CoreLib::RefPtr<UIWindowContext> uiContext;
+        int forceDPIValue;
     protected:
         virtual void Create() override;
         void WindowResized(CoreLib::Object* sender, CoreLib::WinForm::EventArgs e);
@@ -56,7 +57,7 @@ namespace GameEngine
     protected:
         int ProcessMessage(CoreLib::WinForm::WinMessage & msg) override;
     public:
-        Win32SystemWindow(UISystemBase * sysInterface, int log2UIBufferSize);
+        Win32SystemWindow(UISystemBase * sysInterface, int log2UIBufferSize, int forceDPI);
         ~Win32SystemWindow();
         virtual GraphicsUI::UIEntry * GetUIEntry() override;
         virtual GraphicsUI::UIWindowContext * GetUIContext() override

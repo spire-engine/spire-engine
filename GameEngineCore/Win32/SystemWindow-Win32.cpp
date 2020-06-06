@@ -11,10 +11,11 @@ namespace GameEngine
     using namespace CoreLib;
     using namespace VectorMath;
     
-    Win32SystemWindow::Win32SystemWindow(UISystemBase * psysInterface, int log2UIBufferSize)
+    Win32SystemWindow::Win32SystemWindow(UISystemBase * psysInterface, int log2UIBufferSize, int forceDPI)
     {
         Create();
         this->wantChars = true;
+        this->forceDPIValue = forceDPI;
         this->uiContext = psysInterface->CreateWindowContext(this, GetClientWidth(), GetClientHeight(), log2UIBufferSize);
         OnResized.Bind(this, &Win32SystemWindow::WindowResized);
         OnResizing.Bind(this, &Win32SystemWindow::WindowResizing);
@@ -32,6 +33,8 @@ namespace GameEngine
 
     int Win32SystemWindow::GetCurrentDpi()
     {
+        if (forceDPIValue != 0)
+            return forceDPIValue;
         return Win32UISystem::GetCurrentDpi(handle);
     }
    
@@ -67,7 +70,11 @@ namespace GameEngine
         {
             auto sysInterface = dynamic_cast<Win32UISystem*>(engine->GetUISystemInterface());
             if (sysInterface)
+            {
+                if (forceDPIValue != 0 && msg.message == WM_DPICHANGED)
+                    return 0;
                 rs = sysInterface->HandleSystemMessage(dynamic_cast<SystemWindow*>(this), msg.message, msg.wParam, msg.lParam);
+            }
         }
         if (rs == -1)
             return BaseForm::ProcessMessage(msg);

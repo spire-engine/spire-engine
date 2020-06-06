@@ -30,7 +30,7 @@ install:
 
     {
         "ExampleGame directory not found, downloading..."
-        appveyor DownloadFile "https://github.com/spire-engine/spire-engine/releases/download/v0.22/ExampleGame.zip"
+        appveyor DownloadFile "https://github.com/spire-engine/spire-engine/releases/download/v0.23/ExampleGame.zip"
         # Unzip.
         Expand-Archive -Path $fileName -DestinationPath '.\'
 
@@ -85,23 +85,8 @@ after_build:
 
 test_script:
 - ps: >-
-    Start-Process -FilePath ".\$($env:PLATFORM)\$($env:CONFIGURATION)\GameEngine.exe" -ArgumentList @("-enginedir", "EngineContent", "-dir", "ExampleGame", "-no_renderer", "-headless", "-runforframes", "3") -Wait
+    Start-Process -FilePath ".\$($env:PLATFORM)\$($env:CONFIGURATION)\RenderTest.exe" -ArgumentList @("-slndir", ".", "-bindir", ".\$($env:PLATFORM)\$($env:CONFIGURATION)", "-appveyor") -Wait
 
-    $Matches = Select-String -Path "rendercommands.txt" -Pattern "Present" -AllMatches
-
-    if ($Matches.Matches.Count -eq 3)
-
-    {
-      Remove-Item rendercommands.txt
-      appveyor AddTest "Smoke" -FileName "Smoke" -Framework "SpireEngineTest" -Outcome "Passed"
-    }
-
-    else
-
-    {
-      "failed test 'Integration Test'"
-      appveyor AddTest "Smoke" -FileName "Smoke" -Framework "SpireEngineTest" -Outcome "Failed"
-    }
 artifacts:
 - path: $(ENGINE_BINARY_ARCHIVE)
   name: binary_archive

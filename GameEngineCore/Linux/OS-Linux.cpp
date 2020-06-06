@@ -23,7 +23,7 @@ namespace GameEngine
     // Implemented in FontRasterizer-Generic.cpp
     OsFontRasterizer* CreateGenericFontRasterizer();
     // Implemented in SystemWindow-Linux.cpp
-    SystemWindow* CreateLinuxSystemWindow(UISystemBase* sysInterface, int log2BufferSize);
+    SystemWindow* CreateLinuxSystemWindow(UISystemBase* sysInterface, int log2BufferSize, int forceDPI);
     // Implemented in X11KeyCodeTranslater.cpp
     void InitKeyCodeTranslationTable(Display* display);
     void FreeKeyCodeTranslationTable();
@@ -118,7 +118,7 @@ namespace GameEngine
         appContext.terminate = true;
     }
 
-    SystemWindow* OsApplication::CreateSystemWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize)
+    SystemWindow* OsApplication::CreateSystemWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize, int forceDPI)
     {
         if (!appContext.xdisplay)
         {
@@ -131,7 +131,7 @@ namespace GameEngine
             if (!appContext.xdisplay)
                 printf("Failed to open XDisplay.\n");
         }
-        auto rs = CreateLinuxSystemWindow(dynamic_cast<UISystemBase*>(sysInterface), log2BufferSize);
+        auto rs = CreateLinuxSystemWindow(dynamic_cast<UISystemBase *>(sysInterface), log2BufferSize, forceDPI);
         rs->GetUIEntry()->BackColor = GraphicsUI::Color(50, 50, 50);
         return dynamic_cast<SystemWindow*>(rs);
     }

@@ -92,6 +92,10 @@ int __stdcall wWinMain(
 				appParams.EnableVideoCapture = true;
 				appParams.FramesPerSecond = (int)StringToInt(parser.GetOptionValue("-recfps"));
 			}
+            if (parser.OptionExists("-forcedpi"))
+            {
+                appParams.ForceDPI = (int)StringToInt(parser.GetOptionValue("-forcedpi"));
+            }
 			if (parser.OptionExists("-no_console"))
 				args.NoConsole = true;
 			if (parser.OptionExists("-headless"))

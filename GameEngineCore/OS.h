@@ -172,7 +172,8 @@ namespace GameEngine
         static CoreLib::Text::CommandLineParser commandlineParser;
     public:
         static GraphicsUI::ISystemInterface* CreateUISystemInterface(HardwareRenderer * renderer);
-        static SystemWindow* CreateSystemWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize);
+        static SystemWindow *CreateSystemWindow(
+            GraphicsUI::ISystemInterface *sysInterface, int log2BufferSize, int forceDPI = 0);
         static SystemWindow* CreateDummyWindow(GraphicsUI::ISystemInterface* sysInterface, int log2BufferSize);
         static OsTimer* CreateTimer();
         static OsFontRasterizer* CreateFontRasterizer();

@@ -2832,6 +2832,8 @@ public:
         auto &state = RendererState::Get();
         this->w = width;
         this->h = height;
+        if (!windowHandle)
+            return;
         DXGI_SWAP_CHAIN_DESC1 desc = {};
         desc.Flags = 0;
         desc.Width = width;
@@ -2875,6 +2877,8 @@ public:
     }
     virtual void Resize(int width, int height) override
     {
+        if (!windowHandle)
+            return;
         if ((width != w || height != h) && width > 1 && height > 1)
         {
             swapchain->ResizeBuffers(
@@ -3313,8 +3317,11 @@ public:
 
     virtual void Present(GameEngine::WindowSurface *surface, GameEngine::Texture2D *srcImage) override
     {
-        auto &state = RendererState::Get();
         auto d3dsurface = reinterpret_cast<WindowSurface *>(surface);
+        if (!d3dsurface->swapchain)
+            return;
+
+        auto &state = RendererState::Get();
         auto srcTexture = reinterpret_cast<D3DTexture *>(srcImage->GetInternalPtr());
         auto bufferIndex = d3dsurface->swapchain->GetCurrentBackBufferIndex();
         ID3D12Resource *backBuffer = nullptr;

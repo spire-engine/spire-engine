@@ -124,7 +124,8 @@ namespace GameEngine
         if (w == 0 || h == 0)
             return;
         hwRenderer->Wait();
-        surface->Resize(w, h);
+        if (surface)
+            surface->Resize(w, h);
         uiEntry->Posit(0, 0, w, h);
         uiOverlayTexture = hwRenderer->CreateTexture2D("uiOverlayTexture",
             (TextureUsage)((int)TextureUsage::SampledColorAttachment | (int)TextureUsage::Storage), w, h, 1,

@@ -27,6 +27,7 @@ namespace GameEngine
     private:
         CoreLib::RefPtr<UIWindowContext> uiContext;
         uint32_t handle;
+        int forceDPIValue = 0;
         bool visible = false;
 
     public:
@@ -37,7 +38,7 @@ namespace GameEngine
         bool isEnabled = true;
 
     public:
-        LinuxSystemWindow(UISystemBase* sysInterface, int log2UIBufferSize);
+        LinuxSystemWindow(UISystemBase* sysInterface, int log2UIBufferSize, int forceDPI);
         ~LinuxSystemWindow();
         virtual GraphicsUI::UIEntry* GetUIEntry() override;
         virtual GraphicsUI::UIWindowContext* GetUIContext() override
