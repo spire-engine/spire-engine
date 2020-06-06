@@ -3375,7 +3375,7 @@ public:
         dstTexture->TransferState(0, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, pendingBarrierList);
         if (pendingBarrierList.Count())
             cmdList->ResourceBarrier(pendingBarrierList.Count(), pendingBarrierList.Buffer());
-        cmdList->Dispatch(width, height, 1);
+        cmdList->Dispatch(width >> 4, height >> 4, 1);
     }
 
     virtual void Blit(GameEngine::Texture2D *dstImage, GameEngine::Texture2D *srcImage, VectorMath::Vec2i destOffset,
