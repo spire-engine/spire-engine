@@ -260,7 +260,7 @@ namespace GameEngine
 			{
 				instance->uiCommandForm->Write(printBuffer);
 				float timeElapsed = CoreLib::Diagnostics::PerformanceCounter::EndSeconds(lastUIUpdate);
-				if (timeElapsed > 0.2f)
+                if (timeElapsed > 0.2f && !instance->params.HeadlessMode)
 				{
 					instance->RefreshUI();
 					lastUIUpdate = CoreLib::Diagnostics::PerformanceCounter::Start();
