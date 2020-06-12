@@ -29,13 +29,15 @@ float3 ProjSpaceToWorldSpace(float3 p)
 [numthreads(16, 16, 1)]
 void cs_SSAO(uint3 threadId : SV_DispatchThreadID, uint3 localId : SV_GroupThreadID)
 {
-    float thisZ = params.inputTexture.Load(threadId).x;
+    int inputBufferAddrScale = 2;
+
+    float thisZ = params.inputTexture.Load(threadId * inputBufferAddrScale).x;
     float invWidth = 1.0f / params.width;
     float invHeight = 1.0f / params.height;
     float2 invXY = float2(invWidth, invHeight);
     float3 thisWorldPos = ProjSpaceToWorldSpace(float3(threadId.xy * invXY, thisZ));
-    float z_x1 = params.inputTexture.Load(threadId + int3(1, 0, 0)).x;
-    float z_x2 = params.inputTexture.Load(threadId + int3(-1, 0, 0)).x;
+    float z_x1 = params.inputTexture.Load(threadId * inputBufferAddrScale + int3(1, 0, 0)).x;
+    float z_x2 = params.inputTexture.Load(threadId * inputBufferAddrScale + int3(-1, 0, 0)).x;
     float3 viewPos_x;
     float flip = 1.0;
     if (abs(z_x1 - thisZ) < abs(z_x2 - thisZ))
@@ -46,8 +48,8 @@ void cs_SSAO(uint3 threadId : SV_DispatchThreadID, uint3 localId : SV_GroupThrea
         viewPos_x = float3((threadId.xy + int2(-1, 0)) * invXY, z_x2);
     }
 
-    float z_y1 = params.inputTexture.Load(threadId + int3(0, 1, 0)).x;
-    float z_y2 = params.inputTexture.Load(threadId + int3(0, -1, 0)).x;
+    float z_y1 = params.inputTexture.Load(threadId * inputBufferAddrScale + int3(0, 1, 0)).x;
+    float z_y2 = params.inputTexture.Load(threadId * inputBufferAddrScale + int3(0, -1, 0)).x;
     float3 viewPos_y;
     if (abs(z_y1 - thisZ) < abs(z_y2 - thisZ))
         viewPos_y = float3((threadId.xy + int2(0, 1)) * invXY, z_y1);
@@ -71,7 +73,7 @@ void cs_SSAO(uint3 threadId : SV_DispatchThreadID, uint3 localId : SV_GroupThrea
             float3 newPos = thisWorldPos + dir * (params.aoRadius * 0.125f * j);
             float4 projNewPos = mul(params.ProjMatrix, float4(newPos, 1.0));
             projNewPos.xyz *= 1.0f / projNewPos.w;
-            float thatZ = params.inputTexture.Load(int3((projNewPos.xy*0.5+0.5)*float2(params.width, params.height), 0)).x;
+            float thatZ = params.inputTexture.Load(int3((projNewPos.xy*0.5+0.5)*float2(params.width, params.height)*inputBufferAddrScale, 0)).x;
             if (thatZ < projNewPos.z)
             {
                 float thatZViewSpace = DepthZToWorldZ(thatZ);
