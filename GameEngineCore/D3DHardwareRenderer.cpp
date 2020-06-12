@@ -527,6 +527,7 @@ public:
     }
     void Wait()
     {
+        FlushCopy();
         auto value = InterlockedIncrement(&waitFenceValue);
         if (waitFences[renderThreadId] == nullptr)
         {
@@ -762,6 +763,7 @@ public:
         copyCmdList->CopyBufferRegion(buffer.resource, offset, stagingResource, 0, size);
         ID3D12CommandList *cmdList = copyCmdList;
         CHECK_DX(copyCmdList->Close());
+        state.Wait();
         state.queue->ExecuteCommandLists(1, &cmdList);
         state.Wait();
         copyCmdList->Release();

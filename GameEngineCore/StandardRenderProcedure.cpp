@@ -208,8 +208,8 @@ namespace GameEngine
 
             if (postProcess)
             {
-                aoRenderTarget = viewRes->LoadSharedRenderTarget("ao", StorageFormat::RG_8, 1.0f, 1024, 1024, true);
-                aoBlurTarget = viewRes->LoadSharedRenderTarget("aoBlur", StorageFormat::RG_8, 1.0f, 1024, 1024, true);
+                aoRenderTarget = viewRes->LoadSharedRenderTarget("ao", StorageFormat::RG_8, 0.5f, 1024, 1024, true);
+                aoBlurTarget = viewRes->LoadSharedRenderTarget("aoBlur", StorageFormat::RG_8, 0.5f, 1024, 1024, true);
 
                 toneMappingFromAtmospherePass = CreateToneMappingPostRenderPass(viewRes);
                 toneMappingFromAtmospherePass->SetSource(MakeArray(
@@ -457,23 +457,22 @@ namespace GameEngine
                 ssaoBindings.Add(ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage));
                 ssaoBindings.Add(ResourceBinding(randomDirectionBuffer.Ptr(), 0, -1, true));
 
-                ssaoUniforms.width = w;
-                ssaoUniforms.height = h;
+                aoRenderTarget->Texture->GetSize(ssaoUniforms.width, ssaoUniforms.height);
                 ssaoUniforms.ProjMatrix = mainProjMatrix;
                 ssaoUniforms.InvProjMatrix = invProjMatrix;
 
                 ssaoComputeTaskInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
-                ssaoComputeTaskInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
+                ssaoComputeTaskInstance->Queue((ssaoUniforms.width + 15) / 16, (ssaoUniforms.height + 15) / 16, 1);
 
                 ssaoBindings[0] = ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture);
                 ssaoBindings[1] = ResourceBinding(aoBlurTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage);
                 ssaoBlurXInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
-                ssaoBlurXInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
+                ssaoBlurXInstance->Queue((ssaoUniforms.width + 15) / 16, (ssaoUniforms.height + 15) / 16, 1);
 
                 ssaoBindings[0] = ResourceBinding(aoBlurTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture);
                 ssaoBindings[1] = ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::StorageImage);
                 ssaoBlurYInstance->UpdateVersionedParameters(&ssaoUniforms, sizeof(ssaoUniforms), ssaoBindings.GetArrayView());
-                ssaoBlurYInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
+                ssaoBlurYInstance->Queue((ssaoUniforms.width + 15) / 16, (ssaoUniforms.height + 15) / 16, 1);
             }
 
             // build tiled light list
@@ -513,9 +512,10 @@ namespace GameEngine
             if (ssaoEnabled)
             {
                 // composite AO with lit buffer
-                Array<ResourceBinding, 2> aoCompositeBindings;
+                Array<ResourceBinding, 3> aoCompositeBindings;
                 aoCompositeBindings.Add(ResourceBinding(aoRenderTarget->Texture.Ptr(), ResourceBinding::BindingType::Texture));
                 aoCompositeBindings.Add(ResourceBinding(textures[0],ResourceBinding::BindingType::StorageImage));
+                aoCompositeBindings.Add(ResourceBinding(sharedRes->linearClampedSampler.Ptr()));
                 ssaoCompositeInstance->UpdateVersionedParameters(nullptr, 0, aoCompositeBindings.GetArrayView());
                 ssaoCompositeInstance->Queue((w + 15) / 16, (h + 15) / 16, 1);
             }

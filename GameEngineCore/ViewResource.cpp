@@ -19,6 +19,7 @@ namespace GameEngine
 		result->Format = format;
 		result->UseFixedResolution = ratio == 0.0f;
         result->EnableUseAsStorageImage = useAsStorage;
+        result->ResolutionScale = ratio;
 		if (screenWidth > 0 || result->UseFixedResolution)
 		{
 			if (ratio == 0.0f)
