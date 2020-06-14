@@ -64,6 +64,7 @@ void cs_SSAO(uint3 threadId : SV_DispatchThreadID, uint3 localId : SV_GroupThrea
     float3 tangent = normalize(worldPos1 - thisWorldPos);
     float3 binormal = cross(tangent, normal);
     float occlusion = 0.0f;
+
     for (int i = 0; i < 8; i++)
     {
         float3 dir = params.randomDirections[i * 256 + localId.y * 16 + localId.x].xyz;
