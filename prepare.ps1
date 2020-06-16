@@ -19,7 +19,7 @@ if (-NOT ((Test-path '.\ExternalLibs\Slang\') -AND (Test-Path "x64\Debug\slang.d
 {
     "Downloading Slang..."
     New-Item -ItemType directory -Path .\ExternalLibs\Slang\ | Out-Null
-    Invoke-WebRequest -Uri "https://github.com/shader-slang/slang/releases/download/v0.15.10/slang-0.15.10-win64.zip" -OutFile 'slang-x64.zip'
+    Invoke-WebRequest -Uri "https://github.com/shader-slang/slang/releases/download/v0.15.12/slang-0.15.12-win64.zip" -OutFile 'slang-x64.zip'
     Expand-Archive -Path "slang-x64.zip" -DestinationPath '.\ExternalLibs\Slang\' -Force
     Remove-Item 'slang-x64.zip'
   
