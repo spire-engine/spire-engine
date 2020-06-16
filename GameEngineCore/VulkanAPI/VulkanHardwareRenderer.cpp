@@ -179,6 +179,9 @@ namespace VK
 		vk::DescriptorSet emptyDescriptorSet;
 		vk::CommandPool swapchainCommandPool;
 		CoreLib::Array<vk::CommandPool, MaxRenderThreads> renderCommandPools;
+        vk::CommandBuffer copyCommandBuffer;
+        vk::Buffer sharedStagingBuffer;
+		int pendingBytesToCopy = 0;
         CoreLib::Array<CoreLib::RefPtr<CoreLib::List<CoreLib::List<vk::CommandBuffer>>>, MaxRenderThreads> renderCommandBufferPools;
         int currentBufferVersions[MaxRenderThreads] = {};
         int renderCommandBufferAllocPtrs[MaxRenderThreads] = {};
@@ -571,6 +574,73 @@ namespace VK
 		{
 			return State().instance;
 		}
+
+		
+		static void UploadBufferData(vk::Buffer buffer, int offset, void *data, int size)
+        {
+			if (size == 0)
+				return;
+
+            CORELIB_DEBUG_ASSERT(size % 4 == 0);
+            CORELIB_DEBUG_ASSERT(offset % 4 == 0);
+
+            auto &state = State();
+            constexpr int MaxDataSizePerCopyCommand = 65536;
+
+			if (state.pendingBytesToCopy == 0)
+            {
+                state.copyCommandBuffer = RendererState::GetTempTransferCommandBuffer();
+                // Record command buffer
+                vk::CommandBufferBeginInfo transferBeginInfo =
+                    vk::CommandBufferBeginInfo()
+                        .setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
+                        .setPInheritanceInfo(nullptr);
+                // Transfer the data in chunks of <= 65536 bytes
+                state.copyCommandBuffer.begin(transferBeginInfo);
+            }
+            int remainingSize = size;
+            int dataOffset = 0;
+            while (remainingSize > MaxDataSizePerCopyCommand)
+            {
+                state.copyCommandBuffer.updateBuffer(
+                    buffer, offset + dataOffset, MaxDataSizePerCopyCommand, static_cast<char *>(data) + dataOffset);
+                remainingSize -= MaxDataSizePerCopyCommand;
+                dataOffset += MaxDataSizePerCopyCommand;
+            }
+            state.copyCommandBuffer.updateBuffer(
+                buffer, offset + dataOffset, remainingSize, static_cast<char *>(data) + dataOffset);
+			state.pendingBytesToCopy += size;
+            MaybeFlushCopy();
+        }
+
+		static void MaybeFlushCopy()
+        {
+            auto &state = State();
+            if (state.pendingBytesToCopy > (1<<16))
+            {
+                FlushCopy();
+            }
+        }
+
+		static void FlushCopy()
+        {
+            auto &state = State();
+            if (state.pendingBytesToCopy)
+            {
+                state.copyCommandBuffer.end();
+                // Submit to queue
+                vk::SubmitInfo transferSubmitInfo = vk::SubmitInfo()
+                                                        .setWaitSemaphoreCount(0)
+                                                        .setPWaitSemaphores(nullptr)
+                                                        .setPWaitDstStageMask(nullptr)
+                                                        .setCommandBufferCount(1)
+                                                        .setPCommandBuffers(&state.copyCommandBuffer)
+                                                        .setSignalSemaphoreCount(0)
+                                                        .setPSignalSemaphores(nullptr);
+                RendererState::TransferQueue().submit(transferSubmitInfo, vk::Fence());
+				state.pendingBytesToCopy = 0;
+            }
+        }
 
 		static vk::DescriptorSet GetEmptyDescriptorSet()
 		{
@@ -2343,41 +2413,7 @@ namespace VK
 			// Otherwise, we need to use command buffers
 			else
 			{
-				// Create command buffer
-			
-				vk::CommandBuffer transferCommandBuffer = RendererState::GetTempTransferCommandBuffer();
-
-				assert(psize % 4 == 0);
-				assert(offset % 4 == 0);
-
-				// Record command buffer
-				vk::CommandBufferBeginInfo transferBeginInfo = vk::CommandBufferBeginInfo()
-					.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
-					.setPInheritanceInfo(nullptr);
-
-				// Transfer the data in chunks of <= 65536 bytes
-				transferCommandBuffer.begin(transferBeginInfo);
-				int remainingSize = psize;
-				int dataOffset = 0;
-				while (remainingSize > 65536)
-				{
-					transferCommandBuffer.updateBuffer(this->buffer, offset + dataOffset, 65536, static_cast<char*>(data) + dataOffset);
-					remainingSize -= 65536;
-					dataOffset += 65536;
-				}
-				transferCommandBuffer.updateBuffer(this->buffer, offset + dataOffset, remainingSize, static_cast<char*>(data) + dataOffset);
-				transferCommandBuffer.end();
-
-				// Submit to queue
-				vk::SubmitInfo transferSubmitInfo = vk::SubmitInfo()
-					.setWaitSemaphoreCount(0)
-					.setPWaitSemaphores(nullptr)
-					.setPWaitDstStageMask(nullptr)
-					.setCommandBufferCount(1)
-					.setPCommandBuffers(&transferCommandBuffer)
-					.setSignalSemaphoreCount(0)
-					.setPSignalSemaphores(nullptr);
-				RendererState::TransferQueue().submit(transferSubmitInfo, vk::Fence());
+                RendererState::UploadBufferData(this->buffer, offset, data, psize);
 			}
 		}
 		void SetData(int offset, void* data, int psize)
@@ -4373,6 +4409,7 @@ namespace VK
 
         virtual void BeginJobSubmission() override
         {
+            RendererState::FlushCopy();
             // Create command buffer begin info
             vk::CommandBufferBeginInfo primaryBeginInfo = vk::CommandBufferBeginInfo()
                 .setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
@@ -4405,7 +4442,9 @@ namespace VK
 					.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
                 cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
                     vk::PipelineStageFlagBits::eAllCommands,
-					vk::DependencyFlags(), 1, &memBarrier, 0, nullptr, imageMemoryBarriers.Count(), imageMemoryBarriers.Buffer());
+					vk::DependencyFlags(), 
+					1, &memBarrier,
+					0, nullptr, imageMemoryBarriers.Count(), imageMemoryBarriers.Buffer());
 			}
 			else if (barriers == PipelineBarriers::ExecutionOnly)
 			{
@@ -4419,6 +4458,7 @@ namespace VK
 			int x, int y, int z, PipelineBarriers barriers) override
         {
 			std::lock_guard<std::mutex> lock(queueMutex);
+            RendererState::FlushCopy();
 			taskId++;
 			imageMemoryBarriers.Clear();
 			if (barriers == PipelineBarriers::MemoryAndImage)
@@ -4449,6 +4489,7 @@ namespace VK
 			PipelineBarriers barriers) override
 		{
 			std::lock_guard<std::mutex> lock(queueMutex);
+            RendererState::FlushCopy();
 			taskId++;
 			imageMemoryBarriers.Clear();
 			auto vkframeBuffer = (VK::FrameBuffer*)frameBuffer;
@@ -4520,12 +4561,14 @@ namespace VK
 
 		virtual void Wait() override
 		{
+            RendererState::FlushCopy();
 			RendererState::Device().waitIdle();
 		}
         virtual void Blit(GameEngine::Texture2D *dstImage, GameEngine::Texture2D *srcImage, VectorMath::Vec2i dstOffset,
             SourceFlipMode flipSrc) override
 		{
-            auto primaryBuffer = jobSubmissionBuffers[renderThreadId];
+            RendererState::FlushCopy();
+			auto primaryBuffer = jobSubmissionBuffers[renderThreadId];
 
 			vk::ImageSubresourceRange imageSubresourceRange = vk::ImageSubresourceRange()
 				.setAspectMask(vk::ImageAspectFlagBits::eColor)

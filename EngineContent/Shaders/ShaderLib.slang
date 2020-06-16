@@ -131,7 +131,6 @@ struct StaticMeshTransform : IWorldSpaceTransform
 
 struct SkeletalAnimationTransform : IWorldSpaceTransform
 {
-    //uint4 lightmapId;
     float4x4 worldMat;
     float4 boneTransforms[90 * 2]; // dual quaternions
     uint4 blendShapeVertexStart[MAX_BLEND_SHAPES / 4];
@@ -583,29 +582,10 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
 			float shadow = selfShadow.get(lightEnv.sunLightDir);
             if (lightEnv.numCascades)
             {
-#if 1
-                bool terminated = false;
-                #define CASCADE_LOOP_BODY(i) \
-					if (!terminated && (-viewPos.z < lightEnv.zPlanes[i>>2][i&3])) \
-					{ \
-						float4 lightSpacePosT = mul(lightEnv.lightMatrix[i], float4(shadingPoint.vertPos, 1.0));\
-						shadow = lightEnv.shadowMapArray.SampleCmp(lightEnv.shadowMapSampler,  \
-						    float3(ProjCoordToUV(lightSpacePosT.xy / lightSpacePosT.w), i+lightEnv.shadowMapId), lightSpacePosT.z / lightSpacePosT.w);\
-                        terminated = true;\
-					} \
-                    terminated = terminated || i >= lightEnv.numCascades; 
-                CASCADE_LOOP_BODY(0)
-                CASCADE_LOOP_BODY(1)
-                CASCADE_LOOP_BODY(2)
-                CASCADE_LOOP_BODY(3)
-                CASCADE_LOOP_BODY(4)
-                CASCADE_LOOP_BODY(5)
-                CASCADE_LOOP_BODY(6)
-                CASCADE_LOOP_BODY(7)
-#else
                 [loop]
-                for (int i = 0; i < lightEnv.numCascades; i++)
+                for (int i = 0; i < 8; i++)
                 {
+                    if (i >= lightEnv.numCascades) break;
                     if (-viewPos.z < lightEnv.zPlanes[i >> 2][i & 3])
                     {
                         float4 lightSpacePosT = mul(lightEnv.lightMatrix[i], float4(shadingPoint.vertPos, 1.0));
@@ -614,7 +594,6 @@ struct PbrMaterialPattern<TSelfShadow : ISelfShadow> : IMaterialPattern
                         break;
                     }
                 }
-#endif
             }
 			float NoV = max(dot(lNormal, view), 0.0);
 			float3 fspecularColor = specularColor;//EnvBRDFApprox(specularColor, roughness, NoV);
